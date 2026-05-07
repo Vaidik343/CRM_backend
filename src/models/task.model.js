@@ -10,6 +10,10 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
         allowNull: false,
       },
+      call_id: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
       task: {
          type: DataTypes.STRING,
         allowNull: false,

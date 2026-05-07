@@ -1,8 +1,9 @@
 const { body, param } = require("express-validator");
-const { Task, User } = require("../models");
+const { Task, User, Call  } = require("../models");
 const { handleValidation } = require("../utils/validate");
 
 const createTaskValidators = [
+  body("call_id").optional({ nullable: true }).isUUID(),
   body("task").isString().trim().notEmpty(),
   body("description").optional({ nullable: true }).isString(),
   body("assigned_to").isUUID(),
@@ -27,7 +28,7 @@ const taskIncludes = [
 
 const createTask = async(req, res) => {
   try {
-    const { task, description, assigned_to, due_date } = req.body;
+    const {call_id , task, description, assigned_to, due_date } = req.body;
 
     const assignee = await User.findByPk(assigned_to);
     if (!assignee) return res.status(404).json({ message: "Assignee not found" });
@@ -36,6 +37,7 @@ const createTask = async(req, res) => {
     const status = assigned_to === req.user.id ? "ongoing" : "open";
 
     const newTask = await Task.create({
+      call_id: call_id || null,
       task,
       description: description || null,
       assigned_to,

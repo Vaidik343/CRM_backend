@@ -29,6 +29,10 @@
  *           type: string
  *           format: uuid
  *           description: ID of the user who assigned the task
+ *         call_id:
+ *           type: string
+ *           format: uuid
+ *           description: Optional associated call ID
  *         assignee:
  *           type: object
  *           properties:
@@ -98,6 +102,10 @@
  *                 type: string
  *                 format: uuid
  *                 description: ID of user to assign task to
+ *               call_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Optional associated call ID
  *               due_date:
  *                 type: string
  *                 format: date-time
@@ -213,6 +221,9 @@
  *                 type: string
  *               description:
  *                 type: string
+ *               call_id:
+ *                 type: string
+ *                 format: uuid
  *               due_date:
  *                 type: string
  *                 format: date
