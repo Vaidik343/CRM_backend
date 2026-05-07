@@ -1,10 +1,10 @@
 const { DataTypes } = require("sequelize");
-const { sequelize } = require("../config/database");
+const { sequelize } = require("../config/db");
 
 // ── Initialize models ─────────────────────────────────────────
 const User       = require("./user.model")(sequelize, DataTypes);
 const Role       = require("./role.model")(sequelize, DataTypes);
-const Permission = require("./permission..model")(sequelize, DataTypes);
+const Permission = require("./permission.model")(sequelize, DataTypes);
 const Project    = require("./project.model")(sequelize, DataTypes);
 const Call       = require("./call.model")(sequelize, DataTypes);
 const Task       = require("./task.model")(sequelize, DataTypes);

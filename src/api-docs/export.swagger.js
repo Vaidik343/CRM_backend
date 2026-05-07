@@ -7,7 +7,7 @@
 
 /**
  * @swagger
- * /export:
+ * /api/export:
  *   get:
  *     summary: Export data to Excel
  *     description: Export calls, tasks, or work logs to Excel file format (Admin only)

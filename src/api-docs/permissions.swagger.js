@@ -40,7 +40,7 @@
 
 /**
  * @swagger
- * /permissions:
+ * /api/permissions:
  *   get:
  *     summary: Get all user permissions
  *     description: Retrieve list of all users with their permissions (Admin only)
@@ -96,7 +96,7 @@
 
 /**
  * @swagger
- * /permissions/{user_id}:
+ * /api/permissions/{user_id}:
  *   get:
  *     summary: Get user permission by user ID
  *     description: Retrieve permission record for a specific user (Admin only)
@@ -132,7 +132,7 @@
 
 /**
  * @swagger
- * /permissions/{user_id}:
+ * /api/permissions/{user_id}:
  *   patch:
  *     summary: Update user permissions
  *     description: Update permission flags for a user (Admin only). Creates default permission record if not exists.
@@ -187,7 +187,7 @@
 
 /**
  * @swagger
- * /permissions/{user_id}/reset:
+ * /api/permissions/{user_id}/reset:
  *   patch:
  *     summary: Reset user permissions to default
  *     description: Reset permissions to default values (can_read=true, can_write=true, can_update=false, can_delete=false). Admin only.

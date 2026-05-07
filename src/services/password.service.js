@@ -1,9 +1,9 @@
 const crypto = require("crypto");
 
-function generateTempPassword() {
-  // 12-char base64url, readable enough for sharing once.
-  return crypto.randomBytes(9).toString("base64url");
+function generateTempPassword(name) {
+  const prefix = name.trim().slice(0, 3).toLowerCase();
+  const digits = Math.floor(1000 + crypto.randomInt(9000)).toString();
+  return `${prefix}${digits}`;
 }
 
 module.exports = { generateTempPassword };
-

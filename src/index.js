@@ -6,11 +6,26 @@ const { connectDB } = require("./config/connectDB");
 const fs = require("fs");
 const path = require("path");
 const app = express();
-const PORT = process.env.PORT || 7012;
+const PORT = process.env.PORT || 7015;
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
+
+
+const routeFiles = [
+  'auth.routes.js',
+  'calls.routes.js',
+  'dashboard.routes.js',
+  'export.routes.js',
+  'password.routes.js',
+  'projects.routes.js',
+  'tasks.routes.js',
+  'workLogs.routes.js',
+  'permissions.routes.js',
+  'roles.routes.js',
+  'users.routes.js',
+];
 
 
 app.use(
@@ -42,29 +57,11 @@ app.get("/health", (req, res) => {
 // }
 
 // routes
-const routesPath = path.join(__dirname, 'routes');
-
-// Load auth routes FIRST to avoid global authenticate middleware from other routes blocking it
-const authRoute = require("./routes/auth.routes");
-app.use('/api', authRoute);
-console.log(`Loaded route: auth.routes.js`);
-
-fs.readdirSync(routesPath).forEach((file) => {
-  if (file.endsWith('.routes.js') && file !== 'auth.routes.js') {
-    const route = require(path.join(routesPath, file));
-
-    //Validate that the file exports a router
-    if (route && typeof route === 'function') {
-      app.use('/api', route);
-      // console.log(`Loaded route: ${file}`);
-    } else {
-      console.warn(`skipped ${file}: not a valid router export`);
-    }
-  }
+routeFiles.forEach((file) => {
+  const route = require(`./routes/${file}`);
+  app.use('/api', route);
+  console.log(`Loaded route: ${file}`);
 });
-
-// app.use(require("./middleware/errorHandler"));
-
 
 
 // Load all Swagger doc files from api-doc folder
@@ -120,8 +117,8 @@ const startServer = async () => {
   try {
     await connectDB();
 
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`🚀 Server running on http://localhost:0.0.0.0:${PORT}`);
+    app.listen(PORT,  () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error("❌ Server startup failed:", error.message);

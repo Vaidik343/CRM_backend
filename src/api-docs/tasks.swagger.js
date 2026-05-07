@@ -69,7 +69,7 @@
 
 /**
  * @swagger
- * /tasks:
+ * /api/tasks:
  *   post:
  *     summary: Create a new task
  *     description: Create and assign a new task (Requires can_write permission)
@@ -126,7 +126,7 @@
 
 /**
  * @swagger
- * /tasks:
+ * /api/tasks:
  *   get:
  *     summary: Get all tasks
  *     description: Retrieve list of tasks. Non-admin users only see tasks assigned to them.
@@ -153,7 +153,7 @@
 
 /**
  * @swagger
- * /tasks/{id}:
+ * /api/tasks/{id}:
  *   get:
  *     summary: Get task by ID
  *     description: Retrieve a specific task. Non-admin users can only see tasks assigned to them.
@@ -189,7 +189,7 @@
 
 /**
  * @swagger
- * /tasks/{id}:
+ * /api/tasks/{id}:
  *   patch:
  *     summary: Update task
  *     description: Update task details (Requires can_update permission). Non-admin users can only update their assigned tasks and cannot reopen closed tasks.
@@ -243,7 +243,7 @@
 
 /**
  * @swagger
- * /tasks/{id}:
+ * /api/tasks/{id}:
  *   delete:
  *     summary: Delete task
  *     description: Delete a task (Requires can_delete permission). Only creator (assigned_by) or admin can delete.

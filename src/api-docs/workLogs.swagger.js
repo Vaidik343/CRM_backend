@@ -46,7 +46,7 @@
 
 /**
  * @swagger
- * /work-logs:
+ * /api/work-logs:
  *   post:
  *     summary: Create a new work log
  *     description: Log work completed on a specific date (Requires can_write permission)
@@ -94,7 +94,7 @@
 
 /**
  * @swagger
- * /work-logs:
+ * /api/work-logs:
  *   get:
  *     summary: Get all work logs
  *     description: Retrieve list of work logs. Non-admin users only see their own logs.
@@ -121,7 +121,7 @@
 
 /**
  * @swagger
- * /work-logs/{id}:
+ * /api/work-logs/{id}:
  *   get:
  *     summary: Get work log by ID
  *     description: Retrieve a specific work log. Non-admin users can only see their own logs.
@@ -157,7 +157,7 @@
 
 /**
  * @swagger
- * /work-logs/{id}:
+ * /api/work-logs/{id}:
  *   patch:
  *     summary: Update work log
  *     description: Update work log details (Requires can_update permission). Non-admin users can only update own logs.
@@ -208,7 +208,7 @@
 
 /**
  * @swagger
- * /work-logs/{id}:
+ * /api/work-logs/{id}:
  *   delete:
  *     summary: Delete work log
  *     description: Delete a work log (Requires can_delete permission). Non-admin users can only delete own logs.

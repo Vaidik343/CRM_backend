@@ -52,7 +52,7 @@
 
 /**
  * @swagger
- * /users:
+ * /api/users:
  *   post:
  *     summary: Create a new user
  *     description: Create a new user with auto-generated employee ID and temporary password (Admin only)
@@ -105,7 +105,7 @@
 
 /**
  * @swagger
- * /users:
+ * /api/users:
  *   get:
  *     summary: Get all users
  *     description: Retrieve list of all users (Admin only)
@@ -134,7 +134,7 @@
 
 /**
  * @swagger
- * /users/{id}:
+ * /api/users/{id}:
  *   get:
  *     summary: Get user by ID
  *     description: Retrieve a specific user by ID (Admin only)
@@ -170,7 +170,7 @@
 
 /**
  * @swagger
- * /users/{id}:
+ * /api/users/{id}:
  *   patch:
  *     summary: Update user
  *     description: Update user details (Admin only)
@@ -225,7 +225,7 @@
 
 /**
  * @swagger
- * /users/{id}:
+ * /api/users/{id}:
  *   delete:
  *     summary: Delete user
  *     description: Delete a user (Admin only)

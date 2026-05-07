@@ -29,6 +29,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       start_date: {
+         type: DataTypes.DATEONLY,
         defaultValue: DataTypes.NOW
       },
       due_date : {

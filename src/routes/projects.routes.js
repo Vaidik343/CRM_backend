@@ -11,4 +11,4 @@ router.post  ("/projects",      authenticate, requireAdmin, createProjectValidat
 router.patch ("/projects/:id",  authenticate, requireAdmin, updateProjectValidators,  updateProject);
 router.delete("/projects/:id",  authenticate, requireAdmin,                           deleteProject);
 
-module.exports = router;
+module.exports = router; 

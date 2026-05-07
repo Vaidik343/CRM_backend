@@ -54,6 +54,7 @@ const createCall = async (req, res) =>  {
     const project = await Project.findByPk(project_id);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
+    
     const call = await Call.create({
       user_id: req.user.id,
       caller_name,
@@ -66,14 +67,14 @@ const createCall = async (req, res) =>  {
       receive_type,
     });
 
-    return res.status(201).json({ call });
+    return res.status(201).json(call);
   } catch (err) {
     console.error("createCall error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
 
-const listCalls = (req, res) => {
+const listCalls = async(req, res) => {
   try {
     const where = req.user.is_admin ? {} : { user_id: req.user.id };
     const calls = await Call.findAll({
@@ -81,16 +82,20 @@ const listCalls = (req, res) => {
       include: callIncludes,
       order: [["createdAt", "DESC"]],
     });
-    return res.json({ calls });
+    return res.json(calls);
   } catch (err) {
     console.error("listCalls error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
 
-const getCall = (req, res) => {
+const getCall = async (req, res) => {
+  console.log("body call by id", req.body)
   try {
-    const call = await Call.findByPk(req.params.id, { include: callIncludes });
+    const callId = req.params.id;
+    console.log("🚀 ~ getCall ~ callId:", callId)
+    const call = await Call.findByPk(callId);
+    console.log("🚀 ~ getCall ~ call:", call)
     if (!call) return res.status(404).json({ message: "Call not found" });
 
     if (!req.user.is_admin && call.user_id !== req.user.id) {
@@ -104,7 +109,7 @@ const getCall = (req, res) => {
   }
 }
 
-const updateCall = (req, res) => {
+const updateCall = async  (req, res) => {
   try {
     const call = await Call.findByPk(req.params.id);
     if (!call) return res.status(404).json({ message: "Call not found" });
@@ -136,7 +141,7 @@ const updateCall = (req, res) => {
   }
 }
 
-const deleteCall = (req, res) => {
+const deleteCall = async  (req, res) => {
   try {
     const call = await Call.findByPk(req.params.id);
     if (!call) return res.status(404).json({ message: "Call not found" });

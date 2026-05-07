@@ -26,7 +26,7 @@ const updatePermissionValidators = [
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 /** GET /permissions — list all users with their permissions (admin only) */
-async function listPermissions(req, res) {
+const listPermissions = async(req, res) => {
   try {
     const permissions = await Permission.findAll({
       include: [{ model: User, attributes: ["id", "name", "employee_id", "email"] }],
@@ -40,7 +40,7 @@ async function listPermissions(req, res) {
 }
 
 /** GET /permissions/:user_id — get a single user's permission record */
-async function getPermission(req, res) {
+const getPermission = async(req, res) => {
   try {
     const permission = await Permission.findOne({
       where: { user_id: req.params.user_id },
@@ -55,7 +55,7 @@ async function getPermission(req, res) {
 }
 
 /** PUT /permissions/:user_id — update flags for a user (admin only) */
-async function updatePermission(req, res) {
+const updatePermission = async(req, res) => {
   try {
     const user = await User.findByPk(req.params.user_id);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -79,7 +79,7 @@ async function updatePermission(req, res) {
 }
 
 /** DELETE /permissions/:user_id — reset permissions to default (admin only) */
-async function resetPermission(req, res) {
+const resetPermission = async(req, res) => {
   try {
     const permission = await Permission.findOne({ where: { user_id: req.params.user_id } });
     if (!permission) return res.status(404).json({ message: "Permission record not found" });

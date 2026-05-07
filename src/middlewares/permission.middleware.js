@@ -27,3 +27,7 @@ function requirePermission(flag) {
     }
   };
 }
+
+module.exports = {
+  requirePermission,
+};

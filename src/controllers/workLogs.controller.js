@@ -25,7 +25,7 @@ const workLogIncludes = [
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
-async function createWorkLog(req, res) {
+const createWorkLog = async(req, res) => {
   try {
     const workLog = await WorkLog.create({
       user_id: req.user.id,
@@ -39,7 +39,7 @@ async function createWorkLog(req, res) {
   }
 }
 
-async function listWorkLogs(req, res) {
+const listWorkLogs = async(req, res) => {
   try {
     const where = req.user.is_admin ? {} : { user_id: req.user.id };
     const workLogs = await WorkLog.findAll({
@@ -54,7 +54,7 @@ async function listWorkLogs(req, res) {
   }
 }
 
-async function getWorkLog(req, res) {
+const getWorkLog = async (req, res) => {
   try {
     const workLog = await WorkLog.findByPk(req.params.id, { include: workLogIncludes });
     if (!workLog) return res.status(404).json({ message: "Work log not found" });
@@ -67,7 +67,7 @@ async function getWorkLog(req, res) {
   }
 }
 
-async function updateWorkLog(req, res) {
+const updateWorkLog = async(req, res) => {
   try {
     const workLog = await WorkLog.findByPk(req.params.id);
     if (!workLog) return res.status(404).json({ message: "Work log not found" });
@@ -86,7 +86,7 @@ async function updateWorkLog(req, res) {
   }
 }
 
-async function deleteWorkLog(req, res) {
+const deleteWorkLog = async (req, res) => {
   try {
     const workLog = await WorkLog.findByPk(req.params.id);
     if (!workLog) return res.status(404).json({ message: "Work log not found" });

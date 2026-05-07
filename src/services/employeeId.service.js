@@ -10,7 +10,7 @@ async function generateNextEmployeeId() {
   // For high concurrency, switch to a DB sequence/table.
   const last = await User.findOne({
     attributes: ["employee_id"],
-    order: [["id", "DESC"]],
+    order: [["createdAt", "DESC"]],
   });
 
   if (!last?.employee_id) return formatEmployeeId(1);

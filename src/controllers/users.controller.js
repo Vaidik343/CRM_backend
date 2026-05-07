@@ -9,20 +9,20 @@ const { handleValidation } = require("../utils/validate");
 
 const createUserValidators = [
   body("name").isString().trim().notEmpty(),
-  body("email").optional({ nullable: true }).isEmail().normalizeEmail(), // now optional
+  body("email").optional({ nullable: true }).isEmail(),  // removed normalizeEmail()
   body("role_id").isUUID(),
   body("is_admin").optional().isBoolean(),
   handleValidation,
 ];
+
 const updateUserValidators = [
   param("id").isUUID(),
   body("name").optional().isString().trim().notEmpty(),
-  body("email").optional().isEmail().normalizeEmail(),
+  body("email").optional().isEmail(),  // removed normalizeEmail()
   body("role_id").optional().isUUID(),
   body("is_admin").optional().isBoolean(),
   handleValidation,
 ];
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const safeAttributes = ["id", "employee_id", "name", "email", "role_id", "is_admin", "createdAt"];
@@ -31,7 +31,7 @@ const userIncludes = [{ model: Role, attributes: ["id", "name"] }];
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
-async function createUser(req, res) {
+const createUser = async(req, res) => {
   try {
     const { name, email, role_id, is_admin } = req.body;
 
@@ -40,7 +40,7 @@ async function createUser(req, res) {
     if (!role) return res.status(404).json({ message: "Role not found" });
 
     const employee_id = await generateNextEmployeeId();
-    const plainPassword = generateTempPassword();
+    const plainPassword = generateTempPassword(name);
     const password = await bcrypt.hash(plainPassword, 12);
 
     const user = await User.create({
@@ -73,15 +73,17 @@ async function createUser(req, res) {
       },
     });
   } catch (err) {
+      console.log("createUser full error:", err.name, err.message, err.errors);
     if (err.name === "SequelizeUniqueConstraintError") {
       return res.status(409).json({ message: "Email already in use" });
     }
+
     console.error("createUser error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
 
-async function listUsers(req, res) {
+const listUsers = async(req, res) => {
   try {
     const users = await User.findAll({
       attributes: safeAttributes,
@@ -95,7 +97,7 @@ async function listUsers(req, res) {
   }
 }
 
-async function getUser(req, res) {
+const getUser = async(req, res) => {
   try {
     const user = await User.findByPk(req.params.id, {
       attributes: safeAttributes,
@@ -109,7 +111,7 @@ async function getUser(req, res) {
   }
 }
 
-async function updateUser(req, res) {
+const updateUser = async(req, res) => {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -140,7 +142,7 @@ async function updateUser(req, res) {
   }
 }
 
-async function deleteUser(req, res) {
+const deleteUser = async(req, res) => {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });

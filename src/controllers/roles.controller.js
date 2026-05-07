@@ -39,17 +39,17 @@ const createRole = async (req, res) => {
   }
 }
 
-const listRoles = (req, res) => {
+const listRoles = async(req, res) => {
   try {
     const roles = await Role.findAll({ order: [["name", "ASC"]] });
-    return res.json({ roles });
+    return res.json({message:"List of all roles", roles });
   } catch (err) {
     console.error("listRoles error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
 
-const getRole = (req, res) => {
+const getRole = async (req, res) => {
   try {
     const role = await Role.findByPk(req.params.id);
     if (!role) return res.status(404).json({ message: "Role not found" });
@@ -60,7 +60,7 @@ const getRole = (req, res) => {
   }
 }
 
-const updateRole = (req, res) => {
+const updateRole = async (req, res) => {
   try {
     const role = await Role.findByPk(req.params.id);
     if (!role) return res.status(404).json({ message: "Role not found" });
@@ -78,7 +78,7 @@ const updateRole = (req, res) => {
   }
 }
 
-const deleteRole = (req, res) => {
+const deleteRole = async (req, res) => {
   try {
     const role = await Role.findByPk(req.params.id);
     if (!role) return res.status(404).json({ message: "Role not found" });

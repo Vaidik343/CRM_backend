@@ -28,7 +28,7 @@
 
 /**
  * @swagger
- * /roles:
+ * /api/roles:
  *   post:
  *     summary: Create a new role
  *     description: Create a new role (Admin only)
@@ -73,7 +73,7 @@
 
 /**
  * @swagger
- * /roles:
+ * /api/roles:
  *   get:
  *     summary: Get all roles
  *     description: Retrieve list of all roles (Admin only)
@@ -102,7 +102,7 @@
 
 /**
  * @swagger
- * /roles/{id}:
+ * /api/roles/{id}:
  *   get:
  *     summary: Get role by ID
  *     description: Retrieve a specific role by ID (Admin only)
@@ -138,7 +138,7 @@
 
 /**
  * @swagger
- * /roles/{id}:
+ * /api/roles/{id}:
  *   patch:
  *     summary: Update role
  *     description: Update role details (Admin only)
@@ -188,7 +188,7 @@
 
 /**
  * @swagger
- * /roles/{id}:
+ * /api/roles/{id}:
  *   delete:
  *     summary: Delete role
  *     description: Delete a role (Admin only). Cannot delete if users are assigned to it.

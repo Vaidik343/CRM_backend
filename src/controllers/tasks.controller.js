@@ -25,7 +25,7 @@ const taskIncludes = [
   { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
 ];
 
-async function createTask(req, res) {
+const createTask = async(req, res) => {
   try {
     const { task, description, assigned_to, due_date } = req.body;
 
@@ -52,7 +52,7 @@ async function createTask(req, res) {
   }
 }
 
-async function listTasks(req, res) {
+const listTasks = async(req, res) => {
   try {
     const where = req.user.is_admin ? {} : { assigned_to: req.user.id };
     const tasks = await Task.findAll({
@@ -67,9 +67,13 @@ async function listTasks(req, res) {
   }
 }
 
-async function getTask(req, res) {
+const getTask = async(req, res) => {
   try {
-    const task = await Task.findByPk(req.params.id, { include: taskIncludes });
+    const taskId = req.params.id;
+    // console.log("🚀 ~ getTask ~ taskId:", taskId)
+    
+    const task = await Task.findByPk(taskId);
+    // console.log("🚀 ~ getTask ~ task:", task)
     if (!task) return res.status(404).json({ message: "Task not found" });
 
     if (!req.user.is_admin && task.assigned_to !== req.user.id) {
@@ -83,17 +87,16 @@ async function getTask(req, res) {
   }
 }
 
-async function updateTask(req, res) {
+const updateTask = async (req, res) => {
   try {
     const task = await Task.findByPk(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    // Only assignee or admin can update task
+    // ownership check restored
     if (!req.user.is_admin && task.assigned_to !== req.user.id) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    // Prevent reopening a closed task by non-admin
     if (!req.user.is_admin && task.status === "closed") {
       return res.status(400).json({ message: "Cannot update a closed task" });
     }
@@ -109,9 +112,8 @@ async function updateTask(req, res) {
     console.error("updateTask error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
-}
-
-async function deleteTask(req, res) {
+};
+const deleteTask = async(req, res) => {
   try {
     const task = await Task.findByPk(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
@@ -130,3 +132,4 @@ async function deleteTask(req, res) {
 }
 
 module.exports = { createTask, listTasks, getTask, updateTask, deleteTask, createTaskValidators, updateTaskValidators };
+

@@ -7,7 +7,7 @@
 
 /**
  * @swagger
- * /auth/login:
+ * /api/auth/login:
  *   post:
  *     summary: User login
  *     description: Authenticate user with employee ID and password to get access token

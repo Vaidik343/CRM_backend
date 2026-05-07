@@ -74,7 +74,7 @@
 
 /**
  * @swagger
- * /calls:
+ * /api/calls:
  *   post:
  *     summary: Create a new call record
  *     description: Log a new call (Requires can_write permission)
@@ -144,7 +144,7 @@
 
 /**
  * @swagger
- * /calls:
+ * /api/calls:
  *   get:
  *     summary: Get all call records
  *     description: Retrieve list of calls. Non-admin users only see their own calls.
@@ -171,7 +171,7 @@
 
 /**
  * @swagger
- * /calls/{id}:
+ * /api/calls/{id}:
  *   get:
  *     summary: Get call record by ID
  *     description: Retrieve a specific call record. Non-admin users can only see their own calls.
@@ -207,7 +207,7 @@
 
 /**
  * @swagger
- * /calls/{id}:
+ * /api/calls/{id}:
  *   patch:
  *     summary: Update call record
  *     description: Update call details (Requires can_update permission). Non-admin users can only update own calls.
@@ -270,7 +270,7 @@
 
 /**
  * @swagger
- * /calls/{id}:
+ * /api/calls/{id}:
  *   delete:
  *     summary: Delete call record
  *     description: Delete a call record (Requires can_delete permission). Non-admin users can only delete own calls.

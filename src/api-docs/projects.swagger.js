@@ -51,7 +51,7 @@
 
 /**
  * @swagger
- * /projects:
+ * /api/projects:
  *   post:
  *     summary: Create a new project
  *     description: Create a new project (Authenticated, Admin required for creation)
@@ -100,7 +100,7 @@
 
 /**
  * @swagger
- * /projects:
+ * /api/projects:
  *   get:
  *     summary: Get all projects
  *     description: Retrieve list of projects. Non-admin users only see active projects, admins see all.
@@ -127,7 +127,7 @@
 
 /**
  * @swagger
- * /projects/{id}:
+ * /api/projects/{id}:
  *   get:
  *     summary: Get project by ID
  *     description: Retrieve a specific project by ID (Authenticated users only)
@@ -161,7 +161,7 @@
 
 /**
  * @swagger
- * /projects/{id}:
+ * /api/projects/{id}:
  *   patch:
  *     summary: Update project
  *     description: Update project details. Only creator or admin can update. Admin required for creation.
@@ -213,7 +213,7 @@
 
 /**
  * @swagger
- * /projects/{id}:
+ * /api/projects/{id}:
  *   delete:
  *     summary: Delete project
  *     description: Delete a project. Only creator or admin can delete. Admin required for creation/deletion.

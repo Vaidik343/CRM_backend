@@ -28,9 +28,23 @@ const projectIncludes = [
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
-async function createProject(req, res) {
+const createProject = async (req, res) => {
   try {
     const { name, description, remarks } = req.body;
+
+        if(!name)
+    {
+      return res.status(400).json({message: "Field required!"})
+    }
+
+    const existing = await Project.findOne({
+      where: {name}
+    })
+
+      if(existing)
+    {
+        return res.status(409).json({message:"Already Exist!"})
+    }
 
     const project = await Project.create({
       name,
@@ -47,11 +61,10 @@ async function createProject(req, res) {
   }
 }
 
-// Only this function changes — replace listProjects in your existing file
 
-async function listProjects(req, res) {
+const listProjects = async (req, res) => {
   try {
-    // Non-admin users only see active projects
+
     const where = req.user.is_admin ? {} : { is_active: true };
 
     const projects = await Project.findAll({
@@ -59,14 +72,14 @@ async function listProjects(req, res) {
       include: projectIncludes,
       order: [["createdAt", "DESC"]],
     });
-    return res.json({ projects });
+    return res.json( projects );
   } catch (err) {
     console.error("listProjects error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
 
-async function getProject(req, res) {
+const getProject = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id, { include: projectIncludes });
     if (!project) return res.status(404).json({ message: "Project not found" });
@@ -77,7 +90,7 @@ async function getProject(req, res) {
   }
 }
 
-async function updateProject(req, res) {
+const updateProject = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id);
     if (!project) return res.status(404).json({ message: "Project not found" });
@@ -100,7 +113,7 @@ async function updateProject(req, res) {
   }
 }
 
-async function deleteProject(req, res) {
+const deleteProject = async (req, res) =>{
   try {
     const project = await Project.findByPk(req.params.id);
     if (!project) return res.status(404).json({ message: "Project not found" });
