@@ -66,7 +66,9 @@ const createCall = async (req, res) =>  {
       remarks: remarks || null,
       receive_type,
     });
+    console.log("🚀 ~ createCall ~ call:", call)
 
+    await call.reload({ include: callIncludes });
     return res.status(201).json(call);
   } catch (err) {
     console.error("createCall error:", err);
@@ -133,7 +135,8 @@ const updateCall = async  (req, res) => {
       if (typeof req.body[f] !== "undefined") patch[f] = req.body[f];
     });
 
-    await call.update(patch);
+    const uc = await call.update(patch);
+    await call.reload({ include: callIncludes });
     return res.json({ call });
   } catch (err) {
     console.error("updateCall error:", err);

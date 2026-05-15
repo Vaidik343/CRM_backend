@@ -6,7 +6,7 @@ const createTaskValidators = [
   body("call_id").optional({ nullable: true }).isUUID(),
   body("task").isString().trim().notEmpty(),
   body("description").optional({ nullable: true }).isString(),
-  body("assigned_to").isUUID(),
+  body("assigned_to").optional().isUUID(),
   body("due_date").optional({ nullable: true }).isISO8601().toDate(),
   // status intentionally excluded — auto-set by server
   handleValidation,
@@ -28,13 +28,20 @@ const taskIncludes = [
 
 const createTask = async(req, res) => {
   try {
-    const {call_id , task, description, assigned_to, due_date } = req.body;
+    const {call_id , task, description,  due_date } = req.body;
+const assigned_to = req.body.assigned_to || req.user.id;
 
     const assignee = await User.findByPk(assigned_to);
     if (!assignee) return res.status(404).json({ message: "Assignee not found" });
 
+    // replace the current admin check with this
+if (!req.user.is_admin && assigned_to !== req.user.id) {
+  return res.status(403).json({ message: "Employees can only assign tasks to themselves" });
+}
     // Auto-set status: self-assign → ongoing, assign to other → open
     const status = assigned_to === req.user.id ? "ongoing" : "open";
+
+    
 
     const newTask = await Task.create({
       call_id: call_id || null,
@@ -46,8 +53,10 @@ const createTask = async(req, res) => {
       due_date: due_date || null,
       status,
     });
-
+    console.log("🚀 ~ createTask ~ newTask:", newTask)
+    await newTask.reload({ include: taskIncludes });
     return res.status(201).json({ task: newTask });
+    
   } catch (err) {
     console.error("createTask error:", err);
     return res.status(500).json({ message: "Internal server error" });
@@ -109,7 +118,10 @@ const updateTask = async (req, res) => {
     });
 
     await task.update(patch);
-    return res.json({ task });
+    await task.reload({ include: taskIncludes });
+    return res.status(200).json({ task: task });
+
+
   } catch (err) {
     console.error("updateTask error:", err);
     return res.status(500).json({ message: "Internal server error" });

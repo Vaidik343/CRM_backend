@@ -54,6 +54,7 @@ const createProject = async (req, res) => {
       is_active: true,
     });
 
+    await project.reload({ include: projectIncludes });
     return res.status(201).json({ project });
   } catch (err) {
     console.error("createProject error:", err);
@@ -106,6 +107,7 @@ const updateProject = async (req, res) => {
     });
 
     await project.update(patch);
+    await project.reload({ include: projectIncludes });
     return res.json({ project });
   } catch (err) {
     console.error("updateProject error:", err);

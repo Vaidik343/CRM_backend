@@ -55,10 +55,13 @@ const getPermission = async(req, res) => {
 }
 
 /** PUT /permissions/:user_id — update flags for a user (admin only) */
-const updatePermission = async(req, res) => {
+const updatePermission = async (req, res) => {
   try {
     const user = await User.findByPk(req.params.user_id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     const [permission, created] = await Permission.findOrCreate({
       where: { user_id: req.params.user_id },
@@ -66,22 +69,35 @@ const updatePermission = async(req, res) => {
     });
 
     const patch = {};
+    const body = req.body || {};
+
     ["can_read", "can_write", "can_update", "can_delete"].forEach((f) => {
-      if (typeof req.body[f] !== "undefined") patch[f] = req.body[f];
+      if (typeof body[f] !== "undefined") {
+        patch[f] = body[f];
+      }
     });
 
-    await permission.update(patch);
-    return res.json({ permission, created });
+    const updatedPermission = await permission.update(patch);
+
+    return res.json({
+      permission: updatedPermission,
+      created,
+    });
+
   } catch (err) {
     console.error("updatePermission error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
-}
+};
 
 /** DELETE /permissions/:user_id — reset permissions to default (admin only) */
 const resetPermission = async(req, res) => {
   try {
     const permission = await Permission.findOne({ where: { user_id: req.params.user_id } });
+    console.log("🚀 ~ resetPermission ~ permission:", permission)
     if (!permission) return res.status(404).json({ message: "Permission record not found" });
 
     await permission.update({
