@@ -137,28 +137,56 @@
  * /api/tasks:
  *   get:
  *     summary: Get all tasks
- *     description: Retrieve list of tasks. Non-admin users only see tasks assigned to them.
+ *     description: Retrieve paginated list of tasks. Non-admin users only see tasks assigned to them.
  *     tags: [Tasks]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of records per page
+ *         example: 20
  *     responses:
  *       200:
- *         description: List of tasks (sorted by status, due date, creation date)
+ *         description: Paginated list of tasks
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 tasks:
+ *                 message:
+ *                   type: string
+ *                   example: List of all Tasks
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Task'
+ *                 total:
+ *                   type: integer
+ *                   example: 80
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 20
  *       401:
  *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-
 /**
  * @swagger
  * /api/tasks/{id}:

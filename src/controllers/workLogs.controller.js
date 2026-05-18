@@ -40,14 +40,21 @@ const createWorkLog = async(req, res) => {
 }
 
 const listWorkLogs = async(req, res) => {
+  
   try {
+    const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const offset = (page -1) * limit;
     const where = req.user.is_admin ? {} : { user_id: req.user.id };
-    const workLogs = await WorkLog.findAll({
+
+    const {count, rows} = await WorkLog.findAndCountAll({
+      limit,
+      offset,
       where,
       include: workLogIncludes,
       order: [["date", "DESC"], ["createdAt", "DESC"]],
     });
-    return res.json({ workLogs });
+    return res.status(200).json({message:"List of All Work logs", data: rows, total: count, page, limit});
   } catch (err) {
     console.error("listWorkLogs error:", err);
     return res.status(500).json({ message: "Internal server error" });

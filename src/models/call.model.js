@@ -25,7 +25,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       project_id: {
           type:DataTypes.UUID,
-                allowNull: false
+                allowNull: true
       },
       call_type: {
         type: DataTypes.ENUM("inquiry", "request", "complaint"),

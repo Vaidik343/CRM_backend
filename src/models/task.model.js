@@ -14,6 +14,11 @@ module.exports = (sequelize, DataTypes) => {
   type: DataTypes.UUID,
   allowNull: true,
 },
+project_id: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+
       task: {
          type: DataTypes.STRING,
         allowNull: false,

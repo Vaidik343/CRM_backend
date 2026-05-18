@@ -65,15 +65,19 @@ const createProject = async (req, res) => {
 
 const listProjects = async (req, res) => {
   try {
-
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page -1) * limit;
     const where = req.user.is_admin ? {} : { is_active: true };
 
-    const projects = await Project.findAll({
+    const {count, rows} = await Project.findAndCountAll({
+      limit,
+      offset,
       where,
       include: projectIncludes,
       order: [["createdAt", "DESC"]],
     });
-    return res.json( projects );
+    return res.status(200).json({message:"List of All Projects", data: rows, total: count, page, limit});
   } catch (err) {
     console.error("listProjects error:", err);
     return res.status(500).json({ message: "Internal server error" });
@@ -84,7 +88,7 @@ const getProject = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id, { include: projectIncludes });
     if (!project) return res.status(404).json({ message: "Project not found" });
-    return res.json({ project });
+    return res.status(200).json({ project });
   } catch (err) {
     console.error("getProject error:", err);
     return res.status(500).json({ message: "Internal server error" });

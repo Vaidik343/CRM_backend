@@ -103,28 +103,56 @@
  * /api/projects:
  *   get:
  *     summary: Get all projects
- *     description: Retrieve list of projects. Non-admin users only see active projects, admins see all.
+ *     description: Retrieve paginated list of projects. Non-admin users only see active projects, admins see all.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of records per page
+ *         example: 20
  *     responses:
  *       200:
- *         description: List of projects
+ *         description: Paginated list of projects
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 projects:
+ *                 message:
+ *                   type: string
+ *                   example: List of All Projects
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Project'
+ *                 total:
+ *                   type: integer
+ *                   example: 50
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 20
  *       401:
  *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-
 /**
  * @swagger
  * /api/projects/{id}:

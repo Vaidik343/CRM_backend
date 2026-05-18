@@ -9,6 +9,16 @@
  * @swagger
  * components:
  *   schemas:
+ *     Role:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         name:
+ *           type: string
+ *           example: Manager
+ *
  *     User:
  *       type: object
  *       properties:
@@ -17,27 +27,33 @@
  *           format: uuid
  *         employee_id:
  *           type: string
- *           description: Unique employee ID (auto-generated)
+ *           description: Auto-generated employee ID
+ *           example: EMP-001
  *         name:
  *           type: string
+ *           example: John Doe
  *         email:
  *           type: string
+ *           nullable: true
+ *           example: john@example.com
  *         role_id:
  *           type: string
  *           format: uuid
- *         role:
- *           type: string
- *           description: Role name
+ *         Role:
+ *           $ref: '#/components/schemas/Role'
  *         is_admin:
  *           type: boolean
+ *           example: false
  *         createdAt:
  *           type: string
  *           format: date-time
+ *
  *     UserWithCredentials:
  *       type: object
  *       properties:
  *         message:
  *           type: string
+ *           example: User created
  *         user:
  *           $ref: '#/components/schemas/User'
  *         credentials:
@@ -45,9 +61,10 @@
  *           properties:
  *             employee_id:
  *               type: string
+ *               example: EMP-001
  *             password:
  *               type: string
- *               description: Auto-generated temporary password
+ *               example: John@123
  */
 
 /**
@@ -59,6 +76,7 @@
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -71,36 +89,43 @@
  *             properties:
  *               name:
  *                 type: string
- *                 example: "John Doe"
+ *                 example: John Doe
  *               email:
  *                 type: string
- *                 description: Optional email address
- *                 example: "john@example.com"
+ *                 nullable: true
+ *                 example: john@example.com
  *               role_id:
  *                 type: string
  *                 format: uuid
  *               is_admin:
  *                 type: boolean
  *                 default: false
+ *
  *     responses:
  *       201:
- *         description: User created successfully with temporary credentials
+ *         description: User created successfully
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/UserWithCredentials'
+ *
  *       400:
- *         description: Validation error - missing required fields
- *       404:
- *         description: Role not found
- *       409:
- *         description: Email already in use
+ *         description: Validation error
+ *
  *       401:
  *         description: Unauthorized
+ *
  *       403:
  *         description: Admin access required
+ *
+ *       404:
+ *         description: Role not found
+ *
+ *       409:
+ *         description: Email already in use
+ *
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
 
 /**
@@ -112,9 +137,10 @@
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
+ *
  *     responses:
  *       200:
- *         description: List of users
+ *         description: Users fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -124,12 +150,15 @@
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/User'
+ *
  *       401:
  *         description: Unauthorized
+ *
  *       403:
  *         description: Admin access required
+ *
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
 
 /**
@@ -137,10 +166,11 @@
  * /api/users/{id}:
  *   get:
  *     summary: Get user by ID
- *     description: Retrieve a specific user by ID (Admin only)
+ *     description: Retrieve a single user by ID (Admin only)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
+ *
  *     parameters:
  *       - in: path
  *         name: id
@@ -148,9 +178,10 @@
  *         schema:
  *           type: string
  *           format: uuid
+ *
  *     responses:
  *       200:
- *         description: User found
+ *         description: User fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -158,14 +189,18 @@
  *               properties:
  *                 user:
  *                   $ref: '#/components/schemas/User'
- *       404:
- *         description: User not found
+ *
  *       401:
  *         description: Unauthorized
+ *
  *       403:
  *         description: Admin access required
+ *
+ *       404:
+ *         description: User not found
+ *
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
 
 /**
@@ -177,6 +212,7 @@
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
+ *
  *     parameters:
  *       - in: path
  *         name: id
@@ -184,7 +220,9 @@
  *         schema:
  *           type: string
  *           format: uuid
+ *
  *     requestBody:
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
@@ -192,13 +230,16 @@
  *             properties:
  *               name:
  *                 type: string
+ *                 example: Updated User
  *               email:
  *                 type: string
+ *                 example: updated@example.com
  *               role_id:
  *                 type: string
  *                 format: uuid
  *               is_admin:
  *                 type: boolean
+ *
  *     responses:
  *       200:
  *         description: User updated successfully
@@ -209,18 +250,24 @@
  *               properties:
  *                 user:
  *                   $ref: '#/components/schemas/User'
+ *
  *       400:
- *         description: Invalid input
- *       404:
- *         description: User not found
- *       409:
- *         description: Email already in use
+ *         description: Validation error
+ *
  *       401:
  *         description: Unauthorized
+ *
  *       403:
  *         description: Admin access required
+ *
+ *       404:
+ *         description: User not found
+ *
+ *       409:
+ *         description: Email already in use
+ *
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
 
 /**
@@ -232,6 +279,7 @@
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
+ *
  *     parameters:
  *       - in: path
  *         name: id
@@ -239,6 +287,7 @@
  *         schema:
  *           type: string
  *           format: uuid
+ *
  *     responses:
  *       200:
  *         description: User deleted successfully
@@ -249,12 +298,23 @@
  *               properties:
  *                 message:
  *                   type: string
- *       404:
- *         description: User not found
+ *                   example: User deleted
+ *
+ *       400:
+ *         description: Cannot delete your own account
+ *
  *       401:
  *         description: Unauthorized
+ *
  *       403:
  *         description: Admin access required
+ *
+ *       404:
+ *         description: User not found
+ *
+ *       409:
+ *         description: Cannot delete employee assigned to projects or tasks
+ *
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */

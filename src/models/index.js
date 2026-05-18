@@ -29,6 +29,10 @@ Call.belongsTo(User, { foreignKey: "user_id" });
 Project.hasMany(Call, { foreignKey: "project_id", onDelete: "RESTRICT" });
 Call.belongsTo(Project, { foreignKey: "project_id" });
 
+Project.hasMany(Task, { foreignKey: "project_id", as: "projectTasks", onDelete: "SET NULL" });
+Task.belongsTo(Project, { foreignKey: "project_id", as: "project" });
+
+
 Call.hasMany(Task, { foreignKey: "call_id", as: "tasks", onDelete: "SET NULL" });
 Task.belongsTo(Call, { foreignKey: "call_id", as: "call" });
 

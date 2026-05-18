@@ -97,28 +97,56 @@
  * /api/work-logs:
  *   get:
  *     summary: Get all work logs
- *     description: Retrieve list of work logs. Non-admin users only see their own logs.
+ *     description: Retrieve paginated list of work logs. Non-admin users only see their own logs.
  *     tags: [Work Logs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of records per page
+ *         example: 20
  *     responses:
  *       200:
- *         description: List of work logs (sorted by date descending, then by creation date)
+ *         description: Paginated list of work logs (sorted by date descending, then by creation date)
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 workLogs:
+ *                 message:
+ *                   type: string
+ *                   example: List of All Work logs
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/WorkLog'
+ *                 total:
+ *                   type: integer
+ *                   example: 120
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 20
  *       401:
  *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-
 /**
  * @swagger
  * /api/work-logs/{id}:

@@ -29,7 +29,7 @@
  *               password:
  *                 type: string
  *                 description: Password of the user
- *                 example: "password123"
+ *                 example: "Admin@123"
  *     responses:
  *       200:
  *         description: Login successful, returns access token and user details

@@ -1,12 +1,12 @@
 const { body, param } = require("express-validator");
-const { Task, User, Call  } = require("../models");
+const { Task, User, Call, Project  } = require("../models");
 const { handleValidation } = require("../utils/validate");
 
 const createTaskValidators = [
-  body("call_id").optional({ nullable: true }).isUUID(),
+  body("call_id").optional({ nullable: true ,checkFalsy: true}).isUUID(),
   body("task").isString().trim().notEmpty(),
   body("description").optional({ nullable: true }).isString(),
-  body("assigned_to").optional().isUUID(),
+  body("assigned_to").optional({nullable: true ,checkFalsy: true}).isUUID(),
   body("due_date").optional({ nullable: true }).isISO8601().toDate(),
   // status intentionally excluded — auto-set by server
   handleValidation,
@@ -24,11 +24,13 @@ const updateTaskValidators = [
 const taskIncludes = [
   { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
   { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
+  { model: Project, as: "project", attributes: ["id", "name"] },
+  
 ];
 
 const createTask = async(req, res) => {
   try {
-    const {call_id , task, description,  due_date } = req.body;
+    const {call_id , project_id, task, description,  due_date } = req.body;
 const assigned_to = req.body.assigned_to || req.user.id;
 
     const assignee = await User.findByPk(assigned_to);
@@ -45,6 +47,7 @@ if (!req.user.is_admin && assigned_to !== req.user.id) {
 
     const newTask = await Task.create({
       call_id: call_id || null,
+      project_id: project_id || null,
       task,
       description: description || null,
       assigned_to,
@@ -65,13 +68,19 @@ if (!req.user.is_admin && assigned_to !== req.user.id) {
 
 const listTasks = async(req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page -1) * limit;
     const where = req.user.is_admin ? {} : { assigned_to: req.user.id };
-    const tasks = await Task.findAll({
+
+    const {count, rows} = await Task.findAndCountAll({
       where,
       include: taskIncludes,
-      order: [["status", "ASC"], ["due_date", "ASC"], ["createdAt", "DESC"]],
+      order: [["status", "ASC"], ["due_date", "ASC"], ["createdAt", "ASC"]],
+        limit,
+  offset,
     });
-    return res.json({ tasks });
+    return res.status(200).json({message: "List of all Tasks", data: rows, total: count, limit,  page, });
   } catch (err) {
     console.error("listTasks error:", err);
     return res.status(500).json({ message: "Internal server error" });

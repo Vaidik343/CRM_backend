@@ -147,28 +147,56 @@
  * /api/calls:
  *   get:
  *     summary: Get all call records
- *     description: Retrieve list of calls. Non-admin users only see their own calls.
+ *     description: Retrieve paginated list of calls. Non-admin users only see their own calls.
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of records per page
+ *         example: 20
  *     responses:
  *       200:
- *         description: List of call records
+ *         description: Paginated list of call records
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 calls:
+ *                 message:
+ *                   type: string
+ *                   example: List of All calls
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Call'
+ *                 total:
+ *                   type: integer
+ *                   example: 120
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 20
  *       401:
  *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-
 /**
  * @swagger
  * /api/calls/{id}:

@@ -137,14 +137,16 @@ const updateUser = async(req, res) => {
     if (err.name === "SequelizeUniqueConstraintError") {
       return res.status(409).json({ message: "Email already in use" });
     }
-    console.error("updateUser error:", err);
+    // console.error("updateUser error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
 
+
 const deleteUser = async(req, res) => {
   try {
     const user = await User.findByPk(req.params.id);
+    // console.log("🚀 ~ deleteUser ~ user:", user)
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // Prevent self-deletion
@@ -155,7 +157,11 @@ const deleteUser = async(req, res) => {
     await user.destroy();
     return res.json({ message: "User deleted" });
   } catch (err) {
-    console.error("deleteUser error:", err);
+    // console.error("deleteUser error:", err);
+    if (err.name === "SequelizeForeignKeyConstraintError") {
+      return res.status(409).json({ message: "Cannot delete employee: They are currently assigned to projects or tasks." });
+    }
+      
     return res.status(500).json({ message: "Internal server error" });
   }
 }

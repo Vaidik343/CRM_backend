@@ -6,7 +6,7 @@ const CALL_TYPES = require("../constants/callTypes");
 const createCallValidators = [
   body("caller_name").isString().trim().notEmpty(),
   body("caller_number").optional({ nullable: true }).isString().trim(),
-  body("project_id").isUUID(),
+  body("project_id").optional({nullable: true}).isUUID(),
   body("call_type").isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
@@ -19,7 +19,7 @@ const updateCallValidators = [
   param("id").isUUID(),
   body("caller_name").optional().isString().trim().notEmpty(),
   body("caller_number").optional({ nullable: true }).isString().trim(),
-  body("project_id").optional().isUUID(),
+  body("project_id").optional({nullable: true}).isUUID(),
   body("call_type").optional().isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").optional().isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
@@ -51,15 +51,22 @@ const createCall = async (req, res) =>  {
       });
     }
 
-    const project = await Project.findByPk(project_id);
-    if (!project) return res.status(404).json({ message: "Project not found" });
+   // ONLY validate project if project_id exists
+    if (project_id) {
+      const project = await Project.findByPk(project_id);
 
-    
+      if (!project) {
+        return res.status(404).json({
+          message: "Project not found",
+        });
+      }
+    }
+
     const call = await Call.create({
       user_id: req.user.id,
       caller_name,
       caller_number: caller_number || null,
-      project_id,
+      project_id:  project_id || null,
       call_type,
       call_subtype,
       call_summary: call_summary || null,
@@ -78,13 +85,21 @@ const createCall = async (req, res) =>  {
 
 const listCalls = async(req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page -1) * limit;
     const where = req.user.is_admin ? {} : { user_id: req.user.id };
-    const calls = await Call.findAll({
+
+    const {count,rows} = await Call.findAndCountAll({
+      limit,
+      offset,
       where,
       include: callIncludes,
-      order: [["createdAt", "DESC"]],
+      order: [["id", "ASC"]],
     });
-    return res.json(calls);
+
+    // console.log("call all", count, rows)
+    return res.status(200).json({message:"List of All calls", data: rows, total: count, page, limit})
   } catch (err) {
     console.error("listCalls error:", err);
     return res.status(500).json({ message: "Internal server error" });
