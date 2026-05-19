@@ -2,6 +2,8 @@ const { DataTypes } = require("sequelize");
 const { sequelize } = require("../config/db");
 
 // ── Initialize models ─────────────────────────────────────────
+
+
 const User       = require("./user.model")(sequelize, DataTypes);
 const Role       = require("./role.model")(sequelize, DataTypes);
 const Permission = require("./permission.model")(sequelize, DataTypes);
@@ -9,6 +11,8 @@ const Project    = require("./project.model")(sequelize, DataTypes);
 const Call       = require("./call.model")(sequelize, DataTypes);
 const Task       = require("./task.model")(sequelize, DataTypes);
 const WorkLog    = require("./workLog.model")(sequelize, DataTypes);
+const Team = require('./team.model')(sequelize, DataTypes);
+const TeamMember = require('./teamMembers.model')(sequelize, DataTypes);
 
 // ── Layer 1: Role → User ──────────────────────────────────────
 Role.hasMany(User, { foreignKey: "role_id", onDelete: "RESTRICT" });
@@ -47,9 +51,43 @@ Task.belongsTo(User, { foreignKey: "assigned_by", as: "assigner" });
 User.hasMany(WorkLog, { foreignKey: "user_id", onDelete: "CASCADE" });
 WorkLog.belongsTo(User, { foreignKey: "user_id" });
 
+
+// Team creator
+Team.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+User.hasMany(Team, { foreignKey: 'created_by', as: 'created_teams' });
+
+// Team ↔ Members (through TeamMember)
+Team.belongsToMany(User, {
+  through: TeamMember,
+  foreignKey: 'team_id',
+  otherKey: 'user_id',
+  as: 'members',
+});
+User.belongsToMany(Team, {
+  through: TeamMember,
+  foreignKey: 'user_id',
+  otherKey: 'team_id',
+  as: 'teams',
+});
+
+// Direct TeamMember access
+Team.hasMany(TeamMember, { foreignKey: 'team_id', as: 'team_memberships' });
+TeamMember.belongsTo(Team, { foreignKey: 'team_id', as: 'team' });
+TeamMember.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// Team ↔ Projects
+Team.hasMany(Project, { foreignKey: 'team_id', as: 'projects' });
+Project.belongsTo(Team, { foreignKey: 'team_id', as: 'team' });
+
+// Team ↔ Tasks
+Team.hasMany(Task, { foreignKey: 'team_id', as: 'tasks' });
+Task.belongsTo(Team, { foreignKey: 'team_id', as: 'team' });
+
 // ── Export ────────────────────────────────────────────────────
 module.exports = {
   sequelize,
+  Team,
+  TeamMember,
   User,
   Role,
   Permission,

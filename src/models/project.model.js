@@ -8,6 +8,11 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
         allowNull: false,
       },
+
+      team_id: {
+  type: DataTypes.UUID,
+  allowNull: true, 
+},
        name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -17,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
        remarks: {
-        type: DataTypes.TEXT,
+        type: DataTypes.TEXT, 
         allowNull: true,
       },
 

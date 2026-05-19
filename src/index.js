@@ -21,6 +21,8 @@ const routeFiles = [
   'password.routes.js',
   'projects.routes.js',
   'tasks.routes.js',
+  'teams.routes.js',
+  'teamMembers.routes.js',
   'workLogs.routes.js',
   'permissions.routes.js',
   'roles.routes.js',

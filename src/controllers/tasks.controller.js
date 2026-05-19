@@ -1,8 +1,10 @@
 const { body, param } = require("express-validator");
-const { Task, User, Call, Project  } = require("../models");
+const { Task, User, Call, Project,Team, TeamMember   } = require("../models");
 const { handleValidation } = require("../utils/validate");
+const { where } = require("sequelize");
 
 const createTaskValidators = [
+    body("team_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
   body("call_id").optional({ nullable: true ,checkFalsy: true}).isUUID(),
   body("task").isString().trim().notEmpty(),
   body("description").optional({ nullable: true }).isString(),
@@ -25,29 +27,117 @@ const taskIncludes = [
   { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
   { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
   { model: Project, as: "project", attributes: ["id", "name"] },
+   {
+    model: Team,
+    as: "team",
+    attributes: ["id", "name"],
+  },
   
 ];
 
+const getTeamMembership = async (user_id, team_id) => {
+  return await TeamMember.findOne({
+    where: {
+      user_id,
+      team_id,
+    },
+  });
+};
+
+
 const createTask = async(req, res) => {
   try {
-    const {call_id , project_id, task, description,  due_date } = req.body;
+    const {call_id , project_id, team_id, task, description,  due_date } = req.body;
+
 const assigned_to = req.body.assigned_to || req.user.id;
 
     const assignee = await User.findByPk(assigned_to);
     if (!assignee) return res.status(404).json({ message: "Assignee not found" });
 
     // replace the current admin check with this
-if (!req.user.is_admin && assigned_to !== req.user.id) {
-  return res.status(403).json({ message: "Employees can only assign tasks to themselves" });
-}
-    // Auto-set status: self-assign → ongoing, assign to other → open
+// if (!req.user.is_admin && assigned_to !== req.user.id) {
+//   return res.status(403).json({ message: "Employees can only assign tasks to themselves" });
+// }
+
+    // check exists
+
+    const team = await Team.findByPk(team_id);
+
+    if(!team)
+    {
+      return res.status(404).json({
+        message:"Team not found",
+      });
+    }
+
+    // check current user belongs to team
+      const currentMember = await getTeamMembership(
+        req.user.id,
+        team_id
+      );
+
+      if(!currentMember)
+      {
+        return res.status(403).json({
+          message: "You are not part of this team"
+        })
+      }
+
+      // check assignee belongs to same team
+
+      const assigneeMember = await getTeamMembership(
+        assigned_to,
+        team_id
+      );
+
+      if(!assigneeMember)
+      {
+        return res.status(400).json({
+          message: "Assigned user is not part of this team"
+        });
+      }
+
+      // permission rules
+      const isLead = currentMember.role === "Team Lead" || currentMember.role === "Project Manager";
+
+      // developers can assign to only themselves
+      if(!isLead && assigned_to !== req.user.id)
+      {
+        return res.status(403).json({
+          message: "You can only create tasks for yourself"
+        });
+      }
+
+
+      // validate project team
+      if(project_id)
+      {
+        const project = await Project.findByPk(project_id);
+
+        if(!project_id)
+        {
+          return res.status(404).json({
+            message: "Project not found",
+          });
+        }
+
+        if(project.team_id !== team_id)
+        {
+          return res.status(400).json({
+            message: "Project does not belong to this team"
+          });
+        }
+      }
+
+
+          // Auto-set status: self-assign → ongoing, assign to other → open
     const status = assigned_to === req.user.id ? "ongoing" : "open";
 
-    
 
     const newTask = await Task.create({
       call_id: call_id || null,
       project_id: project_id || null,
+      team_id,
       task,
       description: description || null,
       assigned_to,
@@ -56,7 +146,7 @@ if (!req.user.is_admin && assigned_to !== req.user.id) {
       due_date: due_date || null,
       status,
     });
-    console.log("🚀 ~ createTask ~ newTask:", newTask)
+    // console.log("🚀 ~ createTask ~ newTask:", newTask)
     await newTask.reload({ include: taskIncludes });
     return res.status(201).json({ task: newTask });
     
@@ -71,7 +161,34 @@ const listTasks = async(req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page -1) * limit;
-    const where = req.user.is_admin ? {} : { assigned_to: req.user.id };
+    // const where = req.user.is_admin ? {} : { assigned_to: req.user.id };
+
+    const membership = await TeamMember.findAll({
+      where: {
+        user_id: req.user.id,
+      }
+    });
+
+    const teamIds = membership.map((m) => m.team_id);
+
+    const leadTeams = membership.filter((m) => ["Team Lead", "Project Manager"].includes(m.role)).map((m) => m.team_id)
+
+
+    let where = {};
+
+    if(req.user.is_admin)
+    {
+      where = {};
+    } else if (leadTeams.length > 0)
+    {
+      where = {
+        team_id: leadTeams
+      };
+    } else {
+  where = {
+    assigned_to: req.user.id,
+  };
+}
 
     const {count, rows} = await Task.findAndCountAll({
       where,
@@ -96,9 +213,34 @@ const getTask = async(req, res) => {
     // console.log("🚀 ~ getTask ~ task:", task)
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    if (!req.user.is_admin && task.assigned_to !== req.user.id) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
+    const membership = await getTeamMembership(
+  req.user.id,
+  task.team_id
+);
+
+if (!membership && !req.user.is_admin) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
+
+const isLead =
+  membership &&
+  ["Team Lead", "Project Manager"].includes(
+    membership.role
+  );
+
+if (
+  !req.user.is_admin &&
+  !isLead &&
+  task.assigned_to !== req.user.id
+) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
+      
+    
 
     return res.json({ task });
   } catch (err) {
@@ -113,9 +255,32 @@ const updateTask = async (req, res) => {
     if (!task) return res.status(404).json({ message: "Task not found" });
 
     // ownership check restored
-    if (!req.user.is_admin && task.assigned_to !== req.user.id) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
+const membership = await getTeamMembership(
+  req.user.id,
+  task.team_id
+);
+
+if (!membership && !req.user.is_admin) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
+
+const isLead =
+  membership &&
+  ["Team Lead", "Project Manager"].includes(
+    membership.role
+  );
+
+if (
+  !req.user.is_admin &&
+  !isLead &&
+  task.assigned_to !== req.user.id
+) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
 
     if (!req.user.is_admin && task.status === "closed") {
       return res.status(400).json({ message: "Cannot update a closed task" });
