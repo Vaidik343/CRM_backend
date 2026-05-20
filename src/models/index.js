@@ -36,6 +36,16 @@ Call.belongsTo(Project, { foreignKey: "project_id" });
 Project.hasMany(Task, { foreignKey: "project_id", as: "projectTasks", onDelete: "SET NULL" });
 Task.belongsTo(Project, { foreignKey: "project_id", as: "project" });
 
+Project.hasMany(Team, {
+  foreignKey: "project_id",
+  as: "teams",
+});
+
+Team.belongsTo(Project, {
+  foreignKey: "project_id",
+  as: "project",
+});
+
 
 Call.hasMany(Task, { foreignKey: "call_id", as: "tasks", onDelete: "SET NULL" });
 Task.belongsTo(Call, { foreignKey: "call_id", as: "call" });
@@ -52,9 +62,14 @@ User.hasMany(WorkLog, { foreignKey: "user_id", onDelete: "CASCADE" });
 WorkLog.belongsTo(User, { foreignKey: "user_id" });
 
 
+
 // Team creator
 Team.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 User.hasMany(Team, { foreignKey: 'created_by', as: 'created_teams' });
+
+// Add associations
+// TeamMember.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
+Role.hasMany(TeamMember, { foreignKey: 'role_id' });
 
 // Team ↔ Members (through TeamMember)
 Team.belongsToMany(User, {
@@ -76,8 +91,8 @@ TeamMember.belongsTo(Team, { foreignKey: 'team_id', as: 'team' });
 TeamMember.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 // Team ↔ Projects
-Team.hasMany(Project, { foreignKey: 'team_id', as: 'projects' });
-Project.belongsTo(Team, { foreignKey: 'team_id', as: 'team' });
+// Team.hasMany(Project, { foreignKey: 'team_id', as: 'projects' });
+// Project.belongsTo(Team, { foreignKey: 'team_id', as: 'team' });
 
 // Team ↔ Tasks
 Team.hasMany(Task, { foreignKey: 'team_id', as: 'tasks' });

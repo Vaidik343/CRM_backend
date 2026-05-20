@@ -11,7 +11,7 @@ module.exports = {
   async down(queryInterface, Sequelize) {
     await queryInterface.changeColumn("calls", "project_id", {
       type: Sequelize.UUID,
-      allowNull: false,
+      allowNull: true,
     });
   },
 };

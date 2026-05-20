@@ -1,33 +1,28 @@
-const { TeamMember, User, Team } = require("../models");
+const { TeamMember, User, Team, Role, sequelize } = require("../models");
 const { handleValidation } = require("../utils/validate");
 
-// ─────────────────────────────────────────────
 // ADD TEAM MEMBER
-// ─────────────────────────────────────────────
 
 const createTeamMember = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
-    const { team_id, user_id, role } = req.body;
+    const { team_id, members } = req.body;
 
     // Validation
     if (!team_id) {
+      await transaction.rollback();
+
       return res.status(400).json({
         message: "team_id is required",
       });
     }
 
-    if (!user_id) {
+    if (!Array.isArray(members) || members.length === 0) {
+      await transaction.rollback();
+
       return res.status(400).json({
-        message: "user_id is required",
-      });
-    }
-
-    // Check user exists
-    const user = await User.findByPk(user_id);
-
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
+        message: "members array is required",
       });
     }
 
@@ -35,39 +30,87 @@ const createTeamMember = async (req, res) => {
     const team = await Team.findByPk(team_id);
 
     if (!team) {
+      await transaction.rollback();
+
       return res.status(404).json({
         message: "Team not found",
       });
     }
 
-    // Prevent duplicate member
-    const existingMember = await TeamMember.findOne({
-      where: {
-        team_id,
-        user_id,
-      },
-    });
+    const createdMembers = [];
+    const skippedMembers = [];
 
-    if (existingMember) {
+    for (const item of members) {
+      const { user_id, role_id } = item;
+
+      // Check user exists
+      const user = await User.findByPk(user_id);
+
+      if (!user) {
+        skippedMembers.push({
+          user_id,
+          reason: "User not found",
+        });
+
+        continue;
+      }
+
+    
+
+      // Prevent duplicate member
+      const existingMember = await TeamMember.findOne({
+        where: {
+          team_id,
+          user_id,
+        },
+      });
+
+      if (existingMember) {
+        skippedMembers.push({
+          user_id,
+          reason: "User already exists in this team",
+        });
+
+        continue;
+      }
+
+      // Create member
+      const member = await TeamMember.create(
+        {
+          team_id,
+          user_id,
+          
+          is_active: true,
+        },
+        { transaction }
+      );
+
+      createdMembers.push(member);
+    }
+
+    // If everything skipped
+    if (createdMembers.length === 0) {
+      await transaction.rollback();
+
       return res.status(400).json({
-        message: "User already exists in this team",
+        message: "No members were added",
+        skipped_members: skippedMembers,
       });
     }
 
-    // Create member
-    const member = await TeamMember.create({
-      team_id,
-      user_id,
-      role: role || "Developer",
-      is_active: true,
-    });
+    await transaction.commit();
 
     return res.status(201).json({
-      message: "Member added successfully",
-      member,
+      message: "Members processed successfully",
+      added_count: createdMembers.length,
+      skipped_count: skippedMembers.length,
+      added_members: createdMembers,
+      skipped_members: skippedMembers,
     });
 
   } catch (error) {
+    await transaction.rollback();
+
     console.error("createTeamMember error:", error);
 
     return res.status(500).json({
@@ -184,9 +227,6 @@ const updateTeamMember = async (req, res) => {
 
     const patch = {};
 
-    if (req.body.role) {
-      patch.role = req.body.role;
-    }
 
     if (typeof req.body.is_active !== "undefined") {
       patch.is_active = req.body.is_active;
@@ -212,6 +252,7 @@ const updateTeamMember = async (req, res) => {
 // SOFT DELETE TEAM MEMBER
 // ─────────────────────────────────────────────
 
+// name to remove team member
 const deleteMember = async (req, res) => {
   try {
     const memberId = req.params.id;

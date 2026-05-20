@@ -1,5 +1,5 @@
 const { body, param } = require("express-validator");
-const { Project, User, Team, TeamMember } = require("../models");
+const { Project, User, Team, TeamMember, Role } = require("../models");
 const { handleValidation } = require("../utils/validate");
 
 // ── Validators ────────────────────────────────────────────────────────────────
@@ -26,13 +26,20 @@ const updateProjectValidators = [
 
 const projectIncludes = [
   { model: User, as: "creator", attributes: ["id", "name", "employee_id"] },
-   {
-    model: Team,
-    as: "team",
-    attributes: ["id", "name"],
-  },
+  //  {
+  //   model: Team,
+  //   as: "team",
+  //   attributes: ["id", "name"],
+  // },
 ];
 
+
+const getUserRole = async (user_id) => {
+  const user = await User.findByPk(user_id, {
+    include: [{ model: Role, as: 'role' }]
+  });
+  return user?.role?.name; // "Team Lead", "Developer" etc.
+};
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 const createProject = async (req, res) => {
@@ -41,55 +48,34 @@ const createProject = async (req, res) => {
 
         if(!name)
     {
-      return res.status(400).json({message: "Field required!"})
+      return res.status(400).json({message: "Name Field required!"})
     }
 
-    if(!team_id)
-    {
-       return res.status(400).json({message:"Field required!"});
-    }
 
     
-      // Check team exists
-    const team = await Team.findByPk(team_id);
-
-    if (!team) {
-      return res.status(404).json({
-        message: "Team not found",
-      });
-    }
 
 
     // optional
     //only admin or team lead can create project
 
-    if(!req.user.is_admin)
-    {
-      const member = await TeamMember.findOnd({
-        where: {
-          team_id,
-          user_id: req.user.id,
-          is_active: true,
-        },
-      });
+// FIX — clean rewrite:
+if (!req.user.is_admin) {
+  const member = await TeamMember.findOne({
+    where: {  user_id: req.user.id, is_active: true },
+  });
 
-      if(!member)
-      {
-        return res.status(403).json({
-          message: "You are not part of this team",
-        });
-      }
+  if (!member) {
+    return res.status(403).json({ message: "You are not part of this team" });
+  }
 
-      if(member.role !== "Team Lead")
-      {
-        return res.status(403).json({
-          message: "Only Team Lead can create project",
-        });
-      }
-    }
+  const userRole = await getUserRole(req.user.id);
+  if (!["Team Lead", "Project Manager"].includes(userRole)) {
+    return res.status(403).json({ message: "Only Team Lead can create project" });
+  }
+}
 
     const existing = await Project.findOne({
-      where: {name, team_id}
+      where: {name,}
     })
 
       if(existing)
@@ -100,6 +86,7 @@ const createProject = async (req, res) => {
     
     const project = await Project.create({
       name,
+      
       description: description || null,
       remarks: remarks || null,
       created_by: req.user.id,
@@ -136,9 +123,9 @@ const listProjects = async (req, res) => {
         },
       });
 
-      const teamIds = memberships.map( (m) => m.team_id);
+      // const teamIds = memberships.map( (m) => m.team_id);
 
-      where.team_id = teamIds;
+      // where.team_id = teamIds;
       where.is_active = true;
     }
 
@@ -165,7 +152,7 @@ const getProject = async (req, res) => {
 
       const member = await TeamMember.findOne({
         where: {
-          team_id: project.team_id,
+          // team_id: project.team_id,
           user_id: req.user.id,
           is_active: true,
         },
@@ -200,7 +187,7 @@ const updateProject = async (req, res) => {
 
       const member = await TeamMember.findOne({
         where: {
-          team_id: project.team_id,
+          // team_id: project.team_id,
           user_id: req.user.id,
           is_active: true,
         },
@@ -212,11 +199,11 @@ const updateProject = async (req, res) => {
         });
       }
 
-      if (member.role !== "Team Lead") {
-        return res.status(403).json({
-          message: "Only Team Lead can update project",
-        });
-      }
+      const userRole = await getUserRole(req.user.id);
+if (!["Team Lead", "Project Manager"].includes(userRole)) {
+  return res.status(403).json({ message: "Only Team Lead can update project" });
+}
+
     }
 
     const patch = {};
@@ -272,18 +259,19 @@ const deleteProject = async (req, res) => {
 
       const member = await TeamMember.findOne({
         where: {
-          team_id: project.team_id,
+          // team_id: project.team_id,
           user_id: req.user.id,
           is_active: true,
         },
       });
 
-      if (!member || member.role !== "Team Lead") {
-
-        return res.status(403).json({
-          message: "Only Team Lead can delete project",
-        });
-      }
+     if (!member) {
+  return res.status(403).json({ message: "Access denied" });
+}
+const userRole = await getUserRole(req.user.id);
+if (!["Team Lead", "Project Manager"].includes(userRole)) {
+  return res.status(403).json({ message: "Only Team Lead can delete project" });
+}
     }
 
     await project.destroy();

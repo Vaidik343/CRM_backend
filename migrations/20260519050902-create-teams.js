@@ -1,47 +1,35 @@
 'use strict';
 
+const teamIds = {
+  techRetail: '44444444-0000-0000-0000-000000000001',
+  webShop:    '44444444-0000-0000-0000-000000000002',
+};
+
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('teams', {
-      id: {
-        type: Sequelize.UUID,
-        defaultValue: Sequelize.UUIDV4,
-        primaryKey: true,
+  async up(queryInterface) {
+    await queryInterface.bulkInsert('teams', [
+      {
+        id:          teamIds.techRetail,
+        name:        'TechRetail Mobile',
+        description: 'Cross-functional team for TechRetail mobile app redesign project',
+        is_active:   true,
+        createdAt:   new Date(),
+        updatedAt:   new Date(),
       },
-      name: {
-        type: Sequelize.STRING,
-        allowNull: false,
-        unique: true,
+      {
+        id:          teamIds.webShop,
+        name:        'WebShop Redesign',
+        description: 'Team handling full e-commerce website redesign for WebShop client',
+        is_active:   true,
+        createdAt:   new Date(),
+        updatedAt:   new Date(),
       },
-      description: {
-        type: Sequelize.TEXT,
-        allowNull: true,
-      },
-      created_by: {
-        type: Sequelize.UUID,
-        allowNull: false,
-        references: { model: 'users', key: 'id' },
-        onUpdate: 'CASCADE',
-        onDelete: 'RESTRICT',
-      },
-      is_active: {
-        type: Sequelize.BOOLEAN,
-        defaultValue: true,
-      },
-      created_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('NOW()'),
-      },
-      updated_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('NOW()'),
-      },
-    });
+    ]);
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('teams');
+    await queryInterface.bulkDelete('teams', null, {});
   },
 };
+
+module.exports.teamIds = teamIds;

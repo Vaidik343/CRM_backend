@@ -1,5 +1,5 @@
 const { body, param } = require("express-validator");
-const { Team, TeamMember, User } = require("../models");
+const { Team, TeamMember, User, Project } = require("../models");
 const { handleValidation } = require("../utils/validate");
 
 // VALIDATORS 
@@ -18,49 +18,60 @@ const updateTeamValidators = [
   handleValidation,
 ];
 
-const addMemberValidators = [
-  param("id").isUUID(), // team id
-  body("user_id").isUUID(),
-  body("role")
-    .isIn([
-      "Team Lead",
-      "Sr. Developer",
-      "Developer",
-      "Junior Developer",
-      "QA",
-      "Designer",
-      "Project Manager",
-      "Intern",
-      "Other",
-    ]),
-  handleValidation,
-];
+// const addMemberValidators = [
+//   param("id").isUUID(), // team id
+//   body("user_id").isUUID(),
+//   body("role")
+//     .isIn([
+//       "Team Lead",
+//       "Sr. Developer",
+//       "Developer",
+//       "Junior Developer",
+//       "QA",
+//       "Designer",
+//       "Project Manager",
+//       "Intern",
+//       "Other",
+//     ]),
+//   handleValidation,
+// ];
 
-const updateMemberRoleValidators = [
-  param("teamId").isUUID(),
-  param("memberId").isUUID(),
-  body("role")
-    .isIn([
-      "Team Lead",
-      "Sr. Developer",
-      "Developer",
-      "Junior Developer",
-      "QA",
-      "Designer",
-      "Project Manager",
-      "Intern",
-      "Other",
-    ]),
-  handleValidation,
-];
+// const updateMemberRoleValidators = [
+//   param("teamId").isUUID(),
+//   param("memberId").isUUID(),
+//   body("role")
+//     .isIn([
+//       "Team Lead",
+//       "Sr. Developer",
+//       "Developer",
+//       "Junior Developer",
+//       "QA",
+//       "Designer",
+//       "Project Manager",
+//       "Intern",
+//       "Other",
+//     ]),
+//   handleValidation,
+// ];
 
 // CREATE TEAM
 
 
 const createTeam = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const {project_id, name, description } = req.body;
 
+   if(!project_id || !name)
+   {
+     return res.status(403).json({message:"Project id and name required."});
+   }
+
+    const project = await Project.findByPk(project_id);
+
+    if(!project)
+    {
+      return res.status(403).json({message:"Project id not found"})
+    }
     const exists = await Team.findOne({
       where: { name },
     });
@@ -97,10 +108,15 @@ const listTeams = async (req, res) => {
     const teams = await Team.findAll({
       include: [
         {
+          model: Project,
+                    attributes: ["id", "name"],
+        },
+        {
           model: User,
           as: "creator",
           attributes: ["id", "name", "employee_id"],
         },
+        
         {
           model: TeamMember,
           as: "team_memberships",
@@ -136,6 +152,10 @@ const getTeam = async (req, res) => {
   try {
     const team = await Team.findByPk(req.params.id, {
       include: [
+        {
+          model: Project,
+                    attributes: ["id", "name"],
+        },
         {
           model: User,
           as: "creator",
@@ -237,121 +257,121 @@ const deleteTeam = async (req, res) => {
 // ADD MEMBER TO TEAM
 
 
-const addMemberToTeam = async (req, res) => {
-  try {
-    const { user_id, role } = req.body;
+// const addMemberToTeam = async (req, res) => {
+//   try {
+//     const { user_id, role } = req.body;
 
-    const team = await Team.findByPk(req.params.id);
+//     const team = await Team.findByPk(req.params.id);
 
-    if (!team) {
-      return res.status(404).json({
-        message: "Team not found",
-      });
-    }
+//     if (!team) {
+//       return res.status(404).json({
+//         message: "Team not found",
+//       });
+//     }
 
-    const user = await User.findByPk(user_id);
+//     const user = await User.findByPk(user_id);
 
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
+//     if (!user) {
+//       return res.status(404).json({
+//         message: "User not found",
+//       });
+//     }
 
-    const existingMember = await TeamMember.findOne({
-      where: {
-        team_id: team.id,
-        user_id,
-      },
-    });
+//     const existingMember = await TeamMember.findOne({
+//       where: {
+//         team_id: team.id,
+//         user_id,
+//       },
+//     });
 
-    if (existingMember) {
-      return res.status(400).json({
-        message: "User already exists in this team",
-      });
-    }
+//     if (existingMember) {
+//       return res.status(400).json({
+//         message: "User already exists in this team",
+//       });
+//     }
 
-    const member = await TeamMember.create({
-      team_id: team.id,
-      user_id,
-      role,
-    });
+//     const member = await TeamMember.create({
+//       team_id: team.id,
+//       user_id,
+//       role,
+//     });
 
-    return res.status(201).json({
-      message: "Member added successfully",
-      member,
-    });
-  } catch (err) {
-    console.error("addMemberToTeam error:", err);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
-  }
-};
+//     return res.status(201).json({
+//       message: "Member added successfully",
+//       member,
+//     });
+//   } catch (err) {
+//     console.error("addMemberToTeam error:", err);
+//     return res.status(500).json({
+//       message: "Internal server error",
+//     });
+//   }
+// };
 
-// UPDATE MEMBER ROLE
-
-
-const updateMemberRole = async (req, res) => {
-  try {
-    const { role } = req.body;
-
-    const member = await TeamMember.findOne({
-      where: {
-        id: req.params.memberId,
-        team_id: req.params.teamId,
-      },
-    });
-
-    if (!member) {
-      return res.status(404).json({
-        message: "Team member not found",
-      });
-    }
-
-    await member.update({ role });
-
-    return res.status(200).json({
-      message: "Member role updated successfully",
-      member,
-    });
-  } catch (err) {
-    console.error("updateMemberRole error:", err);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
-  }
-};
+// // UPDATE MEMBER ROLE
 
 
-// REMOVE MEMBER
+// const updateMemberRole = async (req, res) => {
+//   try {
+//     const { role } = req.body;
 
-const removeMemberFromTeam = async (req, res) => {
-  try {
-    const member = await TeamMember.findOne({
-      where: {
-        id: req.params.memberId,
-        team_id: req.params.teamId,
-      },
-    });
+//     const member = await TeamMember.findOne({
+//       where: {
+//         id: req.params.memberId,
+//         team_id: req.params.teamId,
+//       },
+//     });
 
-    if (!member) {
-      return res.status(404).json({
-        message: "Team member not found",
-      });
-    }
+//     if (!member) {
+//       return res.status(404).json({
+//         message: "Team member not found",
+//       });
+//     }
 
-    await member.destroy();
+//     await member.update({ role });
 
-    return res.status(200).json({
-      message: "Member removed successfully",
-    });
-  } catch (err) {
-    console.error("removeMemberFromTeam error:", err);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
-  }
-};
+//     return res.status(200).json({
+//       message: "Member role updated successfully",
+//       member,
+//     });
+//   } catch (err) {
+//     console.error("updateMemberRole error:", err);
+//     return res.status(500).json({
+//       message: "Internal server error",
+//     });
+//   }
+// };
+
+
+// // REMOVE MEMBER
+
+// const removeMemberFromTeam = async (req, res) => {
+//   try {
+//     const member = await TeamMember.findOne({
+//       where: {
+//         id: req.params.memberId,
+//         team_id: req.params.teamId,
+//       },
+//     });
+
+//     if (!member) {
+//       return res.status(404).json({
+//         message: "Team member not found",
+//       });
+//     }
+
+//     await member.destroy();
+
+//     return res.status(200).json({
+//       message: "Member removed successfully",
+//     });
+//   } catch (err) {
+//     console.error("removeMemberFromTeam error:", err);
+//     return res.status(500).json({
+//       message: "Internal server error",
+//     });
+//   }
+// };
 
 // ─────────────────────────────────────────────
 
@@ -362,12 +382,12 @@ module.exports.teamController = {
   updateTeam,
   deleteTeam,
 
-  addMemberToTeam,
-  updateMemberRole,
-  removeMemberFromTeam,
+  // addMemberToTeam,
+  // updateMemberRole,
+  // removeMemberFromTeam,
 
   createTeamValidators,
   updateTeamValidators,
-  addMemberValidators,
-  updateMemberRoleValidators,
+  // addMemberValidators,
+  // updateMemberRoleValidators,
 };

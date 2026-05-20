@@ -1,59 +1,90 @@
 'use strict';
 
-module.exports = {
-  async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('team_members', {
-      id: {
-        type: Sequelize.UUID,
-        defaultValue: Sequelize.UUIDV4,
-        primaryKey: true,
-      },
-      team_id: {
-        type: Sequelize.UUID,
-        allowNull: false,
-        references: { model: 'teams', key: 'id' },
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE',
-      },
-      user_id: {
-        type: Sequelize.UUID,
-        allowNull: false,
-        references: { model: 'users', key: 'id' },
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE',
-      },
-      role: {
-        type: Sequelize.ENUM(
-          'Team Lead',
-          'Sr. Developer',
-          'Developer',
-          'Junior Developer',
-          'QA',
-          'Designer',
-          'Project Manager'
-        ),
-        allowNull: false,
-        defaultValue: 'Developer',
-      },
-      created_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('NOW()'),
-      },
-      updated_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.literal('NOW()'),
-      },
-    });
+const { v4: uuidv4 } = require('uuid');
+const { userIds } = require('./02-users');
+const { teamIds } = require('./04-teams');
 
-    await queryInterface.addIndex('team_members', ['team_id', 'user_id'], {
-      unique: true,
-      name: 'unique_team_user',
-    });
+// TeamMember model uses underscored: true
+// so columns are: team_id, user_id, is_active, created_at, updated_at
+
+// Team A: TechRetail Mobile
+//   Harsh  → Project Manager
+//   John   → Sr. Developer
+//   Vaidik → Developer
+//   Elena  → Designer
+//   Tom    → QA
+
+// Team B: WebShop Redesign
+//   Harsh  → Project Manager (same person, different team)
+//   Sarah  → Developer
+
+module.exports = {
+  async up(queryInterface) {
+    await queryInterface.bulkInsert('team_members', [
+
+      // ── Team A: TechRetail Mobile ──────────────────────────────────────
+      {
+        id:         uuidv4(),
+        team_id:    teamIds.techRetail,
+        user_id:    userIds.harsh,
+        is_active:  true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id:         uuidv4(),
+        team_id:    teamIds.techRetail,
+        user_id:    userIds.john,
+        is_active:  true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id:         uuidv4(),
+        team_id:    teamIds.techRetail,
+        user_id:    userIds.vaidik,
+        is_active:  true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id:         uuidv4(),
+        team_id:    teamIds.techRetail,
+        user_id:    userIds.elena,
+        is_active:  true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id:         uuidv4(),
+        team_id:    teamIds.techRetail,
+        user_id:    userIds.tom,
+        is_active:  true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+
+      // ── Team B: WebShop Redesign ───────────────────────────────────────
+      {
+        id:         uuidv4(),
+        team_id:    teamIds.webShop,
+        user_id:    userIds.harsh,   // Harsh is PM in both teams
+        is_active:  true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id:         uuidv4(),
+        team_id:    teamIds.webShop,
+        user_id:    userIds.sarah,
+        is_active:  true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    ]);
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('team_members');
+    await queryInterface.bulkDelete('team_members', null, {});
   },
 };

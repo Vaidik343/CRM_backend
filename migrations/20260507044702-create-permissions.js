@@ -1,54 +1,100 @@
 'use strict';
 
+const { v4: uuidv4 } = require('uuid');
+const { userIds } = require('./02-users');
+
+// Permission rules per role:
+// Admin     → is_admin=true so permission row not strictly needed, but added for consistency
+// PM        → can_read, can_write, can_update (assigns tasks)
+// Sr.Dev    → can_read, can_write, can_update
+// Developer → can_read, can_write only
+// Designer  → can_read, can_write only
+// QA        → can_read, can_write, can_update (can close bugs)
+// Sarah     → Developer → can_read, can_write only
+
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('permissions', {
-      id: {
-        type: Sequelize.UUID,
-        defaultValue: Sequelize.UUIDV4,
-        primaryKey: true,
-        allowNull: false,
+  async up(queryInterface) {
+    await queryInterface.bulkInsert('permissions', [
+      {
+        id:         uuidv4(),
+        user_id:    userIds.admin,
+        can_read:   true,
+        can_write:  true,
+        can_update: true,
+        can_delete: true,
+        createdAt:  new Date(),
+        updatedAt:  new Date(),
       },
-      user_id: {
-        type: Sequelize.UUID,
-        allowNull: false,
-        unique: true,
-        references: { model: 'users', key: 'id' },
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE',
+      {
+        // Harsh — Project Manager
+        id:         uuidv4(),
+        user_id:    userIds.harsh,
+        can_read:   true,
+        can_write:  true,
+        can_update: true,
+        can_delete: false,
+        createdAt:  new Date(),
+        updatedAt:  new Date(),
       },
-      can_read: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
+      {
+        // John — Sr. Developer
+        id:         uuidv4(),
+        user_id:    userIds.john,
+        can_read:   true,
+        can_write:  true,
+        can_update: true,
+        can_delete: false,
+        createdAt:  new Date(),
+        updatedAt:  new Date(),
       },
-      can_write: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
+      {
+        // Vaidik — Developer
+        id:         uuidv4(),
+        user_id:    userIds.vaidik,
+        can_read:   true,
+        can_write:  true,
+        can_update: false,
+        can_delete: false,
+        createdAt:  new Date(),
+        updatedAt:  new Date(),
       },
-      can_update: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
+      {
+        // Elena — Designer
+        id:         uuidv4(),
+        user_id:    userIds.elena,
+        can_read:   true,
+        can_write:  true,
+        can_update: false,
+        can_delete: false,
+        createdAt:  new Date(),
+        updatedAt:  new Date(),
       },
-      can_delete: {
-        type: Sequelize.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
+      {
+        // Tom — QA (can update tasks to close bugs)
+        id:         uuidv4(),
+        user_id:    userIds.tom,
+        can_read:   true,
+        can_write:  true,
+        can_update: true,
+        can_delete: false,
+        createdAt:  new Date(),
+        updatedAt:  new Date(),
       },
-      created_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
+      {
+        // Sarah — Developer
+        id:         uuidv4(),
+        user_id:    userIds.sarah,
+        can_read:   true,
+        can_write:  true,
+        can_update: false,
+        can_delete: false,
+        createdAt:  new Date(),
+        updatedAt:  new Date(),
       },
-      updated_at: {
-        type: Sequelize.DATE,
-        allowNull: false,
-      },
-    });
+    ]);
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('permissions');
+    await queryInterface.bulkDelete('permissions', null, {});
   },
 };

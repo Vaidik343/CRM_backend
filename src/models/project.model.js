@@ -9,10 +9,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
 
-      team_id: {
-  type: DataTypes.UUID,
-  allowNull: true, 
-},
+//       team_id: {
+//   type: DataTypes.UUID,
+//   allowNull: true, 
+// },
        name: {
         type: DataTypes.STRING,
         allowNull: false,

@@ -23,7 +23,7 @@ project_id: {
          type: DataTypes.STRING,
         allowNull: false,
       },
-      description : {
+      description : { 
          type: DataTypes.STRING,
         allowNull: true,
       },

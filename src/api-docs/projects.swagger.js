@@ -15,19 +15,27 @@
  *         id:
  *           type: string
  *           format: uuid
+ *         team_id:
+ *           type: string
+ *           format: uuid
  *         name:
  *           type: string
- *           description: Project name (required)
+ *           description: Project name
  *         description:
  *           type: string
- *           description: Detailed project description
  *         remarks:
  *           type: string
- *           description: Additional remarks
+ *         is_active:
+ *           type: boolean
  *         created_by:
  *           type: string
  *           format: uuid
- *           description: ID of the user who created the project
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
  *         creator:
  *           type: object
  *           properties:
@@ -38,23 +46,29 @@
  *               type: string
  *             employee_id:
  *               type: string
- *         is_active:
- *           type: boolean
- *           description: Whether the project is active
- *         createdAt:
- *           type: string
- *           format: date-time
- *         updatedAt:
- *           type: string
- *           format: date-time
+ *         team:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             id:
+ *               type: string
+ *               format: uuid
+ *             name:
+ *               type: string
  */
 
 /**
  * @swagger
  * /api/projects:
  *   post:
- *     summary: Create a new project
- *     description: Create a new project (Authenticated, Admin required for creation)
+ *     summary: Create project
+ *     description: |
+ *       Create a new project.
+ *
+ *       - Admin can create any project
+ *       - Team Lead and Project Manager can create projects for their teams
+ *       - team_id is optional
+ *       - Small companies can create project first and create teams later
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -67,35 +81,33 @@
  *             required:
  *               - name
  *             properties:
+ *               team_id:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *                 example: 550e8400-e29b-41d4-a716-446655440000
  *               name:
  *                 type: string
- *                 example: "Customer Portal"
+ *                 example: CRM System
  *               description:
  *                 type: string
- *                 description: Optional project description
- *                 example: "A portal for customer interactions"
+ *                 example: CRM backend and dashboard
  *               remarks:
  *                 type: string
- *                 description: Optional remarks
- *                 example: "High priority project"
+ *                 example: High priority project
  *     responses:
  *       201:
  *         description: Project created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 project:
- *                   $ref: '#/components/schemas/Project'
  *       400:
- *         description: Validation error - name is required
- *       401:
- *         description: Unauthorized
+ *         description: Validation error
  *       403:
- *         description: Admin access required
+ *         description: Access denied
+ *       404:
+ *         description: Team not found
+ *       409:
+ *         description: Project already exists
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
 
 /**
@@ -103,62 +115,43 @@
  * /api/projects:
  *   get:
  *     summary: Get all projects
- *     description: Retrieve paginated list of projects. Non-admin users only see active projects, admins see all.
+ *     description: |
+ *       Retrieve paginated list of projects.
+ *
+ *       - Admin can see all projects
+ *       - Employees can only see projects related to their teams
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
- *         required: false
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number
  *         example: 1
  *       - in: query
  *         name: limit
- *         required: false
  *         schema:
  *           type: integer
- *           default: 20
- *         description: Number of records per page
- *         example: 20
+ *           default: 10
+ *         example: 10
  *     responses:
  *       200:
- *         description: Paginated list of projects
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: List of All Projects
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Project'
- *                 total:
- *                   type: integer
- *                   example: 50
- *                 page:
- *                   type: integer
- *                   example: 1
- *                 limit:
- *                   type: integer
- *                   example: 20
- *       401:
- *         description: Unauthorized
+ *         description: List of projects
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
+
 /**
  * @swagger
  * /api/projects/{id}:
  *   get:
- *     summary: Get project by ID
- *     description: Retrieve a specific project by ID (Authenticated users only)
+ *     summary: Get single project
+ *     description: |
+ *       Get single project details.
+ *
+ *       Employees can only access projects assigned to their teams.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -171,20 +164,13 @@
  *           format: uuid
  *     responses:
  *       200:
- *         description: Project found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 project:
- *                   $ref: '#/components/schemas/Project'
+ *         description: Project fetched successfully
+ *       403:
+ *         description: Access denied
  *       404:
  *         description: Project not found
- *       401:
- *         description: Unauthorized
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
 
 /**
@@ -192,7 +178,10 @@
  * /api/projects/{id}:
  *   patch:
  *     summary: Update project
- *     description: Update project details. Only creator or admin can update. Admin required for creation.
+ *     description: |
+ *       Update project details.
+ *
+ *       Only Admin, Team Lead, or Project Manager can update projects.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -204,6 +193,7 @@
  *           type: string
  *           format: uuid
  *     requestBody:
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
@@ -211,32 +201,25 @@
  *             properties:
  *               name:
  *                 type: string
+ *                 example: CRM Dashboard
  *               description:
  *                 type: string
+ *                 example: Updated CRM module
  *               remarks:
  *                 type: string
+ *                 example: Updated remarks
  *               is_active:
  *                 type: boolean
+ *                 example: true
  *     responses:
  *       200:
  *         description: Project updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 project:
- *                   $ref: '#/components/schemas/Project'
- *       400:
- *         description: Invalid input
  *       403:
- *         description: Forbidden - only creator or admin can update
+ *         description: Access denied
  *       404:
  *         description: Project not found
- *       401:
- *         description: Unauthorized
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
 
 /**
@@ -244,7 +227,10 @@
  * /api/projects/{id}:
  *   delete:
  *     summary: Delete project
- *     description: Delete a project. Only creator or admin can delete. Admin required for creation/deletion.
+ *     description: |
+ *       Delete a project.
+ *
+ *       Only Admin, Team Lead, or Project Manager can delete projects.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -258,19 +244,10 @@
  *     responses:
  *       200:
  *         description: Project deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
  *       403:
- *         description: Forbidden - only creator or admin can delete
+ *         description: Access denied
  *       404:
  *         description: Project not found
- *       401:
- *         description: Unauthorized
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */

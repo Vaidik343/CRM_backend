@@ -13,22 +13,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       allowNull: false,
     },
-    role: {
-      type: DataTypes.ENUM(
-        'Team Lead',
-        'Sr. Developer',
-        'Developer',
-        'Junior Developer',
-        'QA',
-        'Designer',
-        'Project Manager',
-        "Intern",
-        "Other"
-      ),
-      allowNull: false,
-      defaultValue: 'Developer',
-    },
-
+    // role_id: {
+    //   type: DataTypes.UUID,
+    //   allowNull: true,
+    // },
      is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
@@ -37,13 +25,15 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'team_members',
     underscored: true,
     timestamps: true,
-    indexes: [
-      {
-        unique: true,
-        fields: ['team_id', 'user_id'], // one role per team per user
-      },
-    ],
+    // indexes: [
+    //   {
+    //     unique: true,
+    //     fields: ['team_id', 'user_id'], // one role per team per user
+    //   },
+    // ],
   });
 
   return TeamMember;
 };
+
+ 

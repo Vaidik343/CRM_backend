@@ -9,7 +9,7 @@
  * @swagger
  * /api/team-members:
  *   post:
- *     summary: Add member to team
+ *     summary: Add multiple members to a team
  *     tags: [Team Members]
  *     security:
  *       - bearerAuth: []
@@ -21,24 +21,41 @@
  *             type: object
  *             required:
  *               - team_id
- *               - user_id
+ *               - members
  *             properties:
  *               team_id:
  *                 type: string
  *                 format: uuid
- *               user_id:
- *                 type: string
- *                 format: uuid
- *               role:
- *                 type: string
- *                 example: Developer
+ *                 example: 550e8400-e29b-41d4-a716-446655440000
+ *
+ *               members:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - user_id
+ *                     - role_id
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                       format: uuid
+ *                       example: 550e8400-e29b-41d4-a716-446655440001
+ *
+ *                     role_id:
+ *                       type: string
+ *                       format: uuid
+ *                       example: 550e8400-e29b-41d4-a716-446655440002
+ *
  *     responses:
  *       201:
- *         description: Team member added successfully
+ *         description: Members processed successfully
+ *
  *       400:
  *         description: Validation error
+ *
  *       404:
- *         description: User or Team not found
+ *         description: Team not found
+ *
  *       500:
  *         description: Internal server error
  */
@@ -115,9 +132,10 @@
  *           schema:
  *             type: object
  *             properties:
- *               role:
+ *               role_id:
  *                 type: string
- *                 example: Team Lead
+ *                 format: uuid
+ *                 example: 550e8400-e29b-41d4-a716-446655440002
  *               is_active:
  *                 type: boolean
  *                 example: true
