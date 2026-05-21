@@ -84,6 +84,7 @@ const createTeam = async (req, res) => {
 
     const team = await Team.create({
       name,
+      project_id,
       description: description || null,
       created_by: req.user.id,
     });
@@ -109,6 +110,7 @@ const listTeams = async (req, res) => {
       include: [
         {
           model: Project,
+            as: "project",
                     attributes: ["id", "name"],
         },
         {
@@ -131,6 +133,7 @@ const listTeams = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
+    console.log("🚀 ~ listTeams ~ teams:", teams)
 
     return res.status(200).json({
       message: "List of all teams",
@@ -155,6 +158,7 @@ const getTeam = async (req, res) => {
       include: [
         {
           model: Project,
+           as: "project",
                     attributes: ["id", "name"],
         },
         {

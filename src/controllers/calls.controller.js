@@ -30,8 +30,8 @@ const updateCallValidators = [
 ];
 
 const callIncludes = [
-  { model: User, attributes: ["id", "name", "employee_id"] },
-  { model: Project, attributes: ["id", "name"] },
+  { model: User, as: "User", attributes: ["id", "name", "employee_id"] },
+  { model: Project, as: "Project", attributes: ["id", "name"] },
 ];
 
 // ── Subtype validator helper ───────────────────────────────────

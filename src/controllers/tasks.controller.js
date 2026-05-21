@@ -28,7 +28,7 @@ const updateTaskValidators = [
 
 const taskIncludes = [
   { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
-  { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
+  // { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
   { model: Project, as: "project", attributes: ["id", "name"] },
   { model: Team, as: "team", attributes: ["id", "name"] },
 ];
@@ -39,7 +39,7 @@ const getTeamMembership = async (user_id, team_id) => {
 
 const getUserRole = async (user_id) => {
   const user = await User.findByPk(user_id, {
-    include: [{ model: Role, as: "role" }],
+    include: [{ model: Role, as: "Role" }],
   });
   return user?.role?.name; // "Team Lead", "Developer" etc.
 };
