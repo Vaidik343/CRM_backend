@@ -1,5 +1,5 @@
 const { body, param } = require("express-validator");
-const { Call, User, Project } = require("../models");
+const { Call, User, Project, Task, Team, TeamMember } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const CALL_TYPES = require("../constants/callTypes");
 
@@ -12,6 +12,7 @@ const createCallValidators = [
   body("call_summary").optional({ nullable: true }).isString(),
   body("remarks").optional({ nullable: true }).isString(),
   body("receive_type").isIn(["call", "msg", "email", "meeting"]),
+   body("is_task").optional({ nullable: true }).isBoolean(),
   handleValidation,
 ];
 
@@ -40,48 +41,107 @@ function validateSubtype(call_type, call_subtype) {
   return validSubtypes.includes(call_subtype);
 }
 
-const createCall = async (req, res) =>  {
+const createCall = async (req, res) => {
   try {
-    const { caller_name, caller_number, project_id, call_type, call_subtype, call_summary, remarks, receive_type } = req.body;
+    const {
+      caller_name,
+      caller_number,
+      project_id,
+      call_type,
+      call_subtype,
+      call_summary,
+      remarks,
+      receive_type,
+      is_task,        // NEW
+    } = req.body;
 
-    // Validate subtype belongs to type
+    // 1. Validate subtype belongs to type
     if (!validateSubtype(call_type, call_subtype)) {
       return res.status(400).json({
         message: `Invalid call_subtype "${call_subtype}" for call_type "${call_type}". Valid options: ${CALL_TYPES[call_type]?.join(", ")}`,
       });
     }
 
-   // ONLY validate project if project_id exists
-    if (project_id) {
-      const project = await Project.findByPk(project_id);
+    // 2. is_task requires project_id (need team_id from project for task)
+    if (is_task && !project_id) {
+      return res.status(400).json({
+        message: "project_id is required when is_task is true",
+      });
+    }
 
+    // 3. Validate project exists if provided
+    let project = null;
+    if (project_id) {
+      project = await Project.findByPk(project_id);
       if (!project) {
-        return res.status(404).json({
-          message: "Project not found",
-        });
+        return res.status(404).json({ message: "Project not found" });
       }
     }
 
+    // 4. Create the call
     const call = await Call.create({
-      user_id: req.user.id,
+      user_id:      req.user.id,
       caller_name,
       caller_number: caller_number || null,
-      project_id:  project_id || null,
+      project_id:   project_id || null,
       call_type,
       call_subtype,
-      call_summary: call_summary || null,
-      remarks: remarks || null,
+      call_summary:  call_summary || null,
+      remarks:       remarks || null,
       receive_type,
+      is_task:       is_task || false,   // NEW
     });
-    console.log("🚀 ~ createCall ~ call:", call)
 
     await call.reload({ include: callIncludes });
-    return res.status(201).json(call);
+
+    // 5. If is_task → auto-create task from call data
+    if (is_task) {
+      const team_id = project.team_id;
+
+      if (!team_id) {
+        // Project exists but has no team — skip task, warn in response
+        return res.status(201).json({
+          call,
+          task: null,
+          warning: "Call created but task was not auto-created because project has no team assigned",
+        });
+      }
+
+      const autoTask = await Task.create({
+        call_id:     call.id,
+        project_id:  project_id,
+        team_id:     team_id,
+        task:        call_summary
+                       ? `Follow up: ${call_summary}`.slice(0, 255)
+                       : `Follow up: ${call_subtype} from ${caller_name}`,
+        description: call_summary || null,
+        assigned_to: req.user.id,   // self-assign to whoever logged call
+        assigned_by: req.user.id,
+        status:      "ongoing",     // self-assign → ongoing
+        start_date:  new Date(),
+        due_date:    null,
+      });
+
+      await autoTask.reload({
+        include: [
+          { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
+          { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
+          { model: Project, as: "project", attributes: ["id", "name"] },
+          { model: Team, as: "team", attributes: ["id", "name"] },
+        ],
+      });
+
+      return res.status(201).json({ call, task: autoTask });
+    }
+
+    // 6. Normal call (no task)
+    return res.status(201).json({ call, task: null });
+
   } catch (err) {
     console.error("createCall error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
-}
+};
 
 const listCalls = async(req, res) => {
   try {

@@ -1,11 +1,11 @@
 const { body, param } = require("express-validator");
-const { Project, User, Team, TeamMember, Role } = require("../models");
+const { Project, User, Team, TeamMember, Role , sequelize } = require("../models");
 const { handleValidation } = require("../utils/validate");
 
 // ── Validators ────────────────────────────────────────────────────────────────
 
 const createProjectValidators = [
-  body("team_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
+  // body("team_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
   body("name").isString().trim().notEmpty(),
   body("description").optional({ nullable: true }).isString(),
   body("remarks").optional({ nullable: true }).isString(),
@@ -14,7 +14,7 @@ const createProjectValidators = [
 
 const updateProjectValidators = [
   param("id").isUUID(),
-  body("team_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
+  // body("team_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
   body("name").optional().isString().trim().notEmpty(),
   body("description").optional({ nullable: true }).isString(),
   body("remarks").optional({ nullable: true }).isString(),
@@ -24,15 +24,20 @@ const updateProjectValidators = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const projectIncludes = [
-  { model: User, as: "creator", attributes: ["id", "name", "employee_id"] },
-  //  {
-  //   model: Team,
-  //   as: "team",
-  //   attributes: ["id", "name"],
-  // },
-];
 
+
+const projectIncludes = [
+  {
+    model: User,
+    as: "creator",
+    attributes: ["id", "name", "employee_id"],
+  },
+  {
+    model: Team,
+    as: "teams",
+    attributes: ["id", "name", "project_id"],
+  },
+];
 
 const getUserRole = async (user_id) => {
   const user = await User.findByPk(user_id, {
@@ -43,11 +48,13 @@ const getUserRole = async (user_id) => {
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 const createProject = async (req, res) => {
+    const transaction = await sequelize.transaction();
   try {
     const { name, team_id, description, remarks } = req.body;
 
         if(!name)
     {
+        await transaction.rollback();
       return res.status(400).json({message: "Name Field required!"})
     }
 
@@ -62,6 +69,7 @@ const createProject = async (req, res) => {
 if (!req.user.is_admin) {
   const member = await TeamMember.findOne({
     where: {  user_id: req.user.id, is_active: true },
+       transaction,
   });
 
   if (!member) {
@@ -75,11 +83,13 @@ if (!req.user.is_admin) {
 }
 
     const existing = await Project.findOne({
-      where: {name,}
+      where: {name},
+            transaction,
     })
 
       if(existing)
     {
+        await transaction.rollback();
         return res.status(409).json({message:"Already Exist in this team!"})
     }
 
@@ -91,11 +101,14 @@ if (!req.user.is_admin) {
       remarks: remarks || null,
       created_by: req.user.id,
       is_active: true,
-    });
+    } ,{ transaction });
 
+      await transaction.commit();
     await project.reload({ include: projectIncludes });
     return res.status(201).json({ project });
   } catch (err) {
+       await transaction.rollback();
+
     console.error("createProject error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }

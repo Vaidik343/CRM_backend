@@ -47,7 +47,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM('call','msg','email','meeting'),
         allowNull:false,
       },
-      
+      is_task : {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: true,
+      }
 
     },
      {

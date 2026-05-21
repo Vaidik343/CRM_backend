@@ -134,7 +134,8 @@ const listTeams = async (req, res) => {
 
     return res.status(200).json({
       message: "List of all teams",
-      data: teams,
+      
+      teams,
     });
   } catch (err) {
     console.error("listTeams error:", err);

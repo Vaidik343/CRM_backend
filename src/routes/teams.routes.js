@@ -18,6 +18,8 @@ router.get("/teams/:id", authenticate, teamController.getTeam);
 
 router.put("/teams/:id", authenticate, teamController.updateTeamValidators , teamController.updateTeam);
 
+router.delete("/teams/:id", authenticate,   teamController.deleteTeam);
+
 // add member to team
 // router.post("/teams/:id/members", authenticate, teamController.addMemberValidators ,teamController.addMemberToTeam);
 
