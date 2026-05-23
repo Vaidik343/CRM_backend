@@ -69,21 +69,21 @@ User.hasMany(Team, { foreignKey: 'created_by', as: 'created_teams' });
 
 // Add associations
 // TeamMember.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
-Role.hasMany(TeamMember, { foreignKey: 'role_id' });
+// Role.hasMany(TeamMember, { foreignKey: 'role_id' });
 
-// Team ↔ Members (through TeamMember)
-Team.belongsToMany(User, {
-  through: TeamMember,
-  foreignKey: 'team_id',
-  otherKey: 'user_id',
-  as: 'members',
-});
-User.belongsToMany(Team, {
-  through: TeamMember,
-  foreignKey: 'user_id',
-  otherKey: 'team_id',
-  as: 'teams',
-});
+// // Team ↔ Members (through TeamMember)
+// Team.belongsToMany(User, {
+//   through: TeamMember,
+//   foreignKey: 'team_id',
+//   otherKey: 'user_id',
+//   as: 'members',
+// });
+// User.belongsToMany(Team, {
+//   through: TeamMember,
+//   foreignKey: 'user_id',
+//   otherKey: 'team_id',
+//   as: 'teams',
+// });
 
 // Direct TeamMember access
 Team.hasMany(TeamMember, { foreignKey: 'team_id', as: 'team_memberships' });

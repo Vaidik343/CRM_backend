@@ -6,19 +6,19 @@ const {teamController} = require("../controllers/team.controller");
 
 const router = express.Router();
 
-router.use(authenticate, requireAdmin);
+// router.use(authenticate, requireAdmin);
 
-router.post("/teams", authenticate, teamController.createTeamValidators ,teamController.createTeam);
+router.post("/teams", authenticate, requireAdmin, teamController.createTeamValidators ,teamController.createTeam);
 
 // get all
-router.get("/teams", authenticate, teamController.listTeams)
+router.get("/teams", authenticate, requireAdmin, teamController.listTeams)
 
 
-router.get("/teams/:id", authenticate, teamController.getTeam);
+router.get("/teams/:id", authenticate, requireAdmin, teamController.getTeam);
 
-router.put("/teams/:id", authenticate, teamController.updateTeamValidators , teamController.updateTeam);
+router.put("/teams/:id", authenticate, requireAdmin, teamController.updateTeamValidators , teamController.updateTeam);
 
-router.delete("/teams/:id", authenticate,   teamController.deleteTeam);
+router.delete("/teams/:id", authenticate, requireAdmin,  teamController.deleteTeam);
 
 // add member to team
 // router.post("/teams/:id/members", authenticate, teamController.addMemberValidators ,teamController.addMemberToTeam);

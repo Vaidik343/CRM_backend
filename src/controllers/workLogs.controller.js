@@ -32,6 +32,7 @@ const createWorkLog = async(req, res) => {
       description: req.body.description,
       date: req.body.date,
     });
+    console.log("🚀 ~ createWorkLog ~ workLog:", workLog)
     return res.status(201).json({ workLog });
   } catch (err) {
     console.error("createWorkLog error:", err);
@@ -63,7 +64,14 @@ const listWorkLogs = async(req, res) => {
 
 const getWorkLog = async (req, res) => {
   try {
+        console.log("params id:", req.params.id);
+    const raw = await WorkLog.sequelize.query(
+      `SELECT * FROM work_logs WHERE id = '${req.params.id}'`
+    );
+    console.log("raw query:", raw[0]);
+    
     const workLog = await WorkLog.findByPk(req.params.id, { include: workLogIncludes });
+    console.log("🚀 ~ getWorkLog ~ workLog:", workLog)
     if (!workLog) return res.status(404).json({ message: "Work log not found" });
     if (!req.user.is_admin && workLog.user_id !== req.user.id)
       return res.status(403).json({ message: "Forbidden" });

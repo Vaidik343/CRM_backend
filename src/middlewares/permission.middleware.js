@@ -15,6 +15,11 @@ function requirePermission(flag) {
       const permission = await Permission.findOne({
         where: { user_id: req.user.id },
       });
+      console.log("🚀 ~ requirePermission ~ permission:", permission)
+      console.log("USER:", req.user);
+console.log("PERMISSION:", permission);
+console.log("FLAG:", flag);
+console.log("VALUE:", permission?.[flag]);
 
       if (!permission || !permission[flag]) {
         return res.status(403).json({ message: "Forbidden: insufficient permissions" });

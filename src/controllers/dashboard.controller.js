@@ -1,5 +1,14 @@
-const { Op } = require("sequelize");
 const { User, Call, Task, WorkLog, Role, Team, TeamMember, Project,  } = require("../models");
+const { Op } = require("sequelize");
+
+
+const getUserRole = async (user_id) => {
+  const user = await User.findByPk(user_id, {
+    include: [{ model: Role }],
+  });
+return user?.Role?.name; // "Team Lead", "Developer" etc.
+};
+
 
 const getDashboard = async (req, res) => {
   try {
@@ -134,6 +143,12 @@ const getTeamDashboard = async (req, res) => {
       if (!membership) {
         return res.status(403).json({ message: "Access denied" });
       }
+        const userRole = await getUserRole(req.user.id);
+  const canViewDashboard = ["Project Manager", "Team Lead"].includes(userRole);
+
+  if (!canViewDashboard) {
+    return res.status(403).json({ message: "Only Project Managers and Team Leads can view team dashboard" });
+  }
     }
 
     // ── SECTION 1: Team Members ───────────────────────────────────────────
@@ -144,19 +159,10 @@ const getTeamDashboard = async (req, res) => {
           model: User,
           as: "user",
           attributes: ["id", "name", "email", "employee_id"],
-          include: [{ model: Role, as: "role", attributes: ["id", "name"] }],
+          include: [{ model: Role,  attributes: ["id", "name"] }],
         },
       ],
     });
-
-    // ── SECTION 2: Projects in this team ─────────────────────────────────
-    const projects = await Project.findAll({
-      where: { team_id, is_active: true },
-      attributes: ["id", "name", "description", "is_active", "createdAt"],
-      order: [["createdAt", "DESC"]],
-    });
-
-    const projectIds = projects.map((p) => p.id);
 
     // ── SECTION 3: Task stats (overall + per project) ─────────────────────
     const allTasks = await Task.findAll({
@@ -175,6 +181,24 @@ const getTeamDashboard = async (req, res) => {
       ongoing: allTasks.filter((t) => t.status === "ongoing").length,
       closed:  allTasks.filter((t) => t.status === "closed").length,
     };
+
+    // ── SECTION 2: Projects in this team ─────────────────────────────────
+    // Get unique project IDs that this team has tasks for, plus the team's default associated project
+    const teamProjectIds = [...new Set(allTasks.map((t) => t.project_id).filter(Boolean))];
+    if (team.project_id && !teamProjectIds.includes(team.project_id)) {
+      teamProjectIds.push(team.project_id);
+    }
+
+    const projects = await Project.findAll({
+      where: { 
+        id: { [Op.in]: teamProjectIds.length > 0 ? teamProjectIds : [null] },
+        is_active: true 
+      },
+      attributes: ["id", "name", "description", "is_active", "createdAt"],
+      order: [["createdAt", "DESC"]],
+    });
+
+    const projectIds = projects.map((p) => p.id);
 
     // Per-project task breakdown
     const projectStats = projects.map((project) => {
@@ -213,7 +237,7 @@ const getTeamDashboard = async (req, res) => {
         user_id:       m.user_id,
         name:          m.user?.name,
         employee_id:   m.user?.employee_id,
-        role:          m.user?.role?.name,
+        role:          m.user?.Role?.name, // Fixed Bug: Capital R in Role
         tasks_total:   memberTasks.length,
         tasks_open:    memberTasks.filter((t) => t.status === "open").length,
         tasks_ongoing: memberTasks.filter((t) => t.status === "ongoing").length,
@@ -310,17 +334,27 @@ const getEmployeeDashboard = async (req, res) => {
     const myTeamIds = myMemberships.map((m) => m.team_id);
 
     // ── SECTION 2: My Projects ────────────────────────────────────────────
-    const myProjects = await Project.findAll({
-      where: {
-        team_id: { [Op.in]: myTeamIds.length > 0 ? myTeamIds : ["none"] },
-        is_active: true,
-      },
-      include: [
-        { model: Team, as: "team", attributes: ["id", "name"] },
-        { model: User, as: "creator", attributes: ["id", "name"] },
-      ],
-      order: [["createdAt", "DESC"]],
-    });
+    // ── SECTION 2: My Projects ────────────────────────────────────────────
+// Get project_ids from the teams the user belongs to
+const myTeamDetails = await Team.findAll({
+  where: { id: { [Op.in]: myTeamIds.length > 0 ? myTeamIds : ["none"] } },
+  attributes: ["id", "name", "project_id"],
+});
+
+const myProjectIds = [...new Set(
+  myTeamDetails.map((t) => t.project_id).filter(Boolean)
+)];
+
+const myProjects = await Project.findAll({
+  where: {
+    id: { [Op.in]: myProjectIds.length > 0 ? myProjectIds : ["none"] },
+    is_active: true,
+  },
+  include: [
+    { model: User, as: "creator", attributes: ["id", "name"] },
+  ],
+  order: [["createdAt", "DESC"]],
+});
 
     // ── SECTION 3: My Tasks ───────────────────────────────────────────────
     const myTasks = await Task.findAll({
@@ -376,21 +410,19 @@ const getEmployeeDashboard = async (req, res) => {
     };
 
     // ── SECTION 6: My open tasks per project (quick overview) ────────────
-    const tasksByProject = myProjects.map((project) => {
-      const projectTasks = myTasks.filter(
-        (t) => t.project_id === project.id
-      );
-      return {
-        project_id:   project.id,
-        project_name: project.name,
-        team_name:    project.team?.name,
-        my_tasks:     projectTasks.length,
-        open:         projectTasks.filter((t) => t.status === "open").length,
-        ongoing:      projectTasks.filter((t) => t.status === "ongoing").length,
-        closed:       projectTasks.filter((t) => t.status === "closed").length,
-      };
-    });
-
+ const tasksByProject = myProjects.map((project) => {
+  const projectTasks = myTasks.filter((t) => t.project_id === project.id);
+  const teamForProject = myTeamDetails.find((t) => t.project_id === project.id);
+  return {
+    project_id:   project.id,
+    project_name: project.name,
+    team_name:    teamForProject?.name || null,  // ← get team name this way
+    my_tasks:     projectTasks.length,
+    open:         projectTasks.filter((t) => t.status === "open").length,
+    ongoing:      projectTasks.filter((t) => t.status === "ongoing").length,
+    closed:       projectTasks.filter((t) => t.status === "closed").length,
+  };
+});
     // ── RESPONSE ──────────────────────────────────────────────────────────
     return res.status(200).json({
       message: "Employee Dashboard",

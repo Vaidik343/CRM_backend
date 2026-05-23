@@ -122,6 +122,8 @@ const listTeams = async (req, res) => {
         {
           model: TeamMember,
           as: "team_memberships",
+             where: { is_active: true },      // ← add this
+  required: false, 
           include: [
             {
               model: User,
@@ -169,6 +171,8 @@ const getTeam = async (req, res) => {
         {
           model: TeamMember,
           as: "team_memberships",
+            where: { is_active: true },      // ← add this
+  required: false, 
           include: [
             {
               model: User,

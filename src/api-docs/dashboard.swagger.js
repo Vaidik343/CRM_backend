@@ -1,7 +1,7 @@
 /**
  * @swagger
  * tags:
- *   - name: Dashboard
+ *     name: Dashboard
  *     description: Dashboard analytics APIs
  */
 

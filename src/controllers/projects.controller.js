@@ -41,9 +41,9 @@ const projectIncludes = [
 
 const getUserRole = async (user_id) => {
   const user = await User.findByPk(user_id, {
-    include: [{ model: Role, as: 'role' }]
+    include: [{ model: Role}]
   });
-  return user?.role?.name; // "Team Lead", "Developer" etc.
+  return user?.Role?.name; // "Team Lead", "Developer" etc.
 };
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
@@ -145,9 +145,10 @@ const listProjects = async (req, res) => {
     const {count, rows} = await Project.findAndCountAll({
       limit,
       offset,
-      where,
+      where : {is_active : true},
       include: projectIncludes,
       order: [["createdAt", "DESC"]],
+
     });
     return res.status(200).json({message:"List of All Projects", data: rows, total: count, page, limit});
   } catch (err) {

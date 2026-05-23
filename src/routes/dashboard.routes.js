@@ -6,11 +6,6 @@ const { getDashboard, getTeamDashboard, getEmployeeDashboard} = require("../cont
 const router = express.Router();
 
 router.get("/dashboard", authenticate, requireAdmin, getDashboard);
-
-// teams.routes.js
-router.get("/dashboard/:id/dashboard", authenticate, getTeamDashboard);
-
-// Add new dashboard route file or in existing:
-// dashboard.routes.js (employee)
-router.get("/dashboard/me/dashboard", authenticate, getEmployeeDashboard);
+router.get("/teams/:id/dashboard", authenticate, getTeamDashboard);           // team
+router.get("/me/dashboard", authenticate, getEmployeeDashboard);  
 module.exports = router;

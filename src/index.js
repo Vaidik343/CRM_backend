@@ -36,7 +36,11 @@ app.use(
   }),
 );
 
-app.use(cors());
+// app.use(cors());
+
+app.use(cors({
+  origin: "*"
+}))
 // app.options('*', cors());
 app.use(express.json());
 app.use(cookieParser());
@@ -113,15 +117,20 @@ const swaggerSpec = swaggerJsdoc(options);
 // 🧾 Serve Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// console.log('✅ Swagger docs loaded from:', apiFiles);
+console.log('✅ Swagger docs loaded from:', apiFiles);
 
 const startServer = async () => {
   try {
     await connectDB();
 
-    app.listen(PORT,  () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-    });
+    // app.listen(PORT,  () => {
+    //   console.log(`🚀 Server running on http://localhost:${PORT}`);
+    // });
+
+    app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on 0.0.0.0:${PORT}`);
+
+    })
   } catch (error) {
     console.error("❌ Server startup failed:", error.message);
   }

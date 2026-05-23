@@ -1,0 +1,1398 @@
+{
+    "info": {
+        "name": "CRM API Test Collection",
+        "_postman_id": "crm-api-tests",
+        "description": "Postman collection with test requests for all CRM API endpoints. Use {{baseUrl}} and set {{authToken}} after login.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "version": "1.0.0"
+    },
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"employee_id\": \"EMP001\",\n  \"password\": \"password123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{authToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/logout",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "logout"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Roles",
+            "item": [
+                {
+                    "name": "Create Role",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{authToken}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Manager\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/roles",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "roles"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "List Roles",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{authToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/roles",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "roles"
+                            ]
+                        }
+                    }
+                },
+{
+  "name": "Get Role by ID",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{authToken}}"
+      }
+    ],
+    "url": {
+      "raw": "{{baseUrl}}/roles/{{roleId}}",
+      "host": ["{{baseUrl}}"],
+      "path": ["roles", "{{roleId}}"]
+    }
+  }
+},
+            {
+                "name": "Users",
+                "item": [
+                    {
+                        "name": "Create User",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"role_id\": \"{{roleId}}\",\n  \"is_admin\": false\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/users",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "users"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "List Users",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/users",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "users"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get User",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/users/{{userId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "users",
+                                    "{{userId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Update User",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"name\": \"John Updated\",\n  \"email\": \"john2@example.com\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/users/{{userId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "users",
+                                    "{{userId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Delete User",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/users/{{userId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "users",
+                                    "{{userId}}"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Permissions",
+                "item": [
+                    {
+                        "name": "List Permissions",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/permissions",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "permissions"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Permission",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/permissions/{{userId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "permissions",
+                                    "{{userId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Update Permission",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"can_update\": true,\n  \"can_delete\": true\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/permissions/{{userId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "permissions",
+                                    "{{userId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Reset Permission",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/permissions/{{userId}}/reset",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "permissions",
+                                    "{{userId}}",
+                                    "reset"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Projects",
+                "item": [
+                    {
+                        "name": "Create Project",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"name\": \"Customer Portal\",\n  \"description\": \"Portal description\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/projects",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "projects"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "List Projects",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/projects",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "projects"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Project",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/projects/{{projectId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "projects",
+                                    "{{projectId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Update Project",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"name\": \"Updated Project\",\n  \"is_active\": false\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/projects/{{projectId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "projects",
+                                    "{{projectId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Delete Project",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/projects/{{projectId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "projects",
+                                    "{{projectId}}"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Calls",
+                "item": [
+                    {
+                        "name": "Create Call",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"caller_name\": \"Alice\",\n  \"caller_number\": \"+15550123\",\n  \"project_id\": \"{{projectId}}\",\n  \"call_type\": \"inquiry\",\n  \"call_subtype\": \"inquiry\",\n  \"call_summary\": \"Asked about pricing\",\n  \"remarks\": \"Follow up\",\n  \"receive_type\": \"call\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/calls",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "calls"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "List Calls",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/calls",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "calls"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Call",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/calls/{{callId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "calls",
+                                    "{{callId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Update Call",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"remarks\": \"Updated remarks\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/calls/{{callId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "calls",
+                                    "{{callId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Delete Call",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/calls/{{callId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "calls",
+                                    "{{callId}}"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Tasks",
+                "item": [
+                    {
+                        "name": "Create Task",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"task\": \"Complete report\",\n  \"description\": \"Monthly report\",\n  \"assigned_to\": \"{{userId}}\",\n  \"call_id\": \"{{callId}}\",\n  \"due_date\": \"2026-05-30\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/tasks",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "tasks"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "List Tasks",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/tasks",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "tasks"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Task",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/tasks/{{taskId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "tasks",
+                                    "{{taskId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Update Task",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"status\": \"ongoing\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/tasks/{{taskId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "tasks",
+                                    "{{taskId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Delete Task",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/tasks/{{taskId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "tasks",
+                                    "{{taskId}}"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Work Logs",
+                "item": [
+                    {
+                        "name": "Create Work Log",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"description\": \"Fixed bug\",\n  \"date\": \"2026-05-22\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/work-logs",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "work-logs"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "List Work Logs",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/work-logs",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "work-logs"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Work Log",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/work-logs/{{workLogId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "work-logs",
+                                    "{{workLogId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Update Work Log",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"description\": \"Updated work log\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/work-logs/{{workLogId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "work-logs",
+                                    "{{workLogId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Delete Work Log",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/work-logs/{{workLogId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "work-logs",
+                                    "{{workLogId}}"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Export",
+                "item": [
+                    {
+                        "name": "Export Calls (xlsx)",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/export?type=calls",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "export"
+                                ],
+                                "query": [
+                                    {
+                                        "key": "type",
+                                        "value": "calls"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Export Tasks (xlsx)",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/export?type=tasks",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "export"
+                                ],
+                                "query": [
+                                    {
+                                        "key": "type",
+                                        "value": "tasks"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Export Work Logs (xlsx)",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/export?type=work-logs",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "export"
+                                ],
+                                "query": [
+                                    {
+                                        "key": "type",
+                                        "value": "work-logs"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Dashboard",
+                "item": [
+                    {
+                        "name": "Admin Dashboard",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/dashboard",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "dashboard"
+                                ],
+                                "query": []
+                            }
+                        }
+                    },
+                    {
+                        "name": "Team Dashboard",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/teams/{{teamId}}/dashboard",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "teams",
+                                    "{{teamId}}",
+                                    "dashboard"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "My Dashboard",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/me/dashboard",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "me",
+                                    "dashboard"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Password",
+                "item": [
+                    {
+                        "name": "Change Own Password",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"current_password\": \"oldpass\",\n  \"new_password\": \"newpass123\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/password/change",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "password",
+                                    "change"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Admin Reset Password",
+                        "request": {
+                            "method": "PATCH",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/password/reset/{{userId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "password",
+                                    "reset",
+                                    "{{userId}}"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Teams",
+                "item": [
+                    {
+                        "name": "Create Team",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"name\": \"Team A\",\n  \"description\": \"Team description\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/teams",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "teams"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "List Teams",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/teams",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "teams"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Team",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/teams/{{teamId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "teams",
+                                    "{{teamId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Update Team",
+                        "request": {
+                            "method": "PUT",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"name\": \"Team A Updated\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/teams/{{teamId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "teams",
+                                    "{{teamId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Delete Team",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/teams/{{teamId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "teams",
+                                    "{{teamId}}"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Team Members",
+                "item": [
+                    {
+                        "name": "Create Team Member",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"team_id\": \"{{teamId}}\",\n  \"user_id\": \"{{userId}}\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/team-members",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "team-members"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "List Team Members",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/team-members",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "team-members"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Get Team Member",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/team-members/{{memberId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "team-members",
+                                    "{{memberId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Update Team Member",
+                        "request": {
+                            "method": "PUT",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                },
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"is_active\": true\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/team-members/{{memberId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "team-members",
+                                    "{{memberId}}"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "Delete Team Member",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{authToken}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/team-members/{{memberId}}",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "team-members",
+                                    "{{memberId}}"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        ],
+        "variable": [
+            {
+                "key": "baseUrl",
+                "value": "http://localhost:7012/api"
+            },
+            {
+                "key": "authToken",
+                "value": ""
+            },
+            {
+                "key": "roleId",
+                "value": ""
+            },
+            {
+                "key": "userId",
+                "value": ""
+            },
+            {
+                "key": "projectId",
+                "value": ""
+            },
+            {
+                "key": "callId",
+                "value": ""
+            },
+            {
+                "key": "taskId",
+                "value": ""
+            },
+            {
+                "key": "workLogId",
+                "value": ""
+            },
+            {
+                "key": "teamId",
+                "value": ""
+            },
+            {
+                "key": "memberId",
+                "value": ""
+            }
+        ]
+    }

@@ -38,7 +38,9 @@ const createTeamMember = async (req, res) => {
     }
 
     const createdMembers = [];
+    console.log("🚀 ~ createTeamMember ~ createdMembers:", createdMembers)
     const skippedMembers = [];
+    console.log("🚀 ~ createTeamMember ~ skippedMembers:", skippedMembers)
 
     for (const item of members) {
       const { user_id, role_id } = item;
@@ -58,21 +60,33 @@ const createTeamMember = async (req, res) => {
     
 
       // Prevent duplicate member
-      const existingMember = await TeamMember.findOne({
-        where: {
-          team_id,
-          user_id,
-        },
-      });
+     const existingMember = await TeamMember.findOne({
+  where: {
+    team_id,
+    user_id,
+  },
+});
 
-      if (existingMember) {
-        skippedMembers.push({
-          user_id,
-          reason: "User already exists in this team",
-        });
+if (existingMember) {
 
-        continue;
-      }
+  // Reactivate if previously removed
+  if (!existingMember.is_active) {
+    await existingMember.update(
+      { is_active: true },
+      { transaction }
+    );
+
+    createdMembers.push(existingMember);
+    continue;
+  }
+
+  skippedMembers.push({
+    user_id,
+    reason: "User already exists in this team",
+  });
+
+  continue;
+}
 
       // Create member
       const member = await TeamMember.create(
@@ -84,6 +98,7 @@ const createTeamMember = async (req, res) => {
         },
         { transaction }
       );
+      console.log("🚀 ~ createTeamMember ~ member:", member)
 
       createdMembers.push(member);
     }
@@ -130,26 +145,37 @@ const getAllTeamMembers = async (req, res) => {
 
     const offset = (page - 1) * limit;
 
-    const { count, rows } = await TeamMember.findAndCountAll({
-      limit,
-      offset,
+const { count, rows } = await TeamMember.findAndCountAll({
+  // attributes: {
+  //   exclude: ["role_id"],
+  // },
+where: {
+    is_active: true,
+  },
+  limit,
+  offset,
 
+  include: [
+    {
+      model: Team,
+      as: "team",
+      attributes: ["id", "name"],
+    },
+    {
+      model: User,
+      as: "user",
+      attributes: ["id", "name", "employee_id", "email"],
       include: [
         {
-          model: Team,
-          as: "team",
+          model: Role,
           attributes: ["id", "name"],
         },
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "name", "employee_id", "email"],
-        },
       ],
+    },
+  ],
 
-      order: [["createdAt", "DESC"]],
-    });
-
+  order: [["createdAt", "DESC"]],
+});
     return res.status(200).json({
       message: "List of all Team Members",
       data: rows,
@@ -175,20 +201,30 @@ const getTeamMember = async (req, res) => {
   try {
     const memberId = req.params.id;
 
-    const member = await TeamMember.findByPk(memberId, {
+   const member = await TeamMember.findByPk(memberId, {
+  attributes: {
+    exclude: ["role_id"],
+  },
+
+  include: [
+    {
+      model: Team,
+      as: "team",
+      attributes: ["id", "name"],
+    },
+    {
+      model: User,
+      as: "user",
+      attributes: ["id", "name", "employee_id", "email"],
       include: [
         {
-          model: Team,
-          as: "team",
+          model: Role,
           attributes: ["id", "name"],
         },
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "name", "employee_id", "email"],
-        },
       ],
-    });
+    },
+  ],
+});
 
     if (!member) {
       return res.status(404).json({

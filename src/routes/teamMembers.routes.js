@@ -10,14 +10,14 @@ const {
 } = require("../controllers/teamMembers.controller");
 
 // Protect all routes
-router.use(authenticate, requireAdmin);
+// router.use(authenticate, requireAdmin);
 
 // ─────────────────────────────────────────────
 // CREATE TEAM MEMBER
 // POST /api/team-members
 // ─────────────────────────────────────────────
 router.post(
-  "/team-members",
+  "/team-members", authenticate, requireAdmin,
   teamMemberController.createTeamMember
 );
 
@@ -26,7 +26,7 @@ router.post(
 // GET /api/team-members
 // ─────────────────────────────────────────────
 router.get(
-  "/team-members",
+  "/team-members",  authenticate, requireAdmin,
   teamMemberController.getAllTeamMembers
 );
 
@@ -35,7 +35,7 @@ router.get(
 // GET /api/team-members/:id
 // ─────────────────────────────────────────────
 router.get(
-  "/team-members/:id",
+  "/team-members/:id",  authenticate, requireAdmin,
   teamMemberController.getTeamMember
 );
 
@@ -44,7 +44,7 @@ router.get(
 // PUT /api/team-members/:id
 // ─────────────────────────────────────────────
 router.put(
-  "/team-members/:id",
+  "/team-members/:id",  authenticate, requireAdmin,
   teamMemberController.updateTeamMember
 );
 
@@ -53,7 +53,7 @@ router.put(
 // DELETE /api/team-members/:id
 // ─────────────────────────────────────────────
 router.delete(
-  "/team-members/:id",
+  "/team-members/:id",  authenticate, requireAdmin,
   teamMemberController.deleteMember
 );
 

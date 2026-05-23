@@ -15,17 +15,18 @@
  *         id:
  *           type: string
  *           format: uuid
+ *           example: "09f40bca-0bbb-4599-8d8f-8f9079c4a9e1"
  *         user_id:
  *           type: string
  *           format: uuid
- *           description: ID of the user who created the work log
+ *           example: "cd45cbfc-43fd-4a0f-95c8-713ebfaab08c"
  *         description:
  *           type: string
- *           description: Description of work done
+ *           example: "Fixed bug in authentication module"
  *         date:
  *           type: string
  *           format: date
- *           description: Date of the work (YYYY-MM-DD format)
+ *           example: "2024-01-15"
  *         User:
  *           type: object
  *           properties:
@@ -34,8 +35,10 @@
  *               format: uuid
  *             name:
  *               type: string
+ *               example: "John Doe"
  *             employee_id:
  *               type: string
+ *               example: "EMP002"
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -48,8 +51,8 @@
  * @swagger
  * /api/work-logs:
  *   post:
- *     summary: Create a new work log
- *     description: Log work completed on a specific date (Requires can_write permission)
+ *     summary: Create a work log
+ *     description: Log work completed on a specific date. Any authenticated employee can create their own log.
  *     tags: [Work Logs]
  *     security:
  *       - bearerAuth: []
@@ -65,13 +68,11 @@
  *             properties:
  *               description:
  *                 type: string
- *                 description: Description of work completed
  *                 example: "Fixed bug in authentication module and tested login functionality"
  *               date:
  *                 type: string
- *                 format: date-time
- *                 description: Date of work (ISO 8601 format)
- *                 example: "2024-01-15T10:00:00Z"
+ *                 format: date
+ *                 example: "2024-01-15"
  *     responses:
  *       201:
  *         description: Work log created successfully
@@ -83,11 +84,9 @@
  *                 workLog:
  *                   $ref: '#/components/schemas/WorkLog'
  *       400:
- *         description: Validation error - missing required fields
+ *         description: Validation error
  *       401:
  *         description: Unauthorized
- *       403:
- *         description: Requires write permission
  *       500:
  *         description: Server error
  */
@@ -97,30 +96,26 @@
  * /api/work-logs:
  *   get:
  *     summary: Get all work logs
- *     description: Retrieve paginated list of work logs. Non-admin users only see their own logs.
+ *     description: Paginated list of work logs. Admin sees all, employees see only their own.
  *     tags: [Work Logs]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
- *         required: false
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number
  *         example: 1
  *       - in: query
  *         name: limit
- *         required: false
  *         schema:
  *           type: integer
  *           default: 20
- *         description: Number of records per page
  *         example: 20
  *     responses:
  *       200:
- *         description: Paginated list of work logs (sorted by date descending, then by creation date)
+ *         description: List of work logs
  *         content:
  *           application/json:
  *             schema:
@@ -128,14 +123,14 @@
  *               properties:
  *                 message:
  *                   type: string
- *                   example: List of All Work logs
+ *                   example: "List of All Work logs"
  *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/WorkLog'
  *                 total:
  *                   type: integer
- *                   example: 120
+ *                   example: 5
  *                 page:
  *                   type: integer
  *                   example: 1
@@ -147,12 +142,13 @@
  *       500:
  *         description: Server error
  */
+
 /**
  * @swagger
  * /api/work-logs/{id}:
  *   get:
  *     summary: Get work log by ID
- *     description: Retrieve a specific work log. Non-admin users can only see their own logs.
+ *     description: Get a specific work log. Employees can only view their own logs.
  *     tags: [Work Logs]
  *     security:
  *       - bearerAuth: []
@@ -163,6 +159,7 @@
  *         schema:
  *           type: string
  *           format: uuid
+ *         example: "09f40bca-0bbb-4599-8d8f-8f9079c4a9e1"
  *     responses:
  *       200:
  *         description: Work log found
@@ -174,7 +171,7 @@
  *                 workLog:
  *                   $ref: '#/components/schemas/WorkLog'
  *       403:
- *         description: Forbidden - can only view own work logs
+ *         description: Forbidden
  *       404:
  *         description: Work log not found
  *       401:
@@ -188,7 +185,7 @@
  * /api/work-logs/{id}:
  *   patch:
  *     summary: Update work log
- *     description: Update work log details (Requires can_update permission). Non-admin users can only update own logs.
+ *     description: Update a work log. Employees can only update their own logs.
  *     tags: [Work Logs]
  *     security:
  *       - bearerAuth: []
@@ -199,6 +196,7 @@
  *         schema:
  *           type: string
  *           format: uuid
+ *         example: "09f40bca-0bbb-4599-8d8f-8f9079c4a9e1"
  *     requestBody:
  *       content:
  *         application/json:
@@ -207,11 +205,11 @@
  *             properties:
  *               description:
  *                 type: string
- *                 description: Updated description
+ *                 example: "Updated description of work done"
  *               date:
  *                 type: string
  *                 format: date
- *                 description: Updated date (ISO 8601 format)
+ *                 example: "2024-01-16"
  *     responses:
  *       200:
  *         description: Work log updated successfully
@@ -225,7 +223,7 @@
  *       400:
  *         description: Invalid input
  *       403:
- *         description: Forbidden or requires update permission
+ *         description: Forbidden
  *       404:
  *         description: Work log not found
  *       401:
@@ -239,7 +237,7 @@
  * /api/work-logs/{id}:
  *   delete:
  *     summary: Delete work log
- *     description: Delete a work log (Requires can_delete permission). Non-admin users can only delete own logs.
+ *     description: Delete a work log. Employees can only delete their own logs.
  *     tags: [Work Logs]
  *     security:
  *       - bearerAuth: []
@@ -250,9 +248,10 @@
  *         schema:
  *           type: string
  *           format: uuid
+ *         example: "09f40bca-0bbb-4599-8d8f-8f9079c4a9e1"
  *     responses:
  *       200:
- *         description: Work log deleted successfully
+ *         description: Work log deleted
  *         content:
  *           application/json:
  *             schema:
@@ -260,8 +259,9 @@
  *               properties:
  *                 message:
  *                   type: string
+ *                   example: "Work log deleted"
  *       403:
- *         description: Forbidden or requires delete permission
+ *         description: Forbidden
  *       404:
  *         description: Work log not found
  *       401:

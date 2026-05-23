@@ -39,9 +39,9 @@ const getTeamMembership = async (user_id, team_id) => {
 
 const getUserRole = async (user_id) => {
   const user = await User.findByPk(user_id, {
-    include: [{ model: Role, as: "Role" }],
+    include: [{ model: Role }],
   });
-  return user?.role?.name; // "Team Lead", "Developer" etc.
+return user?.Role?.name; // "Team Lead", "Developer" etc.
 };
 
 // ── Controllers ───────────────────────────────────────────────────────────────
@@ -50,9 +50,11 @@ const createTask = async (req, res) => {
   try {
     const { call_id, project_id, team_id, task, description, due_date } = req.body;
     const assigned_to = req.body.assigned_to || req.user.id;
+    console.log("🚀 ~ createTask ~ assigned_to:", assigned_to)
 
-    // 1. Verify assignee exists
+    // // 1. Verify assignee exists
     const assignee = await User.findByPk(assigned_to);
+    console.log("🚀 ~ createTask ~ assignee:", assignee)
     if (!assignee) {
       return res.status(404).json({ message: "Assignee not found" });
     }
@@ -68,6 +70,7 @@ const createTask = async (req, res) => {
 
       // 3a. Creator must be team member
       const currentMember = await getTeamMembership(req.user.id, team_id);
+      console.log("🚀 ~ createTask ~ currentMember:", currentMember)
       if (!currentMember) {
         return res.status(403).json({ message: "You are not part of this team" });
       }
@@ -92,9 +95,11 @@ const createTask = async (req, res) => {
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
-      if (project.team_id !== team_id) {
-        return res.status(400).json({ message: "Project does not belong to this team" });
-      }
+     if (team.project_id !== project_id) {
+  return res.status(400).json({
+    message: "Team does not belong to this project",
+  });
+}
     }
 
     // 5. Auto-set status: self-assign → ongoing, assign to other → open
@@ -113,6 +118,7 @@ const createTask = async (req, res) => {
       due_date: due_date || null,
       status,
     });
+    console.log("🚀 ~ createTask ~ newTask:", newTask)
 
     await newTask.reload({ include: taskIncludes });
     return res.status(201).json({ task: newTask });

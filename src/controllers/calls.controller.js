@@ -30,10 +30,9 @@ const updateCallValidators = [
 ];
 
 const callIncludes = [
-  { model: User, as: "User", attributes: ["id", "name", "employee_id"] },
-  { model: Project, as: "Project", attributes: ["id", "name"] },
+  { model: User, attributes: ["id", "name", "employee_id"] },     
+  { model: Project, attributes: ["id", "name"] },                  
 ];
-
 // ── Subtype validator helper ───────────────────────────────────
 function validateSubtype(call_type, call_subtype) {
   const validSubtypes = CALL_TYPES[call_type];
@@ -126,7 +125,7 @@ const createCall = async (req, res) => {
         include: [
           { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
           { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
-          { model: Project, as: "project", attributes: ["id", "name"] },
+          { model: Project,  attributes: ["id", "name"] },
           { model: Team, as: "team", attributes: ["id", "name"] },
         ],
       });
