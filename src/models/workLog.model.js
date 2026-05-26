@@ -14,6 +14,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       description: { type: DataTypes.TEXT, allowNull: false },
       date: { type: DataTypes.DATEONLY, allowNull: false },
+         remarks: {
+        type: DataTypes.JSONB,
+        allowNull:true // change it to false
+        
+      }
     },
     {
       tableName: "work_logs",

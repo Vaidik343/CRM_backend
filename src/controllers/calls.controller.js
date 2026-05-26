@@ -90,47 +90,60 @@ const createCall = async (req, res) => {
       receive_type,
       is_task:       is_task || false,   // NEW
     });
+    console.log("🚀 ~ createCall ~ call:", call)
 
     await call.reload({ include: callIncludes });
 
     // 5. If is_task → auto-create task from call data
     if (is_task) {
-      const team_id = project.team_id;
+  console.log("🚀 ~ createCall ~ is_task:", is_task)
+  // Find team that has this project linked
+  const teamForProject = await Team.findOne({
+    where: { project_id: project_id }
+  });
+  console.log("🚀 ~ createCall ~ teamForProject:", teamForProject)
 
-      if (!team_id) {
-        // Project exists but has no team — skip task, warn in response
-        return res.status(201).json({
-          call,
-          task: null,
-          warning: "Call created but task was not auto-created because project has no team assigned",
-        });
-      }
+  if (!teamForProject) {
+    return res.status(201).json({
+      call,
+      task: null,
+      warning: "Call created but task was not auto-created because no team is linked to this project",
+    });
+  }
 
-      const autoTask = await Task.create({
-        call_id:     call.id,
-        project_id:  project_id,
-        team_id:     team_id,
-        task:        call_summary
-                       ? `Follow up: ${call_summary}`.slice(0, 255)
-                       : `Follow up: ${call_subtype} from ${caller_name}`,
-        description: call_summary || null,
-        assigned_to: req.user.id,   // self-assign to whoever logged call
-        assigned_by: req.user.id,
-        status:      "ongoing",     // self-assign → ongoing
-        start_date:  new Date(),
-        due_date:    null,
-      });
+  const team_id = teamForProject.id;  // ✅ correct team_id
 
-      await autoTask.reload({
+
+   // ✅ CREATE TASK
+  const task = await Task.create({
+    call_id: call.id,
+    project_id: project_id,
+    team_id: team_id,
+    task: call_summary
+      ? `Follow up: ${call_summary}`.slice(0, 255)
+      : `Follow up: ${call_subtype} from ${caller_name}`,
+
+    description: call_summary || null,
+
+    assigned_to: req.user.id,
+    assigned_by: req.user.id,
+
+    status: "ongoing",
+    start_date: new Date(),
+    due_date: null,
+  });
+
+  
+      await task.reload({
         include: [
           { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
           { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
-          { model: Project,  attributes: ["id", "name"] },
+          { model: Project, as: "project" , attributes: ["id", "name"] },
           { model: Team, as: "team", attributes: ["id", "name"] },
         ],
       });
 
-      return res.status(201).json({ call, task: autoTask });
+      return res.status(201).json({ call, task});
     }
 
     // 6. Normal call (no task)
@@ -154,7 +167,7 @@ const listCalls = async(req, res) => {
       offset,
       where,
       include: callIncludes,
-      order: [["id", "ASC"]],
+      order: [["id", "DESC"]],
     });
 
     // console.log("call all", count, rows)

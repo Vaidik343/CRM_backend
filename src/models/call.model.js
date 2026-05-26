@@ -27,6 +27,11 @@ module.exports = (sequelize, DataTypes) => {
           type:DataTypes.UUID,
                 allowNull: true
       },
+      display_id: {
+    type: DataTypes.STRING,
+    allowNull: true // change it to false
+},
+
       call_type: {
         type: DataTypes.ENUM("inquiry", "request", "complaint"),
         allowNull:false
@@ -34,6 +39,10 @@ module.exports = (sequelize, DataTypes) => {
       call_subtype: {
         type: DataTypes.STRING,
         allowNull:false,
+      },
+      follow_up: {
+        type: DataTypes.STRING,
+        allowNull:true // change it to false
       },
       call_summary: {
         type: DataTypes.TEXT,
@@ -51,6 +60,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
         allowNull: true,
+      },
+      remarks: {
+        type: DataTypes.JSONB,
+        allowNull:true // change it to false
+        
       }
 
     },

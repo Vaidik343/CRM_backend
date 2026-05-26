@@ -46,6 +46,10 @@
  *           type: string
  *           enum: [call, msg, email, meeting]
  *           description: How the communication was received
+ *         is_task:
+ *           type: boolean
+ *           description: Whether a follow-up task should be auto-created
+ *           example: true
  *         User:
  *           type: object
  *           properties:
@@ -120,6 +124,10 @@
  *               receive_type:
  *                 type: string
  *                 enum: [call, msg, email, meeting]
+ *               is_task:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Auto-create follow-up task from this call
  *     responses:
  *       201:
  *         description: Call record created successfully

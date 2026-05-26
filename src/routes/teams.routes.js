@@ -11,10 +11,10 @@ const router = express.Router();
 router.post("/teams", authenticate, requireAdmin, teamController.createTeamValidators ,teamController.createTeam);
 
 // get all
-router.get("/teams", authenticate, requireAdmin, teamController.listTeams)
+router.get("/teams", authenticate,  teamController.listTeams)
 
 
-router.get("/teams/:id", authenticate, requireAdmin, teamController.getTeam);
+router.get("/teams/:id", authenticate,  teamController.getTeam);
 
 router.put("/teams/:id", authenticate, requireAdmin, teamController.updateTeamValidators , teamController.updateTeam);
 

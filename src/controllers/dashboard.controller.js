@@ -36,12 +36,33 @@ const getDashboard = async (req, res) => {
       activityWhere = { createdAt: { [Op.gte]: sevenDaysAgo } };
     }
 
-    const [totalEmployees, totalCalls, totalTasks, totalWorkLogs] = await Promise.all([
-      User.count({ where: { is_admin: false, ...totalsWhere } }),
-      Call.count({ where: totalsWhere }),
-      Task.count({ where: totalsWhere }),
-      WorkLog.count({ where: totalsWhere }),
-    ]);
+ const [
+  totalEmployees,
+  totalTeams,
+  totalCalls,
+  totalTasks,
+  totalWorkLogs
+] = await Promise.all([
+
+  User.count({
+    where: {
+      is_admin: false,
+      ...totalsWhere,
+    },
+  }),
+
+  Team.count({
+    where: {
+      is_active: true, // optional if you use soft-active teams
+    },
+  }),
+
+  Call.count({ where: totalsWhere }),
+
+  Task.count({ where: totalsWhere }),
+
+  WorkLog.count({ where: totalsWhere }),
+]);
 
     const [recentCalls, recentTasks, recentWorkLogs] = await Promise.all([
       Call.count({ where: activityWhere }),
@@ -111,7 +132,7 @@ const getDashboard = async (req, res) => {
     }));
 
     return res.json({
-      totals:                 { employees: totalEmployees, calls: totalCalls, tasks: totalTasks, work_logs: totalWorkLogs },
+      totals:                 { employees: totalEmployees, teams: totalTeams,calls: totalCalls, tasks: totalTasks, work_logs: totalWorkLogs },
       last_7_days:            { calls: recentCalls, tasks: recentTasks, work_logs: recentWorkLogs },
       task_status_breakdown:  taskStatusBreakdown,
       call_type_breakdown:    callTypeBreakdown,

@@ -19,6 +19,12 @@ project_id: {
   allowNull: true,
 },
 
+display_id: {
+    type: DataTypes.STRING,
+    allowNull: true // change it to false
+},
+
+
       task: {
          type: DataTypes.STRING,
         allowNull: false,
@@ -54,6 +60,12 @@ project_id: {
         defaultValue: "open",
         allowNull:false
       },
+
+      remarks: {
+        type: DataTypes.JSONB,
+        allowNull:true // change it to false
+        
+      }
 
     },
      {

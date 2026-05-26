@@ -92,6 +92,10 @@ const options = {
             ? `http://localhost:${PORT}`
             : `http://localhost:${PORT}`,
       },
+
+  //      {
+  //   url: `http://192.168.29.85:${PORT}`,
+  // },
     ],
     components: {
       securitySchemes: {

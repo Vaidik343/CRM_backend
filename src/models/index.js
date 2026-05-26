@@ -13,6 +13,7 @@ const Task       = require("./task.model")(sequelize, DataTypes);
 const WorkLog    = require("./workLog.model")(sequelize, DataTypes);
 const Team = require('./team.model')(sequelize, DataTypes);
 const TeamMember = require('./teamMembers.model')(sequelize, DataTypes);
+const Notification = require("./notification.mode")(sequelize, DataTypes);
 
 // ── Layer 1: Role → User ──────────────────────────────────────
 Role.hasMany(User, { foreignKey: "role_id", onDelete: "RESTRICT" });
@@ -110,4 +111,5 @@ module.exports = {
   Call,
   Task,
   WorkLog,
+  Notification
 };

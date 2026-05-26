@@ -1,5 +1,6 @@
 const { body, param } = require("express-validator");
 const { Project, User, Team, TeamMember, Role , sequelize } = require("../models");
+const { Op } = require("sequelize");
 const { handleValidation } = require("../utils/validate");
 
 // ── Validators ────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ const getUserRole = async (user_id) => {
 const createProject = async (req, res) => {
     const transaction = await sequelize.transaction();
   try {
-    const { name, team_id, description, remarks } = req.body;
+    const { name, description, remarks } = req.body;
 
         if(!name)
     {
@@ -66,21 +67,21 @@ const createProject = async (req, res) => {
     //only admin or team lead can create project
 
 // FIX — clean rewrite:
-if (!req.user.is_admin) {
-  const member = await TeamMember.findOne({
-    where: {  user_id: req.user.id, is_active: true },
-       transaction,
-  });
+// if (!req.user.is_admin) {
+//   const member = await TeamMember.findOne({
+//     where: {  user_id: req.user.id, is_active: true },
+//        transaction,
+//   });
 
-  if (!member) {
-    return res.status(403).json({ message: "You are not part of this team" });
-  }
+//   if (!member) {
+//     return res.status(403).json({ message: "You are not part of this team" });
+//   }
 
-  const userRole = await getUserRole(req.user.id);
-  if (!["Team Lead", "Project Manager"].includes(userRole)) {
-    return res.status(403).json({ message: "Only Team Lead can create project" });
-  }
-}
+//   const userRole = await getUserRole(req.user.id);
+//   if (!["Team Lead", "Project Manager"].includes(userRole)) {
+//     return res.status(403).json({ message: "Only Team Lead can create project" });
+//   }
+// }
 
     const existing = await Project.findOne({
       where: {name},
@@ -117,45 +118,94 @@ if (!req.user.is_admin) {
 
 const listProjects = async (req, res) => {
   try {
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const offset = (page -1) * limit;
-    
-    let where = {};
+    const offset = (page - 1) * limit;
 
-    //Admin sees all projects 
-    if(!req.user.is_admin)
-    {
-      // Get all teams of logged-in user
+    let where = {
+      is_active: true,
+    };
 
+    // EMPLOYEE
+    if (!req.user.is_admin) {
+
+      // Get all active team memberships
       const memberships = await TeamMember.findAll({
         where: {
-
           user_id: req.user.id,
           is_active: true,
         },
+        attributes: ["team_id"],
       });
 
-      // const teamIds = memberships.map( (m) => m.team_id);
+      const teamIds = memberships.map((m) => m.team_id);
 
-      // where.team_id = teamIds;
-      where.is_active = true;
+      // No team assigned
+      if (!teamIds.length) {
+        return res.status(200).json({
+          message: "No projects found",
+          data: [],
+          total: 0,
+          page,
+          limit,
+        });
+      }
+
+      // Get teams linked to projects
+      const teams = await Team.findAll({
+        where: {
+          id: teamIds,
+          project_id: {
+            [Op.ne]: null,
+          },
+        },
+        attributes: ["project_id"],
+      });
+
+      const projectIds = teams.map((t) => t.project_id);
+
+      // No project linked
+      if (!projectIds.length) {
+        return res.status(200).json({
+          message: "No projects found",
+          data: [],
+          total: 0,
+          page,
+          limit,
+        });
+      }
+
+      // Filter projects
+      where.id = projectIds;
     }
 
-    const {count, rows} = await Project.findAndCountAll({
+    const { count, rows } = await Project.findAndCountAll({
       limit,
       offset,
-      where : {is_active : true},
+      where,
       include: projectIncludes,
       order: [["createdAt", "DESC"]],
-
+      distinct: true,
     });
-    return res.status(200).json({message:"List of All Projects", data: rows, total: count, page, limit});
+
+    return res.status(200).json({
+      message: "List of Projects",
+      data: rows,
+      total: count,
+      page,
+      limit,
+    });
+
   } catch (err) {
+
     console.error("listProjects error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
-}
+};
 
 const getProject = async (req, res) => {
   try {
