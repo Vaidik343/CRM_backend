@@ -1,27 +1,83 @@
 const { body, param } = require("express-validator");
-const { Project, User, Team, TeamMember, Role , sequelize } = require("../models");
+const { Project, User,  Role , sequelize, ProjectMember } = require("../models");
 const { Op } = require("sequelize");
 const { handleValidation } = require("../utils/validate");
-
+const generateProjectCode = require("../utils/generateProjectCode");
 // ── Validators ────────────────────────────────────────────────────────────────
 
+
 const createProjectValidators = [
-  // body("team_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
-  body("name").isString().trim().notEmpty(),
-  body("description").optional({ nullable: true }).isString(),
-  body("remarks").optional({ nullable: true }).isString(),
+  body("name")
+    .isString()
+    .trim()
+    .notEmpty(),
+
+  body("description")
+    .optional({ nullable: true })
+    .isString(),
+
+  
+ body("project_type")
+  .isString()
+  .trim()
+  .notEmpty(),
+
+  body("project_subtype")
+    .notEmpty(),
+
+  body("tech_details")
+    .notEmpty(),
+
+  body("development_status")
+    .notEmpty(),
+
+
+body("remarks")
+  .optional()
+  .isArray(),
   handleValidation,
 ];
 
 const updateProjectValidators = [
   param("id").isUUID(),
-  // body("team_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
-  body("name").optional().isString().trim().notEmpty(),
-  body("description").optional({ nullable: true }).isString(),
-  body("remarks").optional({ nullable: true }).isString(),
-  body("is_active").optional().isBoolean(),
+
+  body("name")
+    .optional()
+    .isString()
+    .trim()
+    .notEmpty(),
+
+  body("description")
+    .optional({ nullable: true })
+    .isString(),
+
+  body("project_type")
+    .optional({ nullable: true })
+    .isString(),
+
+  body("project_subtype")
+    .optional({ nullable: true })
+    .isString(),
+
+  body("tech_details")
+    .optional({ nullable: true })
+    .isString(),
+
+  body("development_status")
+    .optional({ nullable: true })
+    .isString(),
+
+  body("is_active")
+    .optional()
+    .isBoolean(),
+
+    body("remarks")
+  .optional()
+  .isArray(),
+
   handleValidation,
 ];
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -33,10 +89,30 @@ const projectIncludes = [
     as: "creator",
     attributes: ["id", "name", "employee_id"],
   },
+
   {
-    model: Team,
-    as: "teams",
-    attributes: ["id", "name", "project_id"],
+    separate: true,
+    model: ProjectMember,
+    as: "members",
+    required: false,
+
+    where: {
+      is_active: true,
+    },
+
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["id", "name", "employee_id"],
+      },
+
+      {
+        model: Role,
+        as: "role",
+        attributes: ["id", "name"],
+      },
+    ],
   },
 ];
 
@@ -49,66 +125,154 @@ const getUserRole = async (user_id) => {
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 const createProject = async (req, res) => {
-    const transaction = await sequelize.transaction();
+  const transaction = await sequelize.transaction();
   try {
-    const { name, description, remarks } = req.body;
+    const { name, description, project_type, project_subtype, tech_details, development_status, remarks, members = [] } = req.body;
 
-        if(!name)
-    {
-        await transaction.rollback();
-      return res.status(400).json({message: "Name Field required!"})
+    if (!name) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Name Field required!" });
     }
 
-
-    
-
-
-    // optional
-    //only admin or team lead can create project
-
-// FIX — clean rewrite:
-// if (!req.user.is_admin) {
-//   const member = await TeamMember.findOne({
-//     where: {  user_id: req.user.id, is_active: true },
-//        transaction,
-//   });
-
-//   if (!member) {
-//     return res.status(403).json({ message: "You are not part of this team" });
-//   }
-
-//   const userRole = await getUserRole(req.user.id);
-//   if (!["Team Lead", "Project Manager"].includes(userRole)) {
-//     return res.status(403).json({ message: "Only Team Lead can create project" });
-//   }
-// }
-
-    const existing = await Project.findOne({
-      where: {name},
-            transaction,
-    })
-
-      if(existing)
-    {
-        await transaction.rollback();
-        return res.status(409).json({message:"Already Exist in this team!"})
+    if (!project_type) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Project type Field required!" });
     }
 
-    
+    if (!project_subtype) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Project sub type Field required!" });
+    }
+    if (!tech_details) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Details Field required!" });
+    }
+
+    const existingProject = await Project.findOne({
+      where: {
+        name: {
+          [Op.iLike]: name,
+        },
+      },
+      transaction,
+    });
+
+    if (existingProject) {
+      await transaction.rollback();
+      return res.status(409).json({
+        message: "Project already exists",
+      });
+    }
+
+    // generate project code
+    const code = await generateProjectCode(name, Project);
+
     const project = await Project.create({
       name,
-      
+      code,
       description: description || null,
-      remarks: remarks || null,
+      project_type: project_type || null,
+      project_subtype: project_subtype || null,
+      tech_details: tech_details || null,
+      development_status: development_status || "planning",
+      remarks: remarks || [],
       created_by: req.user.id,
       is_active: true,
-    } ,{ transaction });
+    }, { transaction });
 
-      await transaction.commit();
+    // Validate that members is an array if passed
+    if (members && !Array.isArray(members)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "members must be an array"
+      });
+    }
+
+    const createdMembers = [];
+    const skippedMembers = [];
+
+    if (members && members.length > 0) {
+      for (const item of members) {
+        const { user_id, role_id } = item;
+
+        if (!user_id) {
+          skippedMembers.push({
+            user_id: null,
+            reason: "User ID is required"
+          });
+          continue;
+        }
+
+        // Check user exists
+        const user = await User.findByPk(user_id, { transaction });
+
+        if (!user) {
+          skippedMembers.push({
+            user_id,
+            reason: "User not found"
+          });
+          continue;
+        }
+
+        // prevent duplicate member
+        const existingMember = await ProjectMember.findOne({
+          where: {
+            project_id: project.id,
+            user_id
+          },
+          transaction
+        });
+
+        if (existingMember) {
+          // reactivate if previously removed
+          if (!existingMember.is_active) {
+            await existingMember.update(
+              { is_active: true, role_id: role_id || existingMember.role_id },
+              { transaction }
+            );
+
+            createdMembers.push(existingMember);
+            continue;
+          }
+
+          skippedMembers.push({
+            user_id,
+            reason: "User already exists in this project"
+          });
+
+          continue;
+        }
+
+        // create member
+        const newMember = await ProjectMember.create({
+          project_id: project.id,
+          user_id,
+          role_id: role_id || null,
+          is_active: true
+        }, { transaction });
+
+        createdMembers.push(newMember);
+      }
+
+      // If they explicitly passed members but none of them could be added,
+      // rollback the transaction and return a 400.
+      if (createdMembers.length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          message: "No members were added",
+          skipped_members: skippedMembers,
+        });
+      }
+    }
+
+    await transaction.commit();
+
     await project.reload({ include: projectIncludes });
     return res.status(201).json({ project });
   } catch (err) {
-       await transaction.rollback();
+    if (transaction && !transaction.finished) {
+      await transaction.rollback();
+    }
 
     console.error("createProject error:", err);
     return res.status(500).json({ message: "Internal server error" });
@@ -130,42 +294,18 @@ const listProjects = async (req, res) => {
     // EMPLOYEE
     if (!req.user.is_admin) {
 
-      // Get all active team memberships
-      const memberships = await TeamMember.findAll({
+      // Get all active project memberships
+      const memberships = await ProjectMember.findAll({
         where: {
           user_id: req.user.id,
           is_active: true,
         },
-        attributes: ["team_id"],
-      });
-
-      const teamIds = memberships.map((m) => m.team_id);
-
-      // No team assigned
-      if (!teamIds.length) {
-        return res.status(200).json({
-          message: "No projects found",
-          data: [],
-          total: 0,
-          page,
-          limit,
-        });
-      }
-
-      // Get teams linked to projects
-      const teams = await Team.findAll({
-        where: {
-          id: teamIds,
-          project_id: {
-            [Op.ne]: null,
-          },
-        },
         attributes: ["project_id"],
       });
 
-      const projectIds = teams.map((t) => t.project_id);
+      const projectIds = memberships.map((m) => m.project_id);
 
-      // No project linked
+      // No projects assigned
       if (!projectIds.length) {
         return res.status(200).json({
           message: "No projects found",
@@ -214,9 +354,9 @@ const getProject = async (req, res) => {
      // Employee access check
     if (!req.user.is_admin) {
 
-      const member = await TeamMember.findOne({
+      const member = await ProjectMember.findOne({
         where: {
-          // team_id: project.team_id,
+          project_id: project.id,
           user_id: req.user.id,
           is_active: true,
         },
@@ -246,37 +386,17 @@ const updateProject = async (req, res) => {
       });
     }
 
-    // Permission check
-    if (!req.user.is_admin) {
-
-      const member = await TeamMember.findOne({
-        where: {
-          // team_id: project.team_id,
-          user_id: req.user.id,
-          is_active: true,
-        },
-      });
-
-      if (!member) {
-        return res.status(403).json({
-          message: "Access denied",
-        });
-      }
-
-      const userRole = await getUserRole(req.user.id);
-if (!["Team Lead", "Project Manager"].includes(userRole)) {
-  return res.status(403).json({ message: "Only Team Lead can update project" });
-}
-
-    }
-
     const patch = {};
 
     [
-      "name",
-      "description",
-      "remarks",
-      "is_active",
+       "name",
+  "description",
+  "project_type",
+  "project_subtype",
+  "tech_details",
+  "development_status",
+  "remarks",
+  "is_active",
     ].forEach((field) => {
 
       if (typeof req.body[field] !== "undefined") {
@@ -318,27 +438,9 @@ const deleteProject = async (req, res) => {
       });
     }
 
-    // Permission check
-    if (!req.user.is_admin) {
-
-      const member = await TeamMember.findOne({
-        where: {
-          // team_id: project.team_id,
-          user_id: req.user.id,
-          is_active: true,
-        },
-      });
-
-     if (!member) {
-  return res.status(403).json({ message: "Access denied" });
-}
-const userRole = await getUserRole(req.user.id);
-if (!["Team Lead", "Project Manager"].includes(userRole)) {
-  return res.status(403).json({ message: "Only Team Lead can delete project" });
-}
-    }
-
-    await project.destroy();
+    await project.update({
+      is_active: false,
+    });
 
     return res.status(200).json({
       message: "Project deleted successfully",
@@ -354,12 +456,212 @@ if (!["Team Lead", "Project Manager"].includes(userRole)) {
   }
 };
 
+
+//update member role
+
+const updateMemberRole = async (req, res) => {
+  try {
+    const {role_id} = req.body;
+
+    const memberId = req.params.id;
+    const member = await ProjectMember.findByPk(memberId);
+
+    if(!member)
+    {
+      return res.status(404).json({
+        message:"Member not found"
+      });
+    }
+
+    const role = await Role.findByPk(role_id);
+
+    if(!role)
+    {
+      return res.status(404).json({message:"This role id does not exist!"})
+    }
+
+    await member.update({role_id});
+
+    res.status(200).json({message:"role updated", member})
+  } catch (error) {
+    res.status(500).json({message:"Something went wrong!"});
+  }
+
+}
+const removeMember = async (req, res) => {
+  try {
+    const memberId = req.params.id;
+
+    const member = await ProjectMember.findByPk(memberId);
+
+    if(!member)
+    {
+      return res.status(404).json({
+        message:"Member not found",
+      });
+    }
+
+    // prevent self-removal
+// if(member.user_id === req.user.id)
+    //soft delete
+      await member.update({
+        is_active:false,
+      });
+
+      res.status(200).json({
+        message: "Project member removed  successfully",
+      });
+
+  } catch (error) {
+         res.status(500).json({message:"Something went wrong!"});    
+  }
+
+}
+
+const addProjectMembers = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const projectId = req.params.id;
+    
+    // Check if the project exists and is active
+    const project = await Project.findByPk(projectId, { transaction });
+    if (!project || !project.is_active) {
+      await transaction.rollback();
+      return res.status(404).json({
+        message: "Project not found or is inactive"
+      });
+    }
+
+    const { members = [] } = req.body;
+
+    // Validate that members is an array and not empty
+    if (!Array.isArray(members)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "members must be an array"
+      });
+    }
+
+    if (members.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "members array cannot be empty"
+      });
+    }
+
+    const createdMembers = [];
+    const skippedMembers = [];
+
+    for (const item of members) {
+      const { user_id, role_id } = item;
+
+      if (!user_id) {
+        skippedMembers.push({
+          user_id: null,
+          reason: "User ID is required"
+        });
+        continue;
+      }
+
+      // Check if user exists
+      const user = await User.findByPk(user_id, { transaction });
+      if (!user) {
+        skippedMembers.push({
+          user_id,
+          reason: "User not found"
+        });
+        continue;
+      }
+
+      // Check if role is provided and exists
+      if (role_id) {
+        const role = await Role.findByPk(role_id, { transaction });
+        if (!role) {
+          skippedMembers.push({
+            user_id,
+            reason: `Role ID ${role_id} does not exist`
+          });
+          continue;
+        }
+      }
+
+      // Prevent duplicate active member
+      const existingMember = await ProjectMember.findOne({
+        where: {
+          project_id: projectId,
+          user_id
+        },
+        transaction
+      });
+
+      if (existingMember) {
+        // Reactivate if previously removed
+        if (!existingMember.is_active) {
+          await existingMember.update(
+            { is_active: true, role_id: role_id || existingMember.role_id },
+            { transaction }
+          );
+          createdMembers.push(existingMember);
+          continue;
+        }
+
+        skippedMembers.push({
+          user_id,
+          reason: "User already exists in this project"
+        });
+        continue;
+      }
+
+      // Create new active ProjectMember
+      const newMember = await ProjectMember.create({
+        project_id: projectId,
+        user_id,
+        role_id: role_id || null,
+        is_active: true
+      }, { transaction });
+
+      createdMembers.push(newMember);
+    }
+
+    // If none of the passed members could be added/updated, rollback
+    if (createdMembers.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "No members were added",
+        skipped_members: skippedMembers
+      });
+    }
+
+    await transaction.commit();
+
+    // Reload project with the updated association to return
+    const updatedProject = await Project.findByPk(projectId, { include: projectIncludes });
+
+    return res.status(200).json({
+      message: "Members added successfully",
+      project: updatedProject,
+      created_members: createdMembers,
+      skipped_members: skippedMembers
+    });
+
+  } catch (err) {
+    if (transaction && !transaction.finished) {
+      await transaction.rollback();
+    }
+    console.error("addProjectMembers error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports = {
   createProject,
   listProjects,
   getProject,
   updateProject,
   deleteProject,
+  updateMemberRole,
+  removeMember,
+  addProjectMembers,
   createProjectValidators,
   updateProjectValidators,
 };

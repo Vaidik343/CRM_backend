@@ -13,6 +13,7 @@ const Task       = require("./task.model")(sequelize, DataTypes);
 const WorkLog    = require("./workLog.model")(sequelize, DataTypes);
 const Team = require('./team.model')(sequelize, DataTypes);
 const TeamMember = require('./teamMembers.model')(sequelize, DataTypes);
+const ProjectMember = require("./projectMembers.model")(sequelize, DataTypes);
 const Notification = require("./notification.mode")(sequelize, DataTypes);
 
 // ── Layer 1: Role → User ──────────────────────────────────────
@@ -111,5 +112,6 @@ module.exports = {
   Call,
   Task,
   WorkLog,
+  ProjectMember,
   Notification
 };

@@ -1,45 +1,58 @@
 module.exports = (sequelize, DataTypes) => {
-    const Notification = sequelize.define(
-        'Notification',
-        {
-id: {
+
+  const Notification = sequelize.define(
+    "Notification",
+    {
+      id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
         allowNull: false,
       },
+
       user_id: {
-      type: DataTypes.UUID,
-      allowNull: false,
-    },
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
 
-    type: {
-        type:
-                allowNull:true // change it to false
-    },
-    title: {
-        type:DataTypes.STRING,
-                allowNull:false // change it to false
-    },
-    notification_message: {
-        type:DataTypes.TEXT,
-                allowNull:true // change it to false
-    },
-    data: {
-        type:DataTypes.JSON,
-                allowNull:false
-    },
-    is_read: {
-        type:DataTypes.BOOLEAN,
-        allowNull:true
-    },
+      type: {
+        type: DataTypes.ENUM(
+          "TASK_ASSIGNED",
+          "TASK_UPDATED",
+          "CALL_TRANSFER",
+          "PROJECT_ADDED",
+          "TASK_COMMENT",
+          "CALL_FOLLOWUP"
+        ),
+        allowNull: false,
+      },
 
-        }, {
-      tableName: "notification",
+      title: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+
+      message: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+
+      data: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+
+      is_read: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+    },
+    {
+      tableName: "notifications",
       timestamps: true,
-    },
-    )
+      underscored: true,
+    }
+  );
 
-    return Notification
-
-}
+  return Notification;
+};

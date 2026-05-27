@@ -34,10 +34,12 @@ display_id: {
         allowNull: true,
       },
 
-      team_id: {
-  type: DataTypes.UUID,
-  allowNull: true, // true during migration; set false after all tasks assigned
-},
+      // no need for this now
+//       team_id: {
+//   type: DataTypes.UUID,
+//   allowNull: true,
+//    // true during migration; set false after all tasks assigned
+// },
        assigned_to: {
         type: DataTypes.UUID,
         allowNull: false,

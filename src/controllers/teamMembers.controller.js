@@ -22,7 +22,7 @@ const createTeamMember = async (req, res) => {
       await transaction.rollback();
 
       return res.status(400).json({
-        message: "members array is required",
+        message: "members is required",
       });
     }
 

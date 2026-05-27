@@ -1,11 +1,15 @@
 const { body, param } = require("express-validator");
-const { Task, User, Call, Project, Team, TeamMember, Role } = require("../models");
+const { Task, User, Call, Project, Role, ProjectMember } = require("../models");
 const { handleValidation } = require("../utils/validate");
+const { Op } = require("sequelize");
+const generateDisplayId = require("../utils/generateDisplayId")
 
 // ── Validators ────────────────────────────────────────────────────────────────
 
 const createTaskValidators = [
-  body("team_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
+  body("project_id")
+  .optional()
+  .isUUID(),
   body("call_id").optional({ nullable: true, checkFalsy: true }).isUUID(),
   body("task").isString().trim().notEmpty(),
   body("description").optional({ nullable: true }).isString(),
@@ -27,92 +31,105 @@ const updateTaskValidators = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const taskIncludes = [
-  { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
-  // { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
-  { model: Project, as: "project", attributes: ["id", "name"] },
-  { model: Team, as: "team", attributes: ["id", "name"] },
+  {
+    model: User,
+    as: "assignee",
+    attributes: ["id", "name", "employee_id"],
+  },
+
+  {
+    model: User,
+    as: "assigner",
+    attributes: ["id", "name", "employee_id"],
+  },
+
+  {
+    model: Project,
+    as: "project",
+    attributes: ["id", "name", "code"],
+  },
+
+  {
+    model: Call,
+    as: "call",
+    attributes: ["id", "display_id"],
+  },
 ];
 
-const getTeamMembership = async (user_id, team_id) => {
-  return await TeamMember.findOne({ where: { user_id, team_id } });
+const getProjectMembership = async (user_id, project_id) => {
+  return await ProjectMember.findOne({ where: { user_id, project_id } });
 };
 
-const getUserRole = async (user_id) => {
-  const user = await User.findByPk(user_id, {
-    include: [{ model: Role }],
-  });
-return user?.Role?.name; // "Team Lead", "Developer" etc.
-};
+// const getUserRole = async (user_id) => {
+//   const user = await User.findByPk(user_id, {
+//     include: [{ model: Role }],
+//   });
+// return user?.Role?.name; // "Team Lead", "Developer" etc.
+// };
+
+
 
 // ── Controllers ───────────────────────────────────────────────────────────────
 
 const createTask = async (req, res) => {
   try {
-    const { call_id, project_id, team_id, task, description, due_date } = req.body;
-    const assigned_to = req.body.assigned_to || req.user.id;
-    console.log("🚀 ~ createTask ~ assigned_to:", assigned_to)
-
+    const { call_id, project_id,  task, description, assigned_to, due_date } = req.body;
+    const assignedId = assigned_to || req.user.id;
+    
     // // 1. Verify assignee exists
-    const assignee = await User.findByPk(assigned_to);
+    const assignee = await User.findByPk(assignedId);
     console.log("🚀 ~ createTask ~ assignee:", assignee)
     if (!assignee) {
       return res.status(404).json({ message: "Assignee not found" });
     }
 
-    // 2. Verify team exists
-    const team = await Team.findByPk(team_id);
-    if (!team) {
-      return res.status(404).json({ message: "Team not found" });
-    }
+    // 2. Verify project exists
 
-    // 3. Non-admin checks: membership + role permissions
-    if (!req.user.is_admin) {
 
-      // 3a. Creator must be team member
-      const currentMember = await getTeamMembership(req.user.id, team_id);
-      console.log("🚀 ~ createTask ~ currentMember:", currentMember)
-      if (!currentMember) {
-        return res.status(403).json({ message: "You are not part of this team" });
-      }
-
-      // 3b. Assignee must be in same team
-      const assigneeMember = await getTeamMembership(assigned_to, team_id);
-      if (!assigneeMember) {
-        return res.status(400).json({ message: "Assigned user is not part of this team" });
-      }
-
-      // 3c. Only Team Lead / PM can assign to others
-      const userRole = await getUserRole(req.user.id);
-      const isLead = ["Team Lead", "Project Manager"].includes(userRole);
-      if (!isLead && assigned_to !== req.user.id) {
-        return res.status(403).json({ message: "You can only create tasks for yourself" });
-      }
-    }
-
-    // 4. If project provided, verify it belongs to same team
     if (project_id) {
       const project = await Project.findByPk(project_id);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
-     if (team.project_id !== project_id) {
-  return res.status(400).json({
-    message: "Team does not belong to this project",
-  });
-}
     }
 
-    // 5. Auto-set status: self-assign → ongoing, assign to other → open
-    const status = assigned_to === req.user.id ? "ongoing" : "open";
+    if(call_id)
+    {
+      const call = await Call.findByPk(call_id);
+
+      if(!call)
+      {
+        return res.status(404).json({
+          message:"Call not found"
+        })
+      }
+    }
+    
+    let prefix = "T";
+
+
+if(assignedId  !== req.user.id)
+{
+  prefix = "TA";
+}
+
+
+
+    //generate display id
+    const displayId = await generateDisplayId({prefix, employeeId: req.user.employee_id});
+
+    
+// Auto-set status: self-assign → ongoing, assign to other → open
+    const status = assignedId === req.user.id ? "ongoing" : "open";
 
     // 6. Create task
     const newTask = await Task.create({
       call_id: call_id || null,
       project_id: project_id || null,
-      team_id,
+      display_id: displayId,
       task,
       description: description || null,
-      assigned_to,
+      assigned_to : assignedId,
       assigned_by: req.user.id,
       start_date: new Date(),
       due_date: due_date || null,
@@ -136,24 +153,36 @@ const listTasks = async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Get all teams user belongs to
-    const membership = await TeamMember.findAll({
+    const membership = await ProjectMember.findAll({
       where: { user_id: req.user.id },
     });
-    const teamIds = membership.map((m) => m.team_id);
+    const projectIds = membership.map((m) => m.project_id);
 
     // Get user role to determine visibility scope
-    const userRole = await getUserRole(req.user.id);
-    const isLead = ["Team Lead", "Project Manager"].includes(userRole);
+    // const userRole = await getUserRole(req.user.id);
+    // const isLead = ["Team Lead", "Project Manager"].includes(userRole);
 
-    let where = {};
-    if (req.user.is_admin) {
-      where = {};                          // Admin: see all tasks
-    } else if (isLead) {
-      where = { team_id: teamIds };        // Lead/PM: see all tasks in their teams
-    } else {
-      where = { assigned_to: req.user.id }; // Developer: see only own tasks
-    }
+    // let where = {};
+    // if (req.user.is_admin) {
+    //   where = {};                          // Admin: see all tasks
+    // } else if (isLead) {
+    //   where = { team_id: teamIds };        // Lead/PM: see all tasks in their teams
+    // } else {
+    //   where = { assigned_to: req.user.id }; // Developer: see only own tasks
+    // }
 
+    let where = {
+  is_active: true,
+};
+
+if (!req.user.is_admin) {
+  where = {
+    [Op.or]: [
+      { assigned_to: req.user.id },
+      { assigned_by: req.user.id },
+    ],
+  };
+}
     const { count, rows } = await Task.findAndCountAll({
       where,
       include: taskIncludes,
@@ -184,21 +213,15 @@ const getTask = async (req, res) => {
   try {
     const task = await Task.findByPk(req.params.id, { include: taskIncludes });
     if (!task) return res.status(404).json({ message: "Task not found" });
-
-    if (!req.user.is_admin) {
-      // Must be team member
-      const membership = await getTeamMembership(req.user.id, task.team_id);
-      if (!membership) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
-      // Lead/PM can see all team tasks; others only their own
-      const userRole = await getUserRole(req.user.id);
-      const isLead = ["Team Lead", "Project Manager"].includes(userRole);
-      if (!isLead && task.assigned_to !== req.user.id) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-    }
+if (
+  !req.user.is_admin &&
+  task.assigned_to !== req.user.id &&
+  task.assigned_by !== req.user.id
+) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
 
     return res.json({ task });
 
@@ -213,25 +236,15 @@ const updateTask = async (req, res) => {
     const task = await Task.findByPk(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    if (!req.user.is_admin) {
-      // Must be team member
-      const membership = await getTeamMembership(req.user.id, task.team_id);
-      if (!membership) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
-      // Lead/PM can update any task in team; others only their own
-      const userRole = await getUserRole(req.user.id);
-      const isLead = ["Team Lead", "Project Manager"].includes(userRole);
-      if (!isLead && task.assigned_to !== req.user.id) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
-      // Cannot update a closed task
-      if (task.status === "closed") {
-        return res.status(400).json({ message: "Cannot update a closed task" });
-      }
-    }
+   if (
+  !req.user.is_admin &&
+  task.assigned_to !== req.user.id &&
+  task.assigned_by !== req.user.id
+) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
 
     const patch = {};
     ["task", "description", "due_date", "status"].forEach((f) => {
@@ -258,7 +271,9 @@ const deleteTask = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    await task.destroy();
+   await task.update({
+  is_active: false,
+});
     return res.json({ message: "Task deleted" });
 
   } catch (err) {

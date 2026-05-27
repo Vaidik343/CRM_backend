@@ -65,7 +65,7 @@ const createUser = async(req, res) => {
         role_id: user.role_id,
         role: role.name,
         is_admin: user.is_admin,
-        createdAt: user.createdAt,
+        createdAt: user.createdAt, // check this in db
       },
       credentials: {
         employee_id: user.employee_id,

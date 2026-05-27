@@ -19,35 +19,36 @@ module.exports = (sequelize, DataTypes) => {
       },
       code : {
          type:DataTypes.STRING,
+          unique: true,
          allowNull: true // change it to false
       },
        description: {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-       remarks: {
-        type: DataTypes.TEXT, 
-        allowNull: true,
-      },
+    
       project_type: {
-        type: DataTypes.ENUM("WEB", "Mobile App", "Desktop App"),
+        type: DataTypes.ENUM("web", "mobile", "desktop"),
         allowNull: true, // change it to false
       },
       project_subtype: {
         type: DataTypes.STRING,
         allowNull: true // change to false
       },
-      tech_stack: {
-          type:DataTypes.STRING,
-          allowNull: true  // change it to false
-      },
-      tech_versions: {
-        type:DataTypes.STRING,
-        allowNull: true // change it to false
-      },
+      tech_details: {
+  type: DataTypes.JSONB,
+  allowNull: true,
+  defaultValue: [],
+},
 
       development_status: {
-        type:DataTypes.ENUM("Pending", "On going", "Complete", "Demo",),
+        type:DataTypes.ENUM(
+  "planning",
+  "active",
+  "on_hold",
+  "testing",
+  "completed"
+),
         allowNull: true // change it to false
       },
       // created_by: {

@@ -40,6 +40,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull:false,
       },
+
+      transfer_to: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
+task_assigned_to: {
+  type: DataTypes.UUID,
+  allowNull: true,
+},
       follow_up: {
         type: DataTypes.STRING,
         allowNull:true // change it to false
@@ -48,10 +57,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull:true,
       },
-      remarks: {
-        type: DataTypes.STRING,
-        allowNull:true,
-      },
+
       receive_type: {
         type: DataTypes.ENUM('call','msg','email','meeting'),
         allowNull:false,
