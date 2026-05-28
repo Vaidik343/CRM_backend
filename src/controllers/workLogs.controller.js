@@ -1,7 +1,7 @@
 const { body, param } = require("express-validator");
 const { WorkLog, User } = require("../models");
 const { handleValidation } = require("../utils/validate");
-
+const {appendRemark} = require("../utils/remarksLog")
 // ── Validators ────────────────────────────────────────────────────────────────
 
 const createWorkLogValidators = [
@@ -27,13 +27,32 @@ const workLogIncludes = [
 
 const createWorkLog = async(req, res) => {
   try {
+
+    let remarksLog = [];
+
+    //if frontend sends initial remark
+
+    if(req.body.remark)
+    {
+      remarksLog = appendRemark({
+
+         existingRemarks:[],
+        text:req.body.remark,
+        user_id:req.user.id,
+        user_name:req.user.name
+      }
+      );
+    }
+
     const workLog = await WorkLog.create({
       user_id: req.user.id,
       description: req.body.description,
       date: req.body.date,
+      remarks : remarksLog,
     });
     console.log("🚀 ~ createWorkLog ~ workLog:", workLog)
     return res.status(201).json({ workLog });
+
   } catch (err) {
     console.error("createWorkLog error:", err);
     return res.status(500).json({ message: "Internal server error" });
@@ -64,11 +83,7 @@ const listWorkLogs = async(req, res) => {
 
 const getWorkLog = async (req, res) => {
   try {
-        console.log("params id:", req.params.id);
-    const raw = await WorkLog.sequelize.query(
-      `SELECT * FROM work_logs WHERE id = '${req.params.id}'`
-    );
-    console.log("raw query:", raw[0]);
+      
     
     const workLog = await WorkLog.findByPk(req.params.id, { include: workLogIncludes });
     console.log("🚀 ~ getWorkLog ~ workLog:", workLog)
@@ -85,6 +100,7 @@ const getWorkLog = async (req, res) => {
 const updateWorkLog = async(req, res) => {
   try {
     const workLog = await WorkLog.findByPk(req.params.id);
+
     if (!workLog) return res.status(404).json({ message: "Work log not found" });
     if (!req.user.is_admin && workLog.user_id !== req.user.id)
       return res.status(403).json({ message: "Forbidden" });
@@ -93,6 +109,15 @@ const updateWorkLog = async(req, res) => {
     if (req.body.description) patch.description = req.body.description;
     if (req.body.date) patch.date = req.body.date;
 
+
+if (req.body.remark) {
+  patch.remarks = appendRemark({
+    existingRemarks: workLog.remarks,
+    text: req.body.remark,
+    user_id: req.user.id,
+    user_name:req.user.name
+  });
+}
     await workLog.update(patch);
     return res.json({ workLog });
   } catch (err) {

@@ -9,10 +9,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
 
-//       team_id: {
-//   type: DataTypes.UUID,
-//   allowNull: true, 
-// },
        name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -28,7 +24,7 @@ module.exports = (sequelize, DataTypes) => {
       },
     
       project_type: {
-        type: DataTypes.ENUM("web", "mobile", "desktop"),
+        type: DataTypes.ENUM("web", "app", "desktop"),
         allowNull: true, // change it to false
       },
       project_subtype: {
@@ -49,15 +45,18 @@ module.exports = (sequelize, DataTypes) => {
   "testing",
   "completed"
 ),
-        allowNull: true // change it to false
+        allowNull: true ,// change it to false
+           defaultValue: "active",
       },
-      // created_by: {
-      //     type:DataTypes.UUID,
-      //           allowNull: false
-      // },
+    
       is_active: {
         type:DataTypes.BOOLEAN,
         defaultValue: true
+      },
+
+      created_by: {
+        type: DataTypes.UUID,
+        allowNull: true, // change to false after go-live
       },
          remarks: {
         type: DataTypes.JSONB,

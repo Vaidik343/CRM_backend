@@ -9,47 +9,80 @@
  * @swagger
  * components:
  *   schemas:
+ *     RemarkEntry:
+ *       type: object
+ *       properties:
+ *         text:
+ *           type: string
+ *         added_by:
+ *           type: string
+ *           format: uuid
+ *         added_by_name:
+ *           type: string
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *
  *     Call:
  *       type: object
  *       properties:
  *         id:
  *           type: string
  *           format: uuid
+ *         display_id:
+ *           type: string
+ *           example: "C001260526AB"
+ *           description: 14-char unique display ID shown in UI
  *         user_id:
  *           type: string
  *           format: uuid
- *           description: ID of the user who logged the call
  *         caller_name:
  *           type: string
- *           description: Name of the caller
  *         caller_number:
  *           type: string
- *           description: Phone number of the caller
+ *           nullable: true
  *         project_id:
  *           type: string
  *           format: uuid
- *           description: ID of the associated project
+ *           nullable: true
  *         call_type:
  *           type: string
  *           enum: [inquiry, request, complaint]
- *           description: Type of call
  *         call_subtype:
  *           type: string
- *           description: Subtype of call (specific to call_type)
  *         call_summary:
  *           type: string
- *           description: Summary of the call
- *         remarks:
- *           type: string
- *           description: Additional remarks
+ *           nullable: true
  *         receive_type:
  *           type: string
  *           enum: [call, msg, email, meeting]
- *           description: How the communication was received
  *         is_task:
  *           type: boolean
- *           description: Whether a follow-up task should be auto-created
- *           example: true
+ *           default: false
+ *         transfer_to:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *           description: User ID to transfer this call to (prefix CTR)
+ *         task_assigned_to:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *           description: When is_task=true, assign generated task to this user (prefix CTA)
+ *         follow_up_date:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           description: Scheduled callback date-time for follow-up calls (prefix CFB)
+ *         parent_call_id:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *           description: Links follow-up call back to the original call
+ *         remarks:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/RemarkEntry'
  *         User:
  *           type: object
  *           properties:
@@ -81,7 +114,13 @@
  * /api/calls:
  *   post:
  *     summary: Create a new call record
- *     description: Log a new call (Requires can_write permission)
+ *     description: |
+ *       Log a new call. Display ID is auto-generated based on prefix rules:
+ *       - `C`   — plain call
+ *       - `CT`  — call with auto-task (self)
+ *       - `CTA` — call with auto-task assigned to another employee
+ *       - `CTR` — call transferred to another employee
+ *       - `CFB` — call follow-up (requires parent_call_id)
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []
@@ -93,21 +132,20 @@
  *             type: object
  *             required:
  *               - caller_name
- *               - project_id
  *               - call_type
  *               - call_subtype
  *               - receive_type
  *             properties:
  *               caller_name:
  *                 type: string
- *                 example: "John Smith"
+ *                 example: "Jay Shah"
  *               caller_number:
  *                 type: string
- *                 description: Optional phone number
- *                 example: "+1-555-0123"
+ *                 example: "+91-9999999999"
  *               project_id:
  *                 type: string
  *                 format: uuid
+ *                 nullable: true
  *               call_type:
  *                 type: string
  *                 enum: [inquiry, request, complaint]
@@ -116,21 +154,41 @@
  *                 example: "Product Question"
  *               call_summary:
  *                 type: string
- *                 description: Optional summary
- *                 example: "Customer asked about pricing"
- *               remarks:
- *                 type: string
- *                 description: Optional remarks
+ *                 nullable: true
  *               receive_type:
  *                 type: string
  *                 enum: [call, msg, email, meeting]
  *               is_task:
  *                 type: boolean
  *                 default: false
- *                 description: Auto-create follow-up task from this call
+ *                 description: Auto-create task from this call. Requires project_id.
+ *               transfer_to:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *                 description: Transfer call to this employee. Cannot be yourself.
+ *               task_assigned_to:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *                 description: Assign auto-created task to this employee. Requires is_task=true.
+ *               follow_up_date:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *                 description: Scheduled callback date-time.
+ *               parent_call_id:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *                 description: Required when follow_up_date is set. Links to original call.
+ *               remark:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Optional initial remark added to remarks log.
  *     responses:
  *       201:
- *         description: Call record created successfully
+ *         description: Call created successfully
  *         content:
  *           application/json:
  *             schema:
@@ -138,14 +196,15 @@
  *               properties:
  *                 call:
  *                   $ref: '#/components/schemas/Call'
+ *                 task:
+ *                   nullable: true
+ *                   $ref: '#/components/schemas/Task'
  *       400:
- *         description: Validation error or invalid call_subtype for the call_type
+ *         description: Validation error or invalid subtype
  *       404:
  *         description: Project not found
  *       401:
  *         description: Unauthorized
- *       403:
- *         description: Requires write permission
  *       500:
  *         description: Server error
  */
@@ -155,30 +214,24 @@
  * /api/calls:
  *   get:
  *     summary: Get all call records
- *     description: Retrieve paginated list of calls. Non-admin users only see their own calls.
+ *     description: Paginated list of calls. Non-admin users only see their own calls.
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
- *         required: false
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number
- *         example: 1
  *       - in: query
  *         name: limit
- *         required: false
  *         schema:
  *           type: integer
  *           default: 20
- *         description: Number of records per page
- *         example: 20
  *     responses:
  *       200:
- *         description: Paginated list of call records
+ *         description: Paginated list of calls
  *         content:
  *           application/json:
  *             schema:
@@ -186,31 +239,27 @@
  *               properties:
  *                 message:
  *                   type: string
- *                   example: List of All calls
  *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Call'
  *                 total:
  *                   type: integer
- *                   example: 120
  *                 page:
  *                   type: integer
- *                   example: 1
  *                 limit:
  *                   type: integer
- *                   example: 20
  *       401:
  *         description: Unauthorized
  *       500:
  *         description: Server error
  */
+
 /**
  * @swagger
  * /api/calls/{id}:
  *   get:
- *     summary: Get call record by ID
- *     description: Retrieve a specific call record. Non-admin users can only see their own calls.
+ *     summary: Get call by ID
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []
@@ -223,7 +272,7 @@
  *           format: uuid
  *     responses:
  *       200:
- *         description: Call record found
+ *         description: Call found
  *         content:
  *           application/json:
  *             schema:
@@ -232,7 +281,7 @@
  *                 call:
  *                   $ref: '#/components/schemas/Call'
  *       403:
- *         description: Forbidden - can only view own calls
+ *         description: Forbidden
  *       404:
  *         description: Call not found
  *       401:
@@ -246,7 +295,6 @@
  * /api/calls/{id}:
  *   patch:
  *     summary: Update call record
- *     description: Update call details (Requires can_update permission). Non-admin users can only update own calls.
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []
@@ -277,14 +325,15 @@
  *                 type: string
  *               call_summary:
  *                 type: string
- *               remarks:
- *                 type: string
  *               receive_type:
  *                 type: string
  *                 enum: [call, msg, email, meeting]
+ *               remark:
+ *                 type: string
+ *                 description: Appends a new entry to remarks log
  *     responses:
  *       200:
- *         description: Call updated successfully
+ *         description: Call updated
  *         content:
  *           application/json:
  *             schema:
@@ -293,9 +342,9 @@
  *                 call:
  *                   $ref: '#/components/schemas/Call'
  *       400:
- *         description: Invalid input or invalid call_subtype
+ *         description: Invalid input
  *       403:
- *         description: Forbidden or requires update permission
+ *         description: Forbidden
  *       404:
  *         description: Call not found
  *       401:
@@ -309,7 +358,6 @@
  * /api/calls/{id}:
  *   delete:
  *     summary: Delete call record
- *     description: Delete a call record (Requires can_delete permission). Non-admin users can only delete own calls.
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []
@@ -322,16 +370,9 @@
  *           format: uuid
  *     responses:
  *       200:
- *         description: Call deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
+ *         description: Call deleted
  *       403:
- *         description: Forbidden or requires delete permission
+ *         description: Forbidden
  *       404:
  *         description: Call not found
  *       401:

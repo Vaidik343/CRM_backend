@@ -1,5 +1,4 @@
 module.exports = (sequelize, DataTypes) => {
-
   const Notification = sequelize.define(
     "Notification",
     {
@@ -15,15 +14,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
 
+      // STRING instead of ENUM — easier to extend without new migrations
+      // Values: "TASK_ASSIGNED", "TASK_UPDATED", "CALL_TRANSFER",
+      //         "PROJECT_ADDED", "TASK_COMMENT", "CALL_FOLLOWUP"
       type: {
-        type: DataTypes.ENUM(
-          "TASK_ASSIGNED",
-          "TASK_UPDATED",
-          "CALL_TRANSFER",
-          "PROJECT_ADDED",
-          "TASK_COMMENT",
-          "CALL_FOLLOWUP"
-        ),
+        type: DataTypes.STRING(50),
         allowNull: false,
       },
 
@@ -37,9 +32,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
 
+      // JSON payload — task_id, display_id, project_id, etc.
       data: {
         type: DataTypes.JSONB,
         allowNull: true,
+        defaultValue: {},
       },
 
       is_read: {

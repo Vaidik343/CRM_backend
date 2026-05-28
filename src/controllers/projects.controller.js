@@ -3,9 +3,10 @@ const { Project, User,  Role , sequelize, ProjectMember } = require("../models")
 const { Op } = require("sequelize");
 const { handleValidation } = require("../utils/validate");
 const generateProjectCode = require("../utils/generateProjectCode");
+const {appendRemark} = require("../utils/remarksLog");
+const { createNotification } = require("./notifications.controller");
+
 // ── Validators ────────────────────────────────────────────────────────────────
-
-
 const createProjectValidators = [
   body("name")
     .isString()
@@ -78,10 +79,7 @@ const updateProjectValidators = [
   handleValidation,
 ];
 
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-
 
 const projectIncludes = [
   {
@@ -122,12 +120,15 @@ const getUserRole = async (user_id) => {
   });
   return user?.Role?.name; // "Team Lead", "Developer" etc.
 };
-// ── Handlers ──────────────────────────────────────────────────────────────────
+
+
+
 
 const createProject = async (req, res) => {
   const transaction = await sequelize.transaction();
+   const io = req.app.get("io");
   try {
-    const { name, description, project_type, project_subtype, tech_details, development_status, remarks, members = [] } = req.body;
+    const { name, description, project_type, project_subtype, tech_details, development_status,  members = [] } = req.body;
 
     if (!name) {
       await transaction.rollback();
@@ -167,6 +168,22 @@ const createProject = async (req, res) => {
     // generate project code
     const code = await generateProjectCode(name, Project);
 
+    
+    let remarksLog = [];
+
+// if fronted sends initial remark
+if(req.body.remark)
+{
+  remarksLog = appendRemark({
+ existingRemarks: [],
+    text:req.body.remark,
+    user_id:req.user.id,
+    user_name:req.user.name
+  }
+    
+  )
+}
+
     const project = await Project.create({
       name,
       code,
@@ -175,9 +192,9 @@ const createProject = async (req, res) => {
       project_subtype: project_subtype || null,
       tech_details: tech_details || null,
       development_status: development_status || "planning",
-      remarks: remarks || [],
       created_by: req.user.id,
       is_active: true,
+      remarks : remarksLog
     }, { transaction });
 
     // Validate that members is an array if passed
@@ -265,7 +282,18 @@ const createProject = async (req, res) => {
       }
     }
 
+
     await transaction.commit();
+
+        for (const member of createdMembers) {
+  await createNotification(io, {
+    user_id: member.user_id,
+    type:    "PROJECT_ADDED",
+    title:   "Added to Project",
+    message: `You have been added to project: ${project.name}`,
+    data:    { project_id: project.id, project_code: project.project_code },
+  });
+}
 
     await project.reload({ include: projectIncludes });
     return res.status(201).json({ project });
@@ -404,8 +432,17 @@ const updateProject = async (req, res) => {
       }
     });
 
+     if(req.body.remark)
+    {
+     patch.remarks = appendRemark({
+  existingRemarks: project.remarks,
+  text: req.body.remark,
+  user_id: req.user.id,
+  user_name:req.user.name
+});
+    }
     await project.update(patch);
-
+    await project.reload({ include: projectIncludes }); 
     return res.status(200).json({
       message: "Project updated successfully",
       project,
@@ -520,6 +557,7 @@ const removeMember = async (req, res) => {
 
 const addProjectMembers = async (req, res) => {
   const transaction = await sequelize.transaction();
+  const io = req.app.get("io");
   try {
     const projectId = req.params.id;
     
@@ -637,6 +675,16 @@ const addProjectMembers = async (req, res) => {
     // Reload project with the updated association to return
     const updatedProject = await Project.findByPk(projectId, { include: projectIncludes });
 
+    for(const member of createdMembers)
+    {
+      await createNotification(io, {
+        user_id: member.user_id,
+        type: "PROJECT_ADDED",
+        title: "Added to Project",
+        message: `You have been added to project: ${project.name}`,
+        data: {project_id: project.id, project_code: project.project_code}
+      })
+    }
     return res.status(200).json({
       message: "Members added successfully",
       project: updatedProject,

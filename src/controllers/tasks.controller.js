@@ -2,8 +2,9 @@ const { body, param } = require("express-validator");
 const { Task, User, Call, Project, Role, ProjectMember } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const { Op } = require("sequelize");
-const generateDisplayId = require("../utils/generateDisplayId")
-
+const generateDisplayId = require("../utils/generateDisplayId");
+const { appendRemark } = require("../utils/remarksLog");
+const { createNotification } = require("./notifications.controller");
 // ── Validators ────────────────────────────────────────────────────────────────
 
 const createTaskValidators = [
@@ -104,6 +105,8 @@ const createTask = async (req, res) => {
         })
       }
     }
+
+    // prefix for display id
     
     let prefix = "T";
 
@@ -122,6 +125,21 @@ if(assignedId  !== req.user.id)
 // Auto-set status: self-assign → ongoing, assign to other → open
     const status = assignedId === req.user.id ? "ongoing" : "open";
 
+    let remarksLog = [];
+
+// if fronted sends initial remark
+if(req.body.remark)
+{
+  remarksLog = appendRemark({
+ existingRemarks: [],
+    text:req.body.remark,
+    user_id:req.user.id,
+    user_name:req.user.name
+  }
+    
+  )
+}
+
     // 6. Create task
     const newTask = await Task.create({
       call_id: call_id || null,
@@ -134,9 +152,21 @@ if(assignedId  !== req.user.id)
       start_date: new Date(),
       due_date: due_date || null,
       status,
+      remarks : remarksLog
     });
     console.log("🚀 ~ createTask ~ newTask:", newTask)
 
+    // notify assignee only if someone else was assigned
+if (assignedId !== req.user.id) {
+  const io = req.app.get("io");
+  await createNotification(io, {
+    user_id: assignedId,
+    type:    "TASK_ASSIGNED",
+    title:   "New Task Assigned",
+    message: `You have been assigned a task: ${newTask.task}`,
+    data:    { task_id: newTask.id, display_id: newTask.display_id },
+  });
+}
     await newTask.reload({ include: taskIncludes });
     return res.status(201).json({ task: newTask });
 
@@ -172,7 +202,6 @@ const listTasks = async (req, res) => {
     // }
 
     let where = {
-  is_active: true,
 };
 
 if (!req.user.is_admin) {
@@ -251,6 +280,16 @@ const updateTask = async (req, res) => {
       if (typeof req.body[f] !== "undefined") patch[f] = req.body[f] ?? null;
     });
 
+     if(req.body.remark)
+    {
+     patch.remarks = appendRemark({
+  existingRemarks: task.remarks,
+  text: req.body.remark,
+  user_id: req.user.id,
+  user_name:req.user.name
+});
+    }
+
     await task.update(patch);
     await task.reload({ include: taskIncludes });
     return res.status(200).json({ task });
@@ -271,9 +310,7 @@ const deleteTask = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-   await task.update({
-  is_active: false,
-});
+await task.destroy();
     return res.json({ message: "Task deleted" });
 
   } catch (err) {

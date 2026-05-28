@@ -9,33 +9,90 @@
  * @swagger
  * components:
  *   schemas:
+ *     ProjectMember:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         user_id:
+ *           type: string
+ *           format: uuid
+ *         role_id:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *         is_active:
+ *           type: boolean
+ *         user:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: string
+ *               format: uuid
+ *             name:
+ *               type: string
+ *             employee_id:
+ *               type: string
+ *         role:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             id:
+ *               type: string
+ *               format: uuid
+ *             name:
+ *               type: string
+ *
+ *     TechEntry:
+ *       type: object
+ *       properties:
+ *         name:
+ *           type: string
+ *           example: ".NET Core"
+ *         version:
+ *           type: string
+ *           example: "8.0"
+ *           nullable: true
+ *
  *     Project:
  *       type: object
  *       properties:
  *         id:
  *           type: string
  *           format: uuid
- *         team_id:
+ *         project_code:
  *           type: string
- *           format: uuid
+ *           example: "CRM001"
+ *           description: Auto-generated — first 3 letters of name + 3-digit increment
  *         name:
  *           type: string
- *           description: Project name
  *         description:
  *           type: string
- *         remarks:
+ *           nullable: true
+ *         project_type:
  *           type: string
+ *           enum: [web, app, desktop]
+ *         project_subtype:
+ *           type: string
+ *           example: "dynamic"
+ *         tech:
+ *           type: array
+ *           description: Unified tech stack — each entry has name and optional version
+ *           items:
+ *             $ref: '#/components/schemas/TechEntry'
+ *         development_status:
+ *           type: string
+ *           enum: [planning, active, on_hold, testing, completed]
  *         is_active:
  *           type: boolean
  *         created_by:
  *           type: string
  *           format: uuid
- *         createdAt:
- *           type: string
- *           format: date-time
- *         updatedAt:
- *           type: string
- *           format: date-time
+ *         remarks:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/RemarkEntry'
  *         creator:
  *           type: object
  *           properties:
@@ -46,29 +103,26 @@
  *               type: string
  *             employee_id:
  *               type: string
- *         team:
- *           type: object
- *           nullable: true
- *           properties:
- *             id:
- *               type: string
- *               format: uuid
- *             name:
- *               type: string
+ *         members:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/ProjectMember'
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
  */
 
 /**
  * @swagger
  * /api/projects:
  *   post:
- *     summary: Create project
+ *     summary: Create a new project
  *     description: |
- *       Create a new project.
- *
- *       - Admin can create any project
- *       - Team Lead and Project Manager can create projects for their teams
- *       - team_id is optional
- *       - Small companies can create project first and create teams later
+ *       Admin only. project_code is auto-generated from the project name.
+ *       Members can optionally be added at creation time.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -80,32 +134,62 @@
  *             type: object
  *             required:
  *               - name
+ *               - project_type
+ *               - project_subtype
+ *               - tech
+ *               - development_status
  *             properties:
- *               team_id:
- *                 type: string
- *                 format: uuid
- *                 nullable: true
- *                 example: 550e8400-e29b-41d4-a716-446655440000
  *               name:
  *                 type: string
- *                 example: CRM System
+ *                 example: "CRM Backend"
  *               description:
  *                 type: string
- *                 example: CRM backend and dashboard
- *               remarks:
+ *                 nullable: true
+ *               project_type:
  *                 type: string
- *                 example: High priority project
+ *                 enum: [web, app, desktop]
+ *               project_subtype:
+ *                 type: string
+ *                 example: "dynamic"
+ *               tech:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/TechEntry'
+ *                 example: [{ "name": ".NET Core", "version": "8.0" }, { "name": "MSSQL", "version": "2019" }]
+ *               development_status:
+ *                 type: string
+ *                 enum: [planning, active, on_hold, testing, completed]
+ *               remark:
+ *                 type: string
+ *                 nullable: true
+ *               members:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                       format: uuid
+ *                     role_id:
+ *                       type: string
+ *                       format: uuid
+ *                       nullable: true
  *     responses:
  *       201:
- *         description: Project created successfully
+ *         description: Project created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 project:
+ *                   $ref: '#/components/schemas/Project'
  *       400:
  *         description: Validation error
- *       403:
- *         description: Access denied
- *       404:
- *         description: Team not found
  *       409:
  *         description: Project already exists
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Internal server error
  */
@@ -115,11 +199,7 @@
  * /api/projects:
  *   get:
  *     summary: Get all projects
- *     description: |
- *       Retrieve paginated list of projects.
- *
- *       - Admin can see all projects
- *       - Employees can only see projects related to their teams
+ *     description: Admin sees all. Employees see only projects they are members of.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -129,16 +209,16 @@
  *         schema:
  *           type: integer
  *           default: 1
- *         example: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 10
- *         example: 10
  *     responses:
  *       200:
  *         description: List of projects
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Internal server error
  */
@@ -148,10 +228,7 @@
  * /api/projects/{id}:
  *   get:
  *     summary: Get single project
- *     description: |
- *       Get single project details.
- *
- *       Employees can only access projects assigned to their teams.
+ *     description: Employees can only access projects they are members of.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -164,11 +241,20 @@
  *           format: uuid
  *     responses:
  *       200:
- *         description: Project fetched successfully
+ *         description: Project fetched
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 project:
+ *                   $ref: '#/components/schemas/Project'
  *       403:
  *         description: Access denied
  *       404:
  *         description: Project not found
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Internal server error
  */
@@ -178,10 +264,6 @@
  * /api/projects/{id}:
  *   patch:
  *     summary: Update project
- *     description: |
- *       Update project details.
- *
- *       Only Admin, Team Lead, or Project Manager can update projects.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -193,7 +275,6 @@
  *           type: string
  *           format: uuid
  *     requestBody:
- *       required: false
  *       content:
  *         application/json:
  *           schema:
@@ -201,23 +282,32 @@
  *             properties:
  *               name:
  *                 type: string
- *                 example: CRM Dashboard
  *               description:
  *                 type: string
- *                 example: Updated CRM module
- *               remarks:
+ *               project_type:
  *                 type: string
- *                 example: Updated remarks
+ *                 enum: [web, app, desktop]
+ *               project_subtype:
+ *                 type: string
+ *               tech:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/TechEntry'
+ *               development_status:
+ *                 type: string
+ *                 enum: [planning, active, on_hold, testing, completed]
  *               is_active:
  *                 type: boolean
- *                 example: true
+ *               remark:
+ *                 type: string
+ *                 description: Appends a new entry to remarks log
  *     responses:
  *       200:
- *         description: Project updated successfully
- *       403:
- *         description: Access denied
+ *         description: Project updated
  *       404:
  *         description: Project not found
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Internal server error
  */
@@ -226,11 +316,7 @@
  * @swagger
  * /api/projects/{id}:
  *   delete:
- *     summary: Delete project
- *     description: |
- *       Delete a project.
- *
- *       Only Admin, Team Lead, or Project Manager can delete projects.
+ *     summary: Delete project (soft delete)
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []
@@ -243,11 +329,140 @@
  *           format: uuid
  *     responses:
  *       200:
- *         description: Project deleted successfully
- *       403:
- *         description: Access denied
+ *         description: Project deleted
  *       404:
  *         description: Project not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/projects/{id}/members:
+ *   post:
+ *     summary: Add members to project
+ *     description: Add one or more members to an existing project. Notifies each added member.
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - members
+ *             properties:
+ *               members:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                       format: uuid
+ *                     role_id:
+ *                       type: string
+ *                       format: uuid
+ *                       nullable: true
+ *     responses:
+ *       200:
+ *         description: Members added
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 project:
+ *                   $ref: '#/components/schemas/Project'
+ *                 created_members:
+ *                   type: array
+ *                 skipped_members:
+ *                   type: array
+ *       400:
+ *         description: No members added
+ *       404:
+ *         description: Project not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/members/{id}/role:
+ *   patch:
+ *     summary: Update a project member's role
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ProjectMember ID
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - role_id
+ *             properties:
+ *               role_id:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: Role updated
+ *       404:
+ *         description: Member or role not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/members/{id}:
+ *   delete:
+ *     summary: Remove a member from project (soft delete)
+ *     tags: [Projects]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ProjectMember ID
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Member removed
+ *       404:
+ *         description: Member not found
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Internal server error
  */

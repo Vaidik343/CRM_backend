@@ -2,6 +2,10 @@ const { body, param } = require("express-validator");
 const { Call, User, Project, Task, Team, TeamMember } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const CALL_TYPES = require("../constants/callTypes");
+const { appendRemark } = require("../utils/remarksLog");
+const generateDisplayId = require("../utils/generateDisplayId");
+const { createNotification } = require("./notifications.controller");
+
 
 const createCallValidators = [
   body("caller_name").isString().trim().notEmpty(),
@@ -10,7 +14,7 @@ const createCallValidators = [
   body("call_type").isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
-  body("remarks").optional({ nullable: true }).isString(),
+  body("remark").optional().isString().trim().notEmpty(),
   body("receive_type").isIn(["call", "msg", "email", "meeting"]),
    body("is_task").optional({ nullable: true }).isBoolean(),
   handleValidation,
@@ -24,14 +28,35 @@ const updateCallValidators = [
   body("call_type").optional().isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").optional().isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
-  body("remarks").optional({ nullable: true }).isString(),
+  body("remark").optional().isString().trim().notEmpty(),
   body("receive_type").optional().isIn(["call", "msg", "email", "meeting"]),
   handleValidation,
 ];
 
 const callIncludes = [
-  { model: User, attributes: ["id", "name", "employee_id"] },     
-  { model: Project, attributes: ["id", "name"] },                  
+  {
+    model: User,
+    as: "caller",
+    attributes: ["id", "name", "employee_id"],
+  },
+
+  {
+    model: User,
+    as: "transferredTo",
+    attributes: ["id", "name", "employee_id"],
+  },
+
+  {
+    model: User,
+    as: "taskAssignee",
+    attributes: ["id", "name", "employee_id"],
+  },
+
+  {
+    model: Project,
+    as: "project",
+    attributes: ["id", "name"],
+  },
 ];
 // ── Subtype validator helper ───────────────────────────────────
 function validateSubtype(call_type, call_subtype) {
@@ -39,6 +64,8 @@ function validateSubtype(call_type, call_subtype) {
   if (!validSubtypes) return false;
   return validSubtypes.includes(call_subtype);
 }
+
+
 
 const createCall = async (req, res) => {
   try {
@@ -49,11 +76,15 @@ const createCall = async (req, res) => {
       call_type,
       call_subtype,
       call_summary,
-      remarks,
       receive_type,
       is_task,        // NEW
+      transfer_to,
+      task_assigned_to,
+      follow_up,
+      parent_call_id
     } = req.body;
 
+    const assignedTo = req.user?.id;
     // 1. Validate subtype belongs to type
     if (!validateSubtype(call_type, call_subtype)) {
       return res.status(400).json({
@@ -68,6 +99,31 @@ const createCall = async (req, res) => {
       });
     }
 
+
+    //follow up required parent call id
+    if(follow_up && !parent_call_id)
+    {
+      return res.status(400).json({
+        message:"parent call id required when its follow_up"
+      })
+    }
+
+    // task assign to (when is_task is true and given to other emp)
+    if(task_assigned_to && !is_task )
+    {
+      return res.status(400).json({
+           message: "is_task must be true when assigning task",
+      })
+    }
+
+    // transfer to
+    if(transfer_to === req.user.id)
+    {
+     return res.status(400).json({
+      message: "Cannot transfer call to yourself",
+      });
+    }
+
     // 3. Validate project exists if provided
     let project = null;
     if (project_id) {
@@ -77,18 +133,70 @@ const createCall = async (req, res) => {
       }
     }
 
+
+
+    // prefix display id
+
+    let prefix = "C"
+
+    if(transfer_to)
+    {
+      prefix = "CTR"
+    }
+    else if(is_task && task_assigned_to)
+    {
+      prefix = "CTA"
+    }
+    else if(is_task)
+    {
+      prefix = "CT"
+    }
+    else if(follow_up)
+    {
+      prefix = "CFB"
+    }
+    else {
+      prefix = "C"
+    }
+    
+    
+
+    // generate display id
+    const displayId = await generateDisplayId({prefix, employeeId: req.user.employee_id});
+// remarks
+
+let remarksLog = [];
+
+// if fronted sends initial remark
+if(req.body.remark)
+{
+  remarksLog = appendRemark({
+ existingRemarks: [],
+    text:req.body.remark,
+    user_id:req.user.id,
+    user_name:req.user.name
+  }
+    
+  )
+}
+    
     // 4. Create the call
     const call = await Call.create({
       user_id:      req.user.id,
+      display_id: displayId,
       caller_name,
       caller_number: caller_number || null,
       project_id:   project_id || null,
       call_type,
       call_subtype,
       call_summary:  call_summary || null,
-      remarks:       remarks || null,
       receive_type,
       is_task:       is_task || false,   // NEW
+      transfer_to : transfer_to || null,
+      task_assigned_to: task_assigned_to || null,
+      follow_up : follow_up || null,
+parent_call_id: parent_call_id || null,
+      remarks: remarksLog,
     });
     console.log("🚀 ~ createCall ~ call:", call)
 
@@ -97,42 +205,29 @@ const createCall = async (req, res) => {
     // 5. If is_task → auto-create task from call data
     if (is_task) {
   console.log("🚀 ~ createCall ~ is_task:", is_task)
-  // Find team that has this project linked
-  const teamForProject = await Team.findOne({
-    where: { project_id: project_id }
-  });
-  console.log("🚀 ~ createCall ~ teamForProject:", teamForProject)
-
-  if (!teamForProject) {
-    return res.status(201).json({
-      call,
-      task: null,
-      warning: "Call created but task was not auto-created because no team is linked to this project",
-    });
-  }
-
-  const team_id = teamForProject.id;  // ✅ correct team_id
-
 
    // ✅ CREATE TASK
-  const task = await Task.create({
-    call_id: call.id,
-    project_id: project_id,
-    team_id: team_id,
-    task: call_summary
-      ? `Follow up: ${call_summary}`.slice(0, 255)
-      : `Follow up: ${call_subtype} from ${caller_name}`,
 
-    description: call_summary || null,
+  //  if this logic dont work then get back old logic
+const taskAssignee = task_assigned_to || req.user.id;
 
-    assigned_to: req.user.id,
-    assigned_by: req.user.id,
-
-    status: "ongoing",
-    start_date: new Date(),
-    due_date: null,
-  });
-
+const task = await Task.create({
+  call_id: call.id,
+  project_id,
+  display_id: generateDisplayId({
+    prefix: task_assigned_to ? "CTA" : "CT",
+    employeeId: req.user.employee_id
+  }),
+  task: call_summary
+    ? `Follow up: ${call_summary}`.slice(0, 255)
+    : `Follow up: ${call_subtype} from ${caller_name}`,
+  description: call_summary || null,
+  assigned_to: taskAssignee,
+  assigned_by: req.user.id,
+  status: taskAssignee === req.user.id ? "ongoing" : "open",
+  start_date: new Date(),
+  remarks: remarksLog,
+});
   
       await task.reload({
         include: [
@@ -146,6 +241,29 @@ const createCall = async (req, res) => {
       return res.status(201).json({ call, task});
     }
 
+    const io = req.app.get("io");
+
+// call transferred
+if (transfer_to) {
+  await createNotification(io, {
+    user_id: transfer_to,
+    type:    "CALL_TRANSFER",
+    title:   "Call Transferred to You",
+    message: `A call from ${caller_name} has been transferred to you`,
+    data:    { call_id: call.id, display_id: call.display_id },
+  });
+}
+
+// task auto-created and assigned to someone else
+if (is_task && task_assigned_to) {
+  await createNotification(io, {
+    user_id: task_assigned_to,
+    type:    "TASK_ASSIGNED",
+    title:   "New Task Assigned",
+    message: `You have been assigned a task from call: ${call.display_id}`,
+    data:    { task_id: task.id, display_id: task.display_id, call_id: call.id },
+  });
+}
     // 6. Normal call (no task)
     return res.status(201).json({ call, task: null });
 
@@ -222,6 +340,15 @@ const updateCall = async  (req, res) => {
       if (typeof req.body[f] !== "undefined") patch[f] = req.body[f];
     });
 
+    if(req.body.remark)
+    {
+     patch.remarks = appendRemark({
+  existingRemarks: call.remarks,
+  text: req.body.remark,
+  user_id: req.user.id,
+    user_name: req.user.name,
+});
+    }
     const uc = await call.update(patch);
     await call.reload({ include: callIncludes });
     return res.json({ call });
