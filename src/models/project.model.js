@@ -23,14 +23,21 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
     
-      project_type: {
-        type: DataTypes.ENUM("web", "app", "desktop"),
-        allowNull: true, // change it to false
+       project_types: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        defaultValue: {},
       },
-      project_subtype: {
-        type: DataTypes.STRING,
-        allowNull: true // change to false
-      },
+
+
+      // project_type: {
+      //   type: DataTypes.ENUM("web", "app", "desktop"),
+      //   allowNull: true, // change it to false
+      // },
+      // project_subtype: {
+      //   type: DataTypes.STRING,
+      //   allowNull: true // change to false
+      // },
       tech_details: {
   type: DataTypes.JSONB,
   allowNull: true,
@@ -60,7 +67,16 @@ module.exports = (sequelize, DataTypes) => {
       },
          remarks: {
         type: DataTypes.JSONB,
-        allowNull:true // change it to false
+        allowNull:true, // change it to false
+        defaultValue: [],
+         get() {
+    const val = this.getDataValue("remarks");
+    if (!val) return [];
+    if (typeof val === "string") {
+      try { return JSON.parse(val); } catch { return []; }
+    }
+    return val;
+  }
         
       }
       

@@ -53,7 +53,7 @@ module.exports = {
       await queryInterface.addColumn("calls", "display_id", {
         type: Sequelize.STRING,
         allowNull: true,
-        defaultValue: [],
+
       });
     }
   },

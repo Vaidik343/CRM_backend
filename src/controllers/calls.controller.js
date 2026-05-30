@@ -116,6 +116,12 @@ const createCall = async (req, res) => {
       })
     }
 
+    if (task_assigned_to) {
+  const assigneeExists = await User.findByPk(task_assigned_to);
+  if (!assigneeExists) {
+    return res.status(404).json({ message: "task_assigned_to user not found" });
+  }
+}
     // transfer to
     if(transfer_to === req.user.id)
     {
@@ -183,7 +189,7 @@ if(req.body.remark)
     // 4. Create the call
     const call = await Call.create({
       user_id:      req.user.id,
-      display_id: displayId,
+      display_id: call.displayId,
       caller_name,
       caller_number: caller_number || null,
       project_id:   project_id || null,

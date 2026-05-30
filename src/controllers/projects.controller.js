@@ -5,6 +5,8 @@ const { handleValidation } = require("../utils/validate");
 const generateProjectCode = require("../utils/generateProjectCode");
 const {appendRemark} = require("../utils/remarksLog");
 const { createNotification } = require("./notifications.controller");
+const PROJECT_TYPES = require("../constants/projectTypes");
+
 
 // ── Validators ────────────────────────────────────────────────────────────────
 const createProjectValidators = [
@@ -18,19 +20,19 @@ const createProjectValidators = [
     .isString(),
 
   
- body("project_type")
+ body("project_types")
   .isString()
   .trim()
   .notEmpty(),
 
-  body("project_subtype")
-    .notEmpty(),
+  // body("project_subtype")
+  //   .notEmpty(),
 
   body("tech_details")
     .notEmpty(),
 
   body("development_status")
-    .notEmpty(),
+    .optional().notEmpty(),
 
 
 body("remarks")
@@ -52,13 +54,13 @@ const updateProjectValidators = [
     .optional({ nullable: true })
     .isString(),
 
-  body("project_type")
-    .optional({ nullable: true })
-    .isString(),
+body("project_types")
+  .isObject()
+  .notEmpty(),
 
-  body("project_subtype")
-    .optional({ nullable: true })
-    .isString(),
+  // body("project_subtype")
+  //   .optional({ nullable: true })
+  //   .isString(),
 
   body("tech_details")
     .optional({ nullable: true })
@@ -122,32 +124,77 @@ const getUserRole = async (user_id) => {
 };
 
 
+const validateProjectTypes = (projectTypes) => {
+
+  if (
+    !projectTypes ||
+    typeof projectTypes !== "object" ||
+    Array.isArray(projectTypes)
+  ) {
+    return false;
+  }
+
+  for (const type in projectTypes) {
+
+    // invalid type
+    if (!PROJECT_TYPES[type]) {
+      return false;
+    }
+
+    const subtypes = projectTypes[type];
+
+    // must be array
+    if (!Array.isArray(subtypes)) {
+      return false;
+    }
+
+    for (const subtype of subtypes) {
+
+      // invalid subtype
+      if (!PROJECT_TYPES[type].includes(subtype)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
 
 
 const createProject = async (req, res) => {
   const transaction = await sequelize.transaction();
    const io = req.app.get("io");
   try {
-    const { name, description, project_type, project_subtype, tech_details, development_status,  members = [] } = req.body;
+    const { name, description, project_types,  tech_details, development_status,  members = [] } = req.body;
 
     if (!name) {
       await transaction.rollback();
       return res.status(400).json({ message: "Name Field required!" });
     }
 
-    if (!project_type) {
+    if (!project_types) {
       await transaction.rollback();
       return res.status(400).json({ message: "Project type Field required!" });
     }
 
-    if (!project_subtype) {
-      await transaction.rollback();
-      return res.status(400).json({ message: "Project sub type Field required!" });
-    }
+    // if (!project_subtype) {
+    //   await transaction.rollback();
+    //   return res.status(400).json({ message: "Project sub type Field required!" });
+    // }
     if (!tech_details) {
       await transaction.rollback();
       return res.status(400).json({ message: "Details Field required!" });
     }
+
+
+        if (!validateProjectTypes(project_types)) {
+
+  await transaction.rollback();
+
+  return res.status(400).json({
+    message: "Invalid project types/subtypes",
+  });
+}
 
     const existingProject = await Project.findOne({
       where: {
@@ -182,20 +229,24 @@ if(req.body.remark)
   }
     
   )
+  console.log("🚀 ~ createProject ~ remarksLog:", remarksLog)
 }
+
+
 
     const project = await Project.create({
       name,
       code,
       description: description || null,
-      project_type: project_type || null,
-      project_subtype: project_subtype || null,
+      project_types: project_types || {},
+      // project_subtype: project_subtype || null,
       tech_details: tech_details || null,
-      development_status: development_status || "planning",
+      development_status,
       created_by: req.user.id,
       is_active: true,
       remarks : remarksLog
     }, { transaction });
+    console.log("🚀 ~ createProject ~ project:", project)
 
     // Validate that members is an array if passed
     if (members && !Array.isArray(members)) {
@@ -291,7 +342,7 @@ if(req.body.remark)
     type:    "PROJECT_ADDED",
     title:   "Added to Project",
     message: `You have been added to project: ${project.name}`,
-    data:    { project_id: project.id, project_code: project.project_code },
+    data:    { project_id: project.id, code: project.code },
   });
 }
 
@@ -303,6 +354,7 @@ if(req.body.remark)
     }
 
     console.error("createProject error:", err);
+
     return res.status(500).json({ message: "Internal server error" });
   }
 }
@@ -419,12 +471,13 @@ const updateProject = async (req, res) => {
     [
        "name",
   "description",
-  "project_type",
-  "project_subtype",
+  "project_types",
+  // "project_subtype",
   "tech_details",
   "development_status",
   "remarks",
   "is_active",
+  
     ].forEach((field) => {
 
       if (typeof req.body[field] !== "undefined") {
@@ -441,6 +494,18 @@ const updateProject = async (req, res) => {
   user_name:req.user.name
 });
     }
+
+
+
+if (
+  typeof req.body.project_types !== "undefined" &&
+  !validateProjectTypes(req.body.project_types)
+) {
+
+  return res.status(400).json({
+    message: "Invalid project types/subtypes",
+  });
+}
     await project.update(patch);
     await project.reload({ include: projectIncludes }); 
     return res.status(200).json({
@@ -682,7 +747,7 @@ const addProjectMembers = async (req, res) => {
         type: "PROJECT_ADDED",
         title: "Added to Project",
         message: `You have been added to project: ${project.name}`,
-        data: {project_id: project.id, project_code: project.project_code}
+        data: {project_id: project.id, code: project.code}
       })
     }
     return res.status(200).json({

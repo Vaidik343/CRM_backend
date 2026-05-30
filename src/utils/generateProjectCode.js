@@ -1,20 +1,27 @@
-const { Op } = require("sequelize");
+const {Op, where} = require("sequelize");
 
 const generateProjectCode = async (projectName, ProjectModel) => {
-  const prefix = projectName.replace(/\s+/g, "").substring(0, 3).toUpperCase();
+  const prefix = projectName
+    .replace(/\s+/g, "")
+    .substring(0, 3)
+    .toUpperCase();
 
-  const existing = await ProjectModel.findAll({
-    where: { code: { [Op.like]: `${prefix}%` } },
+  const latestProject = await ProjectModel.findOne({
+    order: [["code", "DESC"]],  // order by code not createdAt
     attributes: ["code"],
+    where: {
+      code: { [Op.not]: null }  // skip old projects with null code
+    }
   });
 
-  let max = 0;
-  for (const p of existing) {
-    const num = parseInt(p.code?.slice(3), 10);
-    if (!isNaN(num) && num > max) max = num;
+  let nextNumber = 1;
+  if (latestProject?.code) {
+    const match = latestProject.code.match(/(\d+)$/);
+    if (match) {
+      nextNumber = parseInt(match[1], 10) + 1;
+    }
   }
 
-  return `${prefix}${String(max + 1).padStart(3, "0")}`;
+  return `${prefix}${String(nextNumber).padStart(3, "0")}`;
 };
-
 module.exports = generateProjectCode;

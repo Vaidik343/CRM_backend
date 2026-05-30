@@ -61,7 +61,7 @@
  *         id:
  *           type: string
  *           format: uuid
- *         project_code:
+ *         code:
  *           type: string
  *           example: "CRM001"
  *           description: Auto-generated — first 3 letters of name + 3-digit increment
@@ -121,7 +121,7 @@
  *   post:
  *     summary: Create a new project
  *     description: |
- *       Admin only. project_code is auto-generated from the project name.
+ *       Admin only. code is auto-generated from the project name.
  *       Members can optionally be added at creation time.
  *     tags: [Projects]
  *     security:
@@ -403,7 +403,7 @@
 
 /**
  * @swagger
- * /api/members/{id}/role:
+ * /api/projects/members/{id}:
  *   patch:
  *     summary: Update a project member's role
  *     tags: [Projects]

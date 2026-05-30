@@ -22,17 +22,19 @@ const appendRemark = ({
   user_id,
   user_name,
 }) => {
-  const remarks = Array.isArray(existingRemarks)
-    ? [...existingRemarks]
-    : [];
+  // Parse if it came back as a string from DB
+  let parsed = existingRemarks;
+  if (typeof existingRemarks === "string") {
+    try {
+      parsed = JSON.parse(existingRemarks);
+    } catch {
+      parsed = [];
+    }
+  }
 
-  remarks.push(
-    createRemark({
-      text,
-      user_id,
-      user_name,
-    })
-  );
+  const remarks = Array.isArray(parsed) ? [...parsed] : [];
+
+  remarks.push(createRemark({ text, user_id, user_name }));
 
   return remarks;
 };
@@ -50,6 +52,7 @@ const sortRemarksOldest = (remarks = []) => {
       new Date(a.created_at) - new Date(b.created_at)
   );
 };
+
 
 module.exports = {
   createRemark,
