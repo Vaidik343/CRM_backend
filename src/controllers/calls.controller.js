@@ -28,7 +28,7 @@ const updateCallValidators = [
   body("call_type").optional().isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").optional().isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
-  body("remark").optional().isString().trim().notEmpty(),
+  body("remark").optional().trim().notEmpty(),
   body("receive_type").optional().isIn(["call", "msg", "email", "meeting"]),
   handleValidation,
 ];
@@ -101,12 +101,12 @@ const createCall = async (req, res) => {
 
 
     //follow up required parent call id
-    if(follow_up && !parent_call_id)
-    {
-      return res.status(400).json({
-        message:"parent call id required when its follow_up"
-      })
-    }
+    // if(follow_up && !parent_call_id)
+    // {
+    //   return res.status(400).json({
+    //     message:"parent call id required when its follow_up"
+    //   })
+    // }
 
     // task assign to (when is_task is true and given to other emp)
     if(task_assigned_to && !is_task )
@@ -157,7 +157,7 @@ const createCall = async (req, res) => {
     {
       prefix = "CT"
     }
-    else if(follow_up)
+    else if(parent_call_id)
     {
       prefix = "CFB"
     }
@@ -200,7 +200,7 @@ if(req.body.remark)
       is_task:       is_task || false,   // NEW
       transfer_to : transfer_to || null,
       task_assigned_to: task_assigned_to || null,
-      follow_up : follow_up || null,
+      // follow_up : follow_up || null,
 parent_call_id: parent_call_id || null,
       remarks: remarksLog,
     });
