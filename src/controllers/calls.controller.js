@@ -189,7 +189,7 @@ if(req.body.remark)
     // 4. Create the call
     const call = await Call.create({
       user_id:      req.user.id,
-      display_id: call.displayId,
+      display_id: displayId,
       caller_name,
       caller_number: caller_number || null,
       project_id:   project_id || null,
@@ -220,10 +220,7 @@ const taskAssignee = task_assigned_to || req.user.id;
 const task = await Task.create({
   call_id: call.id,
   project_id,
-  display_id: generateDisplayId({
-    prefix: task_assigned_to ? "CTA" : "CT",
-    employeeId: req.user.employee_id
-  }),
+  display_id: call.display_id,
   task: call_summary
     ? `Follow up: ${call_summary}`.slice(0, 255)
     : `Follow up: ${call_subtype} from ${caller_name}`,
@@ -291,7 +288,7 @@ const listCalls = async(req, res) => {
       offset,
       where,
       include: callIncludes,
-      order: [["id", "DESC"]],
+      order: [["id", "ASC"]],
     });
 
     // console.log("call all", count, rows)

@@ -216,9 +216,10 @@ if (!req.user.is_admin) {
       where,
       include: taskIncludes,
       order: [
-        ["status", "ASC"],
-        ["due_date", "ASC"],
-        ["createdAt", "ASC"],
+        ["id", "ASC"]
+        // ["status", "ASC"],
+        // ["due_date", "ASC"],
+        // ["createdAt", "ASC"],
       ],
       limit,
       offset,
