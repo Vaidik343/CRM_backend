@@ -12,6 +12,7 @@ const createUserValidators = [
   body("email").optional({ nullable: true }).isEmail(),  // removed normalizeEmail()
   body("role_id").isUUID(),
   body("is_admin").optional().isBoolean(),
+  body("mobile").optional(),
   handleValidation,
 ];
 
@@ -20,12 +21,13 @@ const updateUserValidators = [
   body("name").optional().isString().trim().notEmpty(),
   body("email").optional().isEmail(),  // removed normalizeEmail()
   body("role_id").optional().isUUID(),
+  body("mobile").optional(),
   body("is_admin").optional().isBoolean(),
   handleValidation,
 ];
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const safeAttributes = ["id", "employee_id", "name", "email", "role_id", "is_admin", "createdAt"];
+const safeAttributes = ["id", "employee_id", "name", "email", "role_id", "is_admin", "mobile", "createdAt"];
 
 const userIncludes = [{ model: Role, attributes: ["id", "name"] }];
 
@@ -47,6 +49,7 @@ const createUser = async(req, res) => {
       employee_id,
       name,
       email,
+      mobile,
       password,
       role_id,
       is_admin: is_admin ?? false,
@@ -62,6 +65,7 @@ const createUser = async(req, res) => {
         employee_id: user.employee_id,
         name: user.name,
         email: user.email,
+        mobile: user.mobile,
         role_id: user.role_id,
         role: role.name,
         is_admin: user.is_admin,

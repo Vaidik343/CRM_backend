@@ -1,0 +1,20 @@
+'use strict';
+
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    await queryInterface.addColumn('work_logs', 'project_id', {
+      type: Sequelize.UUID,
+      allowNull: true,
+      references: {
+        model: 'projects',
+        key: 'id',
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL',
+    });
+  },
+
+  async down(queryInterface) {
+    await queryInterface.removeColumn('work_logs', 'project_id');
+  },
+};

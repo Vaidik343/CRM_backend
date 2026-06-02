@@ -81,7 +81,11 @@ Task.belongsTo(User, { foreignKey: "assigned_by", as: "assigner" });
 // ── WorkLog ↔ User ────────────────────────────────────────────
 User.hasMany(WorkLog, { foreignKey: "user_id", onDelete: "CASCADE" });
 WorkLog.belongsTo(User, { foreignKey: "user_id" });
- 
+
+
+//worklog to project
+Project.hasMany(WorkLog,{foreignKey: "project_id"});
+WorkLog.belongsTo(Project,{foreignKey: "project_id"})
  
 // ── Notification ↔ User ───────────────────────────────────────
 User.hasMany(Notification, { foreignKey: "user_id", as: "notifications", onDelete: "CASCADE" });

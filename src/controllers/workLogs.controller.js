@@ -20,7 +20,8 @@ const updateWorkLogValidators = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const workLogIncludes = [
-  { model: User, attributes: ["id", "name", "employee_id"] },
+  { model: User, attributes: ["id", "name", "employee_id", "project_id"] },
+  {model: Project, attributes: ["id", "name"]}
 ];
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
@@ -44,8 +45,21 @@ const createWorkLog = async(req, res) => {
       );
     }
 
+
+    if (project_id) {
+  const project = await Project.findByPk(project_id);
+
+  if (!project) {
+    return res.status(404).json({
+      success: false,
+      message: "Project not found",
+    });
+  }
+}
+
     const workLog = await WorkLog.create({
       user_id: req.user.id,
+  project_id: project_id || null,
       description: req.body.description,
       date: req.body.date,
       remarks : remarksLog,

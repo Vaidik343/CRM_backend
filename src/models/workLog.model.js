@@ -12,11 +12,16 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: false,
       },
+      project_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+    
       description: { type: DataTypes.TEXT, allowNull: false },
       date: { type: DataTypes.DATEONLY, allowNull: false },
          remarks: {
         type: DataTypes.JSONB,
-        allowNull:true // change it to false
+        allowNull:false // change it to false
         
       }
     },

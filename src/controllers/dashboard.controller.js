@@ -16,10 +16,14 @@ const getDashboard = async (req, res) => {
 
     // ── Totals section filter ─────────────────────────────
     let totalsWhere = {};
-    if (from && to) {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999);
+
+    if (from) {
       const start = new Date(from); start.setHours(0, 0, 0, 0);
-      const end   = new Date(to);   end.setHours(23, 59, 59, 999);
-      totalsWhere = { createdAt: { [Op.between]: [start, end] } };
+      totalsWhere = { createdAt: { [Op.between]: [start, todayEnd] } };
+    } else {
+      totalsWhere = { createdAt: { [Op.between]: [todayStart, todayEnd] } };
     }
 
     // ── Activity section filter ───────────────────────────
@@ -76,8 +80,31 @@ const getDashboard = async (req, res) => {
       group: ["status"],
       raw: true,
     });
-    const taskStatusBreakdown = { open: 0, ongoing: 0, closed: 0 };
+    const taskStatusBreakdown = { open: 0, ongoing: 0, closed: 0, due: 0, overdue: 0 };
     taskStatusRows.forEach((r) => { taskStatusBreakdown[r.status] = parseInt(r.count); });
+
+    const now = new Date();
+    const todayDateStr = now.toISOString().split('T')[0];
+
+    const [dueCount, overdueCount] = await Promise.all([
+      Task.count({
+        where: {
+          ...totalsWhere,
+          due_date: todayDateStr,
+          status: { [Op.ne]: 'closed' },
+        },
+      }),
+      Task.count({
+        where: {
+          ...totalsWhere,
+          due_date: { [Op.lt]: todayDateStr },
+          status: { [Op.ne]: 'closed' },
+        },
+      }),
+    ]);
+
+    taskStatusBreakdown.due = dueCount;
+    taskStatusBreakdown.overdue = overdueCount;
 
     const callTypeRows = await Call.findAll({
       attributes: ["call_type", [Call.sequelize.fn("COUNT", Call.sequelize.col("call_type")), "count"]],
@@ -131,12 +158,41 @@ const getDashboard = async (req, res) => {
       work_logs:   logMap[e.id]  || 0,
     }));
 
+    const todayCalls = await Call.findAll({
+      where: { createdAt: { [Op.between]: [todayStart, todayEnd] } },
+      include: [
+        { model: User, as: 'caller', attributes: ['id', 'name', 'employee_id'] },
+        { model: Project, as: 'project', attributes: ['id', 'name'] },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    const taskCalls = await Call.findAll({
+      where: { is_task: true, ...totalsWhere },
+      include: [
+        { model: User, as: 'caller', attributes: ['id', 'name', 'employee_id'] },
+        { model: Project, as: 'project', attributes: ['id', 'name'] },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    const allTimeTotalCalls = await Call.count();
+
+    const calls_section = {
+      total_calls:    allTimeTotalCalls,
+      today_calls:    todayCalls,
+      task_calls:     taskCalls,
+      today_count:    todayCalls.length,
+      task_call_count: taskCalls.length,
+    };
+
     return res.json({
       totals:                 { employees: totalEmployees, teams: totalTeams,calls: totalCalls, tasks: totalTasks, work_logs: totalWorkLogs },
       last_7_days:            { calls: recentCalls, tasks: recentTasks, work_logs: recentWorkLogs },
       task_status_breakdown:  taskStatusBreakdown,
       call_type_breakdown:    callTypeBreakdown,
       employee_breakdown:     employeeBreakdown,
+      calls_section:          calls_section,
     });
   } catch (err) {
     console.error("getDashboard error:", err);
