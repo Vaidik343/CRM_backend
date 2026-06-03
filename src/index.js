@@ -52,7 +52,7 @@ app.use("/public", express.static(path.join(__dirname, "public")));
 app.set("io", io);
 
 // ── Basic routes ──────────────────────────────────────────────
-app.get("/", (req, res) => res.send("home page12"));
+app.get("/", (req, res) => res.send("home page"));
 app.get("/health", (req, res) => res.json({ ok: true }));
 
 // ── API routes ────────────────────────────────────────────────
@@ -105,12 +105,23 @@ io.on("connection", (socket) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────
+// const startServer = async () => {
+//   try {
+//     await connectDB();
+//       startDueDateCron(io);
+//     server.listen(PORT, "0.0.0.0", () => {
+//       console.log(`🚀 Server running on 0.0.0.0:${PORT}`);
+//     });
+//   } catch (error) {
+//     console.error("❌ Server startup failed:", error.message);
+//   }
+// };
 const startServer = async () => {
   try {
     await connectDB();
       startDueDateCron(io);
-    server.listen(PORT, "0.0.0.0", () => {
-      console.log(`🚀 Server running on 0.0.0.0:${PORT}`);
+    server.listen(PORT,  () => {
+      console.log(`🚀 Server running http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error("❌ Server startup failed:", error.message);
