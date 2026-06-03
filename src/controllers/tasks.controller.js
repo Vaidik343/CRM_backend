@@ -264,6 +264,7 @@ if (
 const updateTask = async (req, res) => {
   try {
     const task = await Task.findByPk(req.params.id);
+    console.log("🚀 ~ updateTask ~ task:", task)
     if (!task) return res.status(404).json({ message: "Task not found" });
 
    if (
@@ -291,7 +292,12 @@ const updateTask = async (req, res) => {
 });
     }
 
-    await task.update(patch);
+   const ut = await task.update(patch);
+    console.log("🚀 ~ updateTask ~ ut:", ut)
+    console.log("REQ BODY:", req.body);
+console.log("PATCH:", patch);
+console.log("PATCH DUE DATE:", patch.due_date);
+console.log("TYPE:", typeof patch.due_date);
     await task.reload({ include: taskIncludes });
     return res.status(200).json({ task });
 

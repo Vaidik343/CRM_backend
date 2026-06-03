@@ -52,7 +52,7 @@ module.exports = (sequelize, DataTypes) => {
   "testing",
   "completed"
 ),
-        allowNull: true ,// change it to false
+        allowNull: false ,// change it to false
            defaultValue: "active",
       },
     

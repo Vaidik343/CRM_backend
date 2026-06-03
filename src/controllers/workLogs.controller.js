@@ -1,5 +1,5 @@
 const { body, param } = require("express-validator");
-const { WorkLog, User } = require("../models");
+const { WorkLog, User ,Project } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const {appendRemark} = require("../utils/remarksLog")
 // ── Validators ────────────────────────────────────────────────────────────────

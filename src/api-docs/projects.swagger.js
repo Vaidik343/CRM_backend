@@ -442,7 +442,7 @@
 
 /**
  * @swagger
- * /api/members/{id}:
+ * /api/projects/members/{id}:
  *   delete:
  *     summary: Remove a member from project (soft delete)
  *     tags: [Projects]

@@ -20,9 +20,9 @@ const createProjectValidators = [
     .isString(),
 
   
- body("project_types")
-  .isString()
-  .trim()
+ // ✅ Correct
+body("project_types")
+  .isObject()
   .notEmpty(),
 
   // body("project_subtype")
@@ -590,6 +590,7 @@ const updateMemberRole = async (req, res) => {
   }
 
 }
+ 
 const removeMember = async (req, res) => {
   try {
     const memberId = req.params.id;
@@ -615,7 +616,9 @@ const removeMember = async (req, res) => {
       });
 
   } catch (error) {
-         res.status(500).json({message:"Something went wrong!"});    
+     console.log("🚀 ~ removeMember ~ error:", error)
+         res.status(500).json({message:"Something went wrong!"});  
+           
   }
 
 }

@@ -11,7 +11,7 @@ router.get   ("/tasks/:id",authenticate, getTask);
 
 router.post  ("/tasks",       authenticate,   requirePermission("can_write"),                      createTaskValidators,  createTask);
 
-router.patch ("/tasks/:id",   authenticate, requirePermission("can_update"),     updateTaskValidators,  updateTask);
+router.patch ("/tasks/:id",   authenticate, requirePermission("can_update"),  updateTask);
 router.delete("/tasks/:id",   authenticate, requireAdmin,                         deleteTask);
 
 module.exports = router;
