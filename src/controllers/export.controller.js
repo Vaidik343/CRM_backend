@@ -43,8 +43,8 @@ const exportData = async (req, res) => {
       const rows = await Call.findAll({
         where: dateWhere,
         include: [
-          { model: User,    attributes: ["name", "employee_id"] },
-          { model: Project, attributes: ["name"] },
+          { model: User,  as:"caller",   attributes: ["name", "employee_id"] },
+          { model: Project, as:"project", attributes: ["name"] },
         ],
         order: [["createdAt", "DESC"]],
       });
@@ -139,6 +139,152 @@ const exportData = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-module.exports = { exportData };
+
+const exportMyData = async (req, res) => {
+  try {
+    const type = String(req.query.type || "").toLowerCase();
+    if (!["calls", "tasks", "work-logs"].includes(type)) {
+      return res.status(400).json({ message: "type must be one of: calls, tasks, work-logs" });
+    }
+
+    const { from, to } = req.query;
+    const userId = req.user.id;
+
+    const start = new Date(from || new Date());
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(to || new Date());
+    end.setHours(23, 59, 59, 999);
+    const dateWhere = { createdAt: { [Op.between]: [start, end] } };
+
+    // helper — flatten remarks array to readable string
+    const flattenRemarks = (remarks) => {
+      if (!Array.isArray(remarks) || remarks.length === 0) return "";
+      return remarks
+        .map((r) => `[${new Date(r.created_at).toLocaleDateString()} - ${r.added_by_name}]: ${r.text}`)
+        .join("\n");
+    };
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet(type);
+
+    if (type === "calls") {
+      const rows = await Call.findAll({
+        where: {
+          ...dateWhere,
+          // ✅ all calls by this user — creator, transfer recipient, or follow-up
+          [Op.or]: [
+            { user_id: userId },
+            { transfer_to: userId },
+          ],
+        },
+        include: [{ model: Project, as:"project", attributes: ["name"] }],
+        order: [["createdAt", "DESC"]],
+      });
+
+      sheet.columns = [
+        { header: "Display ID",    key: "display_id",    width: 20 },
+        { header: "Project",       key: "project",       width: 20 },
+        { header: "Caller Name",   key: "caller_name",   width: 20 },
+        { header: "Caller Number", key: "caller_number", width: 18 },
+        { header: "Call Type",     key: "call_type",     width: 15 },
+        { header: "Call Subtype",  key: "call_subtype",  width: 20 },
+        { header: "Medium",        key: "receive_type",  width: 15 },
+        { header: "Summary",       key: "call_summary",  width: 30 },
+        { header: "Remarks",       key: "remarks",       width: 40 },
+        { header: "Created At",    key: "createdAt",     width: 20 },
+      ];
+
+      sheet.addRows(rows.map((r) => ({
+        ...r.toJSON(),
+        project: r.Project?.name || "",
+        remarks: flattenRemarks(r.remarks),
+      })));
+    }
+
+    if (type === "tasks") {
+      const rows = await Task.findAll({
+        where: {
+          ...dateWhere,
+          [Op.or]: [
+            { assigned_to: userId },
+            { assigned_by: userId },
+          ],
+        },
+        include: [
+          { model: User, as: "assignee", attributes: ["name"] },
+          { model: User, as: "assigner", attributes: ["name"] },
+          { model: Project, as: "project", attributes: ["name"] },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      sheet.columns = [
+        { header: "Display ID",   key: "display_id",       width: 20 },
+        { header: "Task",         key: "task",             width: 25 },
+        { header: "Description",  key: "description",      width: 25 },
+        { header: "Project",      key: "project",          width: 20 },
+        { header: "Assigned To",  key: "assigned_to_name", width: 20 },
+        { header: "Assigned By",  key: "assigned_by_name", width: 20 },
+        { header: "Status",       key: "status",           width: 15 },
+        { header: "Due Date",     key: "due_date",         width: 15 },
+        { header: "Remarks",      key: "remarks",          width: 40 },
+        { header: "Created At",   key: "createdAt",        width: 20 },
+      ];
+
+      sheet.addRows(rows.map((r) => ({
+        ...r.toJSON(),
+        project:          r.project?.name  || "",
+        assigned_to_name: r.assignee?.name || "",
+        assigned_by_name: r.assigner?.name || "",
+        remarks:          flattenRemarks(r.remarks),
+      })));
+    }
+
+    if (type === "work-logs") {
+      let workLogWhere = { user_id: userId };
+      if (from && to) {
+        workLogWhere.date = { [Op.between]: [from, to] };
+      } else {
+        workLogWhere.date = new Date().toISOString().split("T")[0];
+      }
+
+      const rows = await WorkLog.findAll({
+        where: workLogWhere,
+        order: [["date", "DESC"]],
+      });
+
+      sheet.columns = [
+        { header: "Description", key: "description", width: 30 },
+        { header: "Date",        key: "date",        width: 15 },
+        { header: "Remarks",     key: "remarks",     width: 40 },
+        { header: "Created At",  key: "createdAt",   width: 20 },
+      ];
+
+      sheet.addRows(rows.map((r) => ({
+        ...r.toJSON(),
+        remarks: flattenRemarks(r.remarks),
+      })));
+    }
+
+    // style header row
+    sheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
+    });
+
+    const fileLabel = from && to ? `${from}_to_${to}` : new Date().toISOString().split("T")[0];
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${type}_${fileLabel}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("exportMyData error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports = { exportData, exportMyData };
+// module.exports = { exportData };
 
 

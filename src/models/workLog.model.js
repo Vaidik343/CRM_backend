@@ -19,11 +19,16 @@ module.exports = (sequelize, DataTypes) => {
     
       description: { type: DataTypes.TEXT, allowNull: false },
       date: { type: DataTypes.DATEONLY, allowNull: false },
+
+
          remarks: {
         type: DataTypes.JSONB,
-        allowNull:false // change it to false
+        allowNull:false, // change it to false
+                  defaultValue: [],
         
-      }
+      } ,
+
+ 
     },
     {
       tableName: "work_logs",

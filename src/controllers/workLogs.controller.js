@@ -20,7 +20,7 @@ const updateWorkLogValidators = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const workLogIncludes = [
-  { model: User, attributes: ["id", "name", "employee_id", "project_id"] },
+  { model: User, attributes: ["id", "name", "employee_id",] },
   {model: Project, attributes: ["id", "name"]}
 ];
 
@@ -28,6 +28,8 @@ const workLogIncludes = [
 
 const createWorkLog = async(req, res) => {
   try {
+
+    const {user_id, project_id, description} = req.body;
 
     let remarksLog = [];
 

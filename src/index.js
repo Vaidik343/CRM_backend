@@ -18,10 +18,11 @@ const server = http.createServer(app);  // wrap express in http server for socke
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+    credentials: true,
   },
+  allowEIO3: true,  
 });
-
 const PORT = process.env.PORT || 7015;
 
 const routeFiles = [
@@ -105,27 +106,27 @@ io.on("connection", (socket) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────
-// const startServer = async () => {
-//   try {
-//     await connectDB();
-//       startDueDateCron(io);
-//     server.listen(PORT, "0.0.0.0", () => {
-//       console.log(`🚀 Server running on 0.0.0.0:${PORT}`);
-//     });
-//   } catch (error) {
-//     console.error("❌ Server startup failed:", error.message);
-//   }
-// };
 const startServer = async () => {
   try {
     await connectDB();
       startDueDateCron(io);
-    server.listen(PORT,  () => {
-      console.log(`🚀 Server running http://localhost:${PORT}`);
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on 0.0.0.0:${PORT}`);
     });
   } catch (error) {
     console.error("❌ Server startup failed:", error.message);
   }
 };
+// const startServer = async () => {
+//   try {
+//     await connectDB();
+//       startDueDateCron(io);
+//     server.listen(PORT,  () => {
+//       console.log(`🚀 Server running http://localhost:${PORT}`);
+//     });
+//   } catch (error) {
+//     console.error("❌ Server startup failed:", error.message);
+//   }
+// };
 
 startServer();
