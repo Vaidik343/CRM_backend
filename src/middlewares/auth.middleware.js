@@ -16,7 +16,7 @@ async function authenticate(req, res, next) {
     });
     // console.log("🚀 ~ authenticate ~ user:", user)
     if (!user) return res.status(401).json({ message: "Invalid token" });
-console.log("AUTH USER:", req.user);
+// console.log("AUTH USER:", req.user);
     // Flatten to a plain object and attach the role name for convenience
     req.user = user.toJSON();
     req.user.role = req.user.Role?.name || null;

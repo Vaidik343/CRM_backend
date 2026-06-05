@@ -37,8 +37,8 @@ const routeFiles = [
   "teamMembers.routes.js",
   "workLogs.routes.js",
   "permissions.routes.js",
-  "roles.routes.js",
   "users.routes.js",
+  "roles.routes.js",
   "notifications.routes.js",  // new
 ];
 
@@ -56,12 +56,25 @@ app.set("io", io);
 app.get("/", (req, res) => res.send("home page"));
 app.get("/health", (req, res) => res.json({ ok: true }));
 
+
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.path}`);
+  next();
+});
+
 // ── API routes ────────────────────────────────────────────────
 routeFiles.forEach((file) => {
   const route = require(`./routes/${file}`);
   app.use("/api", route);
   console.log(`Loaded route: ${file}`);
 });
+
+// ← add this after all routes are loaded
+app.get("/api/users", (req, res) => {
+  console.log("⚠️ FALLTHROUGH — /api/users not caught by any route file");
+  res.json({ debug: "fallthrough" });
+});
+
 
 // ── Swagger ───────────────────────────────────────────────────
 const apiDocsPath = path.join(__dirname, "api-docs");

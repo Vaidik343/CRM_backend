@@ -5,12 +5,12 @@ const { createRole, listRoles, getRole, updateRole, deleteRole, createRoleValida
 
 const router = express.Router();
 
-router.use(authenticate, requireAdmin);
+// router.use(authenticate, requireAdmin);
 
-router.post  ("/roles",       createRoleValidators,   createRole);
-router.get   ("/roles",                               listRoles);
-router.get   ("/roles/:id",                           getRole);
-router.patch ("/roles/:id",   updateRoleValidators,   updateRole);
-router.delete("/roles/:id",                           deleteRole);
+router.post  ("/roles",   authenticate, requireAdmin,    createRoleValidators,   createRole);
+router.get   ("/roles",   authenticate, requireAdmin,                            listRoles);
+router.get   ("/roles/:id",        authenticate, requireAdmin,                   getRole);
+router.patch ("/roles/:id",  authenticate, requireAdmin, updateRoleValidators,   updateRole);
+router.delete("/roles/:id",   authenticate, requireAdmin,                        deleteRole);
 
 module.exports = router;

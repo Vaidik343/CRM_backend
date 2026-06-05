@@ -1,5 +1,5 @@
 const { User, Call, Task, WorkLog, Role, Team, TeamMember, Project,  } = require("../models");
-const { Op } = require("sequelize");
+const { Op, where } = require("sequelize");
 
 
 const getUserRole = async (user_id) => {
@@ -43,12 +43,14 @@ const getDashboard = async (req, res) => {
     const [
       totalEmployees,
       totalTeams,
+      totalProjects,
       totalCalls,
       totalTasks,
       totalWorkLogs
     ] = await Promise.all([
       User.count({ where: { is_admin: false } }),          // ✅ no date filter
       Team.count({ where: { is_active: true } }),          // ✅ no date filter
+      Project.count({where: {is_active:true}}),
       Call.count({ where: totalsWhere }),                  // date filtered
       Task.count({ where: totalsWhere }),                  // date filtered
       WorkLog.count({ where: totalsWhere }),               // date filtered
@@ -181,6 +183,7 @@ const getDashboard = async (req, res) => {
       totals: {
         employees: totalEmployees,   // all-time
         teams:     totalTeams,        // all-time
+        projects: totalProjects,       // all time
         calls:     totalCalls,        // date filtered
         tasks:     totalTasks,        // date filtered
         work_logs: totalWorkLogs,     // date filtered

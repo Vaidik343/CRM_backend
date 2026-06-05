@@ -201,17 +201,16 @@ const listTasks = async (req, res) => {
     //   where = { assigned_to: req.user.id }; // Developer: see only own tasks
     // }
 
-    let where = {
-};
+    let where = {};
 
-// if (!req.user.is_admin) {
-//   where = {
-//     [Op.or]: [
-//       { assigned_to: req.user.id },
-//       { assigned_by: req.user.id },
-//     ],
-//   };
-// }
+if (!req.user.is_admin) {
+  where = {
+    [Op.or]: [
+      { assigned_to: req.user.id },
+      { assigned_by: req.user.id },
+    ],
+  };
+}
     const { count, rows } = await Task.findAndCountAll({
       where,
       include: taskIncludes,
@@ -243,15 +242,15 @@ const getTask = async (req, res) => {
   try {
     const task = await Task.findByPk(req.params.id, { include: taskIncludes });
     if (!task) return res.status(404).json({ message: "Task not found" });
-// if (
-//   !req.user.is_admin &&
-//   task.assigned_to !== req.user.id &&
-//   task.assigned_by !== req.user.id
-// ) {
-//   return res.status(403).json({
-//     message: "Forbidden",
-//   });
-// }
+if (
+  !req.user.is_admin &&
+  task.assigned_to !== req.user.id &&
+  task.assigned_by !== req.user.id
+) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
 
     return res.json({ task });
 
@@ -267,15 +266,15 @@ const updateTask = async (req, res) => {
     console.log("🚀 ~ updateTask ~ task:", task)
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-//    if (
-//   !req.user.is_admin &&
-//   task.assigned_to !== req.user.id &&
-//   task.assigned_by !== req.user.id
-// ) {
-//   return res.status(403).json({
-//     message: "Forbidden",
-//   });
-// }
+   if (
+  !req.user.is_admin &&
+  task.assigned_to !== req.user.id &&
+  task.assigned_by !== req.user.id
+) {
+  return res.status(403).json({
+    message: "Forbidden",
+  });
+}
 
     const patch = {};
     ["task", "description", "due_date", "status"].forEach((f) => {

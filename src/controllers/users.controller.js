@@ -89,6 +89,7 @@ const createUser = async(req, res) => {
 
 const listUsers = async(req, res) => {
   try {
+    console.log("✅ listUsers hit — user:", req.user?.id, "is_admin:", req.user?.is_admin);
 
     const users = await User.findAll({
       attributes: safeAttributes,

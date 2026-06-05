@@ -5,11 +5,11 @@ const { listPermissions, getPermission, updatePermission, resetPermission, updat
 
 const router = express.Router();
 
-router.use(authenticate, requireAdmin);
+// router.use(authenticate, requireAdmin);
 
-router.get   ("/permissions",                   listPermissions);
-router.get   ("/permissions/:user_id",          getPermission);
-router.patch ("/permissions/:user_id",          updatePermissionValidators, updatePermission);
-router.patch ("/permissions/:user_id/reset",    resetPermission);  // reset → PATCH not DELETE
+router.get   ("/permissions",             authenticate, requireAdmin,      listPermissions);
+router.get   ("/permissions/:user_id",authenticate, requireAdmin,          getPermission);
+router.patch ("/permissions/:user_id", authenticate, requireAdmin,          updatePermissionValidators, updatePermission);
+router.patch ("/permissions/:user_id/reset", authenticate, requireAdmin,   resetPermission);  // reset → PATCH not DELETE
 
 module.exports = router;
