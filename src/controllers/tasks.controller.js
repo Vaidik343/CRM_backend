@@ -215,7 +215,7 @@ if (!req.user.is_admin) {
       where,
       include: taskIncludes,
       order: [
-        ["id", "ASC"]
+        ["createdAt", "DESC"]
         // ["status", "ASC"],
         // ["due_date", "ASC"],
         // ["createdAt", "ASC"],

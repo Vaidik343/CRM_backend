@@ -1,4 +1,4 @@
-const { User, Call, Task, WorkLog, Role, Team, TeamMember, Project,  } = require("../models");
+const { User, Call, Task, WorkLog, Role, Team, TeamMember, Project, ProjectMember } = require("../models");
 const { Op, where } = require("sequelize");
 
 
@@ -342,8 +342,8 @@ const getTeamDashboard = async (req, res) => {
         project_id: { [Op.in]: projectIds.length > 0 ? projectIds : [null] },
       },
       include: [
-        { model: User, attributes: ["id", "name", "employee_id"] },
-        { model: Project, attributes: ["id", "name"] },
+        { model: User,as: "caller", attributes: ["id", "name", "employee_id"] },
+        { model: Project, as:"project", attributes: ["id", "name"] },
       ],
       order: [["createdAt", "DESC"]],
       limit: 10,
@@ -395,74 +395,333 @@ const getTeamDashboard = async (req, res) => {
 };
 
 
-// ── GET /api/me/dashboard ─────────────────────────────────────────────────────
-// Access: Any logged-in user (sees only their own data)
-
-const getEmployeeDashboard = async (req, res) => {
+const getProjectDashboard = async (req, res) => {
   try {
-    const user_id = req.user.id;
+    const project_id = req.params.id;
+    const now = new Date();
+    const in48hrs = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
-    // ── SECTION 1: My Teams ───────────────────────────────────────────────
-    const myMemberships = await TeamMember.findAll({
-      where: { user_id, is_active: true },
+    // ── Verify project exists ─────────────────────────────────────────────
+    const project = await Project.findByPk(project_id, {
+      include: [{ model: User, as: "creator", attributes: ["id", "name", "employee_id"] }],
+    });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    // ── Access check — admin or project member ────────────────────────────
+    if (!req.user.is_admin) {
+      const membership = await ProjectMember.findOne({
+        where: { project_id, user_id: req.user.id, is_active: true },
+      });
+      if (!membership) return res.status(403).json({ message: "Access denied" });
+    }
+
+    // ── Members ───────────────────────────────────────────────────────────
+    const members = await ProjectMember.findAll({
+      where: { project_id, is_active: true },
       include: [
         {
-          model: Team,
-          as: "team",
-          attributes: ["id", "name", "description", "is_active"],
+          model: User,
+          as: "user",
+          attributes: ["id", "name", "email", "employee_id"],
+          include: [{ model: Role, attributes: ["id", "name"] }],
         },
       ],
     });
 
-    const myTeams = myMemberships
-      .filter((m) => m.team)
-      .map((m) => ({
-        team_id:   m.team_id,
-        team_name: m.team.name,
-        is_active: m.team.is_active,
-      }));
-
-    const myTeamIds = myMemberships.map((m) => m.team_id);
-
-    // ── SECTION 2: My Projects ────────────────────────────────────────────
-    // ── SECTION 2: My Projects ────────────────────────────────────────────
-// Get project_ids from the teams the user belongs to
-const myTeamDetails = await Team.findAll({
-  where: { id: { [Op.in]: myTeamIds.length > 0 ? myTeamIds : ["none"] } },
-  attributes: ["id", "name", "project_id"],
-});
-
-const myProjectIds = [...new Set(
-  myTeamDetails.map((t) => t.project_id).filter(Boolean)
-)];
-
-const myProjects = await Project.findAll({
-  where: {
-    id: { [Op.in]: myProjectIds.length > 0 ? myProjectIds : ["none"] },
-    is_active: true,
-  },
-  include: [
-    { model: User, as: "creator", attributes: ["id", "name"] },
-  ],
-  order: [["createdAt", "DESC"]],
-});
-
-    // ── SECTION 3: My Tasks ───────────────────────────────────────────────
-    const myTasks = await Task.findAll({
-      where: { assigned_to: user_id },
+    // ── Tasks ─────────────────────────────────────────────────────────────
+    const allTasks = await Task.findAll({
+      where: { project_id },
       include: [
-        { model: Project, as: "project", attributes: ["id", "name"] },
-        { model: Team, as: "team", attributes: ["id", "name"] },
+        { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
         { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
+        { model: Call, as: "call",     attributes: ["id", "display_id"] },
       ],
-      order: [
-        ["status", "ASC"],
-        ["due_date", "ASC"],
-        ["createdAt", "ASC"],
-      ],
+      order: [["createdAt", "DESC"]],
     });
 
-    // Task stats breakdown
+    const taskStats = {
+      total:   allTasks.length,
+      open:    allTasks.filter((t) => t.status === "open").length,
+      ongoing: allTasks.filter((t) => t.status === "ongoing").length,
+      closed:  allTasks.filter((t) => t.status === "closed").length,
+    };
+
+    const overdueTasks = allTasks.filter((t) =>
+      t.due_date && new Date(t.due_date) < now && t.status !== "closed"
+    );
+    const dueSoonTasks = allTasks.filter((t) =>
+      t.due_date &&
+      new Date(t.due_date) >= now &&
+      new Date(t.due_date) <= in48hrs &&
+      t.status !== "closed"
+    );
+
+    // ── Per member stats ──────────────────────────────────────────────────
+    const memberStats = members.map((m) => {
+      const memberTasks = allTasks.filter((t) => t.assigned_to === m.user_id);
+      return {
+        user_id:       m.user_id,
+        name:          m.user?.name,
+        employee_id:   m.user?.employee_id,
+        role:          m.user?.Role?.name,
+        tasks_total:   memberTasks.length,
+        tasks_open:    memberTasks.filter((t) => t.status === "open").length,
+        tasks_ongoing: memberTasks.filter((t) => t.status === "ongoing").length,
+        tasks_closed:  memberTasks.filter((t) => t.status === "closed").length,
+      };
+    });
+
+    // ── Calls for this project ────────────────────────────────────────────
+    const recentCalls = await Call.findAll({
+      where: { project_id },
+      include: [{ model: User, as:"caller", attributes: ["id", "name", "employee_id"] }],
+      order: [["createdAt", "DESC"]],
+      limit: 20,
+    });
+
+    const callStats = {
+      total:     recentCalls.length,
+      inquiry:   recentCalls.filter((c) => c.call_type === "inquiry").length,
+      request:   recentCalls.filter((c) => c.call_type === "request").length,
+      complaint: recentCalls.filter((c) => c.call_type === "complaint").length,
+    };
+
+    return res.status(200).json({
+      project: {
+        id:                 project.id,
+        name:               project.name,
+        code:               project.code,
+        description:        project.description,
+        project_types:      project.project_types,
+        tech_details:       project.tech_details,
+        development_status: project.development_status,
+        is_active:          project.is_active,
+        creator:            project.creator,
+        createdAt:          project.createdAt,
+      },
+      summary: {
+        total_members: members.length,
+        task_stats:    taskStats,
+        call_stats:    callStats,
+      },
+      alerts: {
+        overdue_count:  overdueTasks.length,
+        due_soon_count: dueSoonTasks.length,
+        overdue_tasks:  overdueTasks,
+        due_soon_tasks: dueSoonTasks,
+      },
+      members,
+      member_stats:  memberStats,
+      recent_calls:  recentCalls,
+      recent_tasks:  allTasks.slice(0, 10),
+    });
+
+  } catch (err) {
+    console.error("getProjectDashboard error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// ── GET /api/me/dashboard ─────────────────────────────────────────────────────
+// Access: Any logged-in user (sees only their own data)
+
+
+// old code
+// const getEmployeeDashboard = async (req, res) => {
+//   try {
+//     const user_id = req.user.id;
+
+//     // ── SECTION 1: My Teams ───────────────────────────────────────────────
+//     const myMemberships = await TeamMember.findAll({
+//       where: { user_id, is_active: true },
+//       include: [
+//         {
+//           model: Team,
+//           as: "team",
+//           attributes: ["id", "name", "description", "is_active"],
+//         },
+//       ],
+//     });
+
+//     const myTeams = myMemberships
+//       .filter((m) => m.team)
+//       .map((m) => ({
+//         team_id:   m.team_id,
+//         team_name: m.team.name,
+//         is_active: m.team.is_active,
+//       }));
+
+//     const myTeamIds = myMemberships.map((m) => m.team_id);
+
+//     // ── SECTION 2: My Projects ────────────────────────────────────────────
+//     // ── SECTION 2: My Projects ────────────────────────────────────────────
+// // Get project_ids from the teams the user belongs to
+// const myTeamDetails = await Team.findAll({
+//   where: { id: { [Op.in]: myTeamIds.length > 0 ? myTeamIds : ["none"] } },
+//   attributes: ["id", "name", "project_id"],
+// });
+
+// const myProjectIds = [...new Set(
+//   myTeamDetails.map((t) => t.project_id).filter(Boolean)
+// )];
+
+// const myProjects = await Project.findAll({
+//   where: {
+//     id: { [Op.in]: myProjectIds.length > 0 ? myProjectIds : ["none"] },
+//     is_active: true,
+//   },
+//   include: [
+//     { model: User, as: "creator", attributes: ["id", "name"] },
+//   ],
+//   order: [["createdAt", "DESC"]],
+// });
+
+//     // ── SECTION 3: My Tasks ───────────────────────────────────────────────
+//     const myTasks = await Task.findAll({
+//       where: { assigned_to: user_id },
+//       include: [
+//         { model: Project, as: "project", attributes: ["id", "name"] },
+//         { model: Team, as: "team", attributes: ["id", "name"] },
+//         { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
+//       ],
+//       order: [
+//         ["status", "ASC"],
+//         ["due_date", "ASC"],
+//         ["createdAt", "ASC"],
+//       ],
+//     });
+
+//     // Task stats breakdown
+//     const taskStats = {
+//       total:   myTasks.length,
+//       open:    myTasks.filter((t) => t.status === "open").length,
+//       ongoing: myTasks.filter((t) => t.status === "ongoing").length,
+//       closed:  myTasks.filter((t) => t.status === "closed").length,
+//     };
+
+//     // ── SECTION 4: Urgent tasks (due within 48 hours, not closed) ────────
+//     const now = new Date();
+//     const in48hrs = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+//     const urgentTasks = myTasks.filter((t) => {
+//       if (!t.due_date || t.status === "closed") return false;
+//       const due = new Date(t.due_date);
+//       return due <= in48hrs;
+//     });
+
+//     const overdueTasks = urgentTasks.filter((t) => new Date(t.due_date) < now);
+//     const dueSoonTasks = urgentTasks.filter((t) => new Date(t.due_date) >= now);
+
+//     // ── SECTION 5: My Calls ───────────────────────────────────────────────
+//     const myCalls = await Call.findAll({
+//       where: { user_id },
+//       include: [
+//         { model: Project, as: "project", attributes: ["id", "name"] },
+//       ],
+//       order: [["createdAt", "DESC"]],
+//       limit: 20,
+//     });
+
+//     const callStats = {
+//       total:     myCalls.length,
+//       inquiry:   myCalls.filter((c) => c.call_type === "inquiry").length,
+//       request:   myCalls.filter((c) => c.call_type === "request").length,
+//       complaint: myCalls.filter((c) => c.call_type === "complaint").length,
+//     };
+
+//     // ── SECTION 6: My open tasks per project (quick overview) ────────────
+//  const tasksByProject = myProjects.map((project) => {
+//   const projectTasks = myTasks.filter((t) => t.project_id === project.id);
+//   const teamForProject = myTeamDetails.find((t) => t.project_id === project.id);
+//   return {
+//     project_id:   project.id,
+//     project_name: project.name,
+//     team_name:    teamForProject?.name || null,  // ← get team name this way
+//     my_tasks:     projectTasks.length,
+//     open:         projectTasks.filter((t) => t.status === "open").length,
+//     ongoing:      projectTasks.filter((t) => t.status === "ongoing").length,
+//     closed:       projectTasks.filter((t) => t.status === "closed").length,
+//   };
+// });
+//     // ── RESPONSE ──────────────────────────────────────────────────────────
+//     return res.status(200).json({
+//       message: "Employee Dashboard",
+//       summary: {
+//         total_teams:    myTeams.length,
+//         total_projects: myProjects.length,
+//         task_stats:     taskStats,
+//         call_stats:     callStats,
+//       },
+//       alerts: {
+//         overdue_count:  overdueTasks.length,
+//         due_soon_count: dueSoonTasks.length,
+//         overdue_tasks:  overdueTasks,
+//         due_soon_tasks: dueSoonTasks,
+//       },
+//       my_teams:           myTeams,
+//       my_projects:        myProjects,
+//       my_tasks:           myTasks,
+//       tasks_by_project:   tasksByProject,
+//       my_calls:           myCalls,
+//     });
+
+//   } catch (err) {
+//     console.error("getEmployeeDashboard error:", err);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// };
+
+
+const getEmployeeDashboard = async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    const todayStr = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const in48hrs = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+    // ── My Projects via ProjectMember ─────────────────────────────────────
+    const myMemberships = await ProjectMember.findAll({
+      where: { user_id, is_active: true },
+      attributes: ["project_id"],
+    });
+    const myProjectIds = myMemberships.map((m) => m.project_id);
+
+    const myProjects = await Project.findAll({
+      where: {
+        id: { [Op.in]: myProjectIds.length > 0 ? myProjectIds : ["none"] },
+        is_active: true,
+      },
+      include: [
+        { model: User, as: "creator", attributes: ["id", "name"] },
+        {
+          separate: true,
+          model: ProjectMember,
+          as: "members",
+          where: { is_active: true },
+          required: false,
+          include: [{ model: User, as: "user", attributes: ["id", "name", "employee_id"] }],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    // ── My Tasks ──────────────────────────────────────────────────────────
+    const myTasks = await Task.findAll({
+      where: {
+        [Op.or]: [
+          { assigned_to: user_id },
+          { assigned_by: user_id },
+        ],
+      },
+      include: [
+        { model: Project, as: "project", attributes: ["id", "name"] },
+        { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
+        { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
+        { model: Call, as: "call", attributes: ["id", "display_id"] },
+      ],
+      order: [["status", "ASC"], ["due_date", "ASC"], ["createdAt", "ASC"]],
+    });
+
     const taskStats = {
       total:   myTasks.length,
       open:    myTasks.filter((t) => t.status === "open").length,
@@ -470,25 +729,21 @@ const myProjects = await Project.findAll({
       closed:  myTasks.filter((t) => t.status === "closed").length,
     };
 
-    // ── SECTION 4: Urgent tasks (due within 48 hours, not closed) ────────
-    const now = new Date();
-    const in48hrs = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    // ── Alerts ────────────────────────────────────────────────────────────
+    const overdueTasks = myTasks.filter((t) =>
+      t.due_date && new Date(t.due_date) < now && t.status !== "closed"
+    );
+    const dueSoonTasks = myTasks.filter((t) =>
+      t.due_date &&
+      new Date(t.due_date) >= now &&
+      new Date(t.due_date) <= in48hrs &&
+      t.status !== "closed"
+    );
 
-    const urgentTasks = myTasks.filter((t) => {
-      if (!t.due_date || t.status === "closed") return false;
-      const due = new Date(t.due_date);
-      return due <= in48hrs;
-    });
-
-    const overdueTasks = urgentTasks.filter((t) => new Date(t.due_date) < now);
-    const dueSoonTasks = urgentTasks.filter((t) => new Date(t.due_date) >= now);
-
-    // ── SECTION 5: My Calls ───────────────────────────────────────────────
+    // ── My Calls ──────────────────────────────────────────────────────────
     const myCalls = await Call.findAll({
       where: { user_id },
-      include: [
-        { model: Project, as: "project", attributes: ["id", "name"] },
-      ],
+      include: [{ model: Project, as: "project", attributes: ["id", "name"] }],
       order: [["createdAt", "DESC"]],
       limit: 20,
     });
@@ -500,28 +755,30 @@ const myProjects = await Project.findAll({
       complaint: myCalls.filter((c) => c.call_type === "complaint").length,
     };
 
-    // ── SECTION 6: My open tasks per project (quick overview) ────────────
- const tasksByProject = myProjects.map((project) => {
-  const projectTasks = myTasks.filter((t) => t.project_id === project.id);
-  const teamForProject = myTeamDetails.find((t) => t.project_id === project.id);
-  return {
-    project_id:   project.id,
-    project_name: project.name,
-    team_name:    teamForProject?.name || null,  // ← get team name this way
-    my_tasks:     projectTasks.length,
-    open:         projectTasks.filter((t) => t.status === "open").length,
-    ongoing:      projectTasks.filter((t) => t.status === "ongoing").length,
-    closed:       projectTasks.filter((t) => t.status === "closed").length,
-  };
-});
-    // ── RESPONSE ──────────────────────────────────────────────────────────
+    // ── Tasks by Project ──────────────────────────────────────────────────
+    const tasksByProject = myProjects.map((project) => {
+      const projectTasks = myTasks.filter((t) => t.project_id === project.id);
+      return {
+        project_id:   project.id,
+        project_name: project.name,
+        my_tasks:     projectTasks.length,
+        open:         projectTasks.filter((t) => t.status === "open").length,
+        ongoing:      projectTasks.filter((t) => t.status === "ongoing").length,
+        closed:       projectTasks.filter((t) => t.status === "closed").length,
+      };
+    });
+
+    // ── Today's WorkLog count ─────────────────────────────────────────────
+    const todayLogCount = await WorkLog.count({
+      where: { user_id, date: todayStr },
+    });
+
     return res.status(200).json({
-      message: "Employee Dashboard",
       summary: {
-        total_teams:    myTeams.length,
         total_projects: myProjects.length,
         task_stats:     taskStats,
         call_stats:     callStats,
+        today_logs:     todayLogCount,
       },
       alerts: {
         overdue_count:  overdueTasks.length,
@@ -529,11 +786,10 @@ const myProjects = await Project.findAll({
         overdue_tasks:  overdueTasks,
         due_soon_tasks: dueSoonTasks,
       },
-      my_teams:           myTeams,
-      my_projects:        myProjects,
-      my_tasks:           myTasks,
-      tasks_by_project:   tasksByProject,
-      my_calls:           myCalls,
+      my_projects:      myProjects,
+      my_tasks:         myTasks,
+      tasks_by_project: tasksByProject,
+      my_calls:         myCalls,
     });
 
   } catch (err) {
@@ -542,5 +798,4 @@ const myProjects = await Project.findAll({
   }
 };
 
-
-module.exports = { getDashboard, getTeamDashboard, getEmployeeDashboard };
+module.exports = { getDashboard, getTeamDashboard, getProjectDashboard , getEmployeeDashboard };

@@ -10,7 +10,7 @@ const { createNotification } = require("./notifications.controller");
 const createCallValidators = [
   body("caller_name").isString().trim().notEmpty(),
   body("caller_number").optional({ nullable: true }).isString().trim(),
-  body("project_id").optional({nullable: true}).isUUID(),
+  body("project_id").optional({nullable: true, checkFalsy: true}).isUUID(),
   body("call_type").isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
@@ -24,7 +24,7 @@ const updateCallValidators = [
   param("id").isUUID(),
   body("caller_name").optional().isString().trim().notEmpty(),
   body("caller_number").optional({ nullable: true }).isString().trim(),
-  body("project_id").optional({nullable: true}).isUUID(),
+  body("project_id").optional({nullable: true, checkFalsy: true}).isUUID(),
   body("call_type").optional().isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").optional().isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
@@ -288,7 +288,7 @@ const listCalls = async(req, res) => {
       offset,
       where,
       include: callIncludes,
-      order: [["id", "ASC"]],
+      order: [["createdAt", "DESC"]],
     });
 
     // console.log("call all", count, rows)
@@ -353,6 +353,7 @@ const updateCall = async  (req, res) => {
 });
     }
     const uc = await call.update(patch);
+    console.log("🚀 ~ updateCall ~ uc:", uc)
     await call.reload({ include: callIncludes });
     return res.json({ call });
   } catch (err) {

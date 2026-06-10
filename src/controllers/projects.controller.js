@@ -55,6 +55,7 @@ const updateProjectValidators = [
     .isString(),
 
 body("project_types")
+.optional({nullable: true, checkFalsy: true})
   .isObject()
   .notEmpty(),
 
@@ -64,7 +65,7 @@ body("project_types")
 
   body("tech_details")
     .optional({ nullable: true })
-    .isString(),
+    ,
 
   body("development_status")
     .optional({ nullable: true })
@@ -229,7 +230,7 @@ if(req.body.remark)
   }
     
   )
-  console.log("🚀 ~ createProject ~ remarksLog:", remarksLog)
+  // console.log("🚀 ~ createProject ~ remarksLog:", remarksLog)
 }
 
 
@@ -506,7 +507,8 @@ if (
     message: "Invalid project types/subtypes",
   });
 }
-    await project.update(patch);
+  const up = await project.update(patch);
+    console.log("🚀 ~ updateProject ~ up:", up)
     await project.reload({ include: projectIncludes }); 
     return res.status(200).json({
       message: "Project updated successfully",

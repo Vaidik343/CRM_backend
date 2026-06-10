@@ -35,7 +35,7 @@ const userIncludes = [{ model: Role, attributes: ["id", "name"] }];
 
 const createUser = async(req, res) => {
   try {
-    const { name, email, role_id, is_admin } = req.body;
+    const { name, email, role_id,mobile, is_admin } = req.body;
 
     // Validate role exists
     const role = await Role.findByPk(role_id);
