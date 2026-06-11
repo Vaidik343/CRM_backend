@@ -128,16 +128,14 @@ if(assignedId  !== req.user.id)
     let remarksLog = [];
 
 // if fronted sends initial remark
-if(req.body.remark)
-{
+const remarkText = req.body.remark || req.body.remarks;
+if (remarkText) {
   remarksLog = appendRemark({
- existingRemarks: [],
-    text:req.body.remark,
-    user_id:req.user.id,
-    user_name:req.user.name
-  }
-    
-  )
+    existingRemarks: [],
+    text: remarkText,
+    user_id: req.user.id,
+    user_name: req.user.name,
+  });
 }
 
     // 6. Create task
@@ -280,16 +278,15 @@ const updateTask = async (req, res) => {
     ["task", "description", "due_date", "status"].forEach((f) => {
       if (typeof req.body[f] !== "undefined") patch[f] = req.body[f] ?? null;
     });
-
-     if(req.body.remark)
-    {
-     patch.remarks = appendRemark({
-  existingRemarks: task.remarks,
-  text: req.body.remark,
-  user_id: req.user.id,
-  user_name:req.user.name
-});
-    }
+const remarkText = req.body.remark || req.body.remarks;
+if (remarkText) {
+  patch.remarks = appendRemark({
+    existingRemarks: task.remarks || [],  
+    text: remarkText,
+    user_id: req.user.id,
+    user_name: req.user.name,
+  });
+}
 
    const ut = await task.update(patch);
     console.log("🚀 ~ updateTask ~ ut:", ut)
