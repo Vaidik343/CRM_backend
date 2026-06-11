@@ -19,6 +19,10 @@ module.exports = (sequelize, DataTypes) => {
     type: DataTypes.STRING,
     allowNull: true // change it to false
 },
+client_id: {
+  type: DataTypes.UUID,
+  allowNull: true,  
+},
       caller_name: {
         type: DataTypes.STRING,
         allowNull: false

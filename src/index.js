@@ -28,6 +28,7 @@ const PORT = process.env.PORT || 7015;
 const routeFiles = [
   "auth.routes.js",
   "calls.routes.js",
+  "client.routes.js",
   "dashboard.routes.js",
   "export.routes.js",
   "password.routes.js",

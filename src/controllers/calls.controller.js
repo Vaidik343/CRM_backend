@@ -1,5 +1,5 @@
 const { body, param } = require("express-validator");
-const { Call, User, Project, Task, Team, TeamMember } = require("../models");
+const { Call, User, Project, Task, Team, TeamMember, Client  } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const CALL_TYPES = require("../constants/callTypes");
 const { appendRemark } = require("../utils/remarksLog");
@@ -11,6 +11,9 @@ const createCallValidators = [
   body("caller_name").isString().trim().notEmpty(),
   body("caller_number").optional({ nullable: true }).isString().trim(),
   body("project_id").optional({nullable: true, checkFalsy: true}).isUUID(),
+  body("client_id")
+  .optional({ nullable: true, checkFalsy: true})
+  .isUUID(),
   body("call_type").isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
@@ -25,6 +28,9 @@ const updateCallValidators = [
   body("caller_name").optional().isString().trim().notEmpty(),
   body("caller_number").optional({ nullable: true }).isString().trim(),
   body("project_id").optional({nullable: true, checkFalsy: true}).isUUID(),
+  body("client_id")
+  .optional({ nullable: true, checkFalsy: true})
+  .isUUID(),
   body("call_type").optional().isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").optional().isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
@@ -57,6 +63,12 @@ const callIncludes = [
     as: "project",
     attributes: ["id", "name"],
   },
+  {
+  model: Client,
+  as: "client",
+  attributes: ["id", "name", "phone", "company"],
+  required: false,
+},
 ];
 // ── Subtype validator helper ───────────────────────────────────
 function validateSubtype(call_type, call_subtype) {
@@ -73,6 +85,7 @@ const createCall = async (req, res) => {
       caller_name,
       caller_number,
       project_id,
+      client_id ,
       call_type,
       call_subtype,
       call_summary,
@@ -190,6 +203,7 @@ if(req.body.remark)
     const call = await Call.create({
       user_id:      req.user.id,
       display_id: displayId,
+      client_id: client_id || null,
       caller_name,
       caller_number: caller_number || null,
       project_id:   project_id || null,
@@ -337,7 +351,7 @@ const updateCall = async  (req, res) => {
       });
     }
 
-    const fields = ["caller_name", "caller_number", "project_id", "call_type", "call_subtype", "call_summary", "remarks", "receive_type"];
+    const fields = ["caller_name", "caller_number", "project_id", "call_type", "call_subtype", "call_summary", "remarks", "receive_type", "client_id"];
     const patch = {};
     fields.forEach((f) => {
       if (typeof req.body[f] !== "undefined") patch[f] = req.body[f];

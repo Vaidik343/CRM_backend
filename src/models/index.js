@@ -9,6 +9,7 @@ const Role       = require("./role.model")(sequelize, DataTypes);
 const Permission = require("./permission.model")(sequelize, DataTypes);
 const Project    = require("./project.model")(sequelize, DataTypes);
 const Call       = require("./call.model")(sequelize, DataTypes);
+const Client = require("./client.model")(sequelize, DataTypes);
 const Task       = require("./task.model")(sequelize, DataTypes);
 const WorkLog    = require("./workLog.model")(sequelize, DataTypes);
 const Team = require('./team.model')(sequelize, DataTypes);
@@ -70,6 +71,11 @@ Task.belongsTo(Call, { foreignKey: "call_id", as: "call" });
 Call.belongsTo(Call, { foreignKey: "parent_call_id", as: "parentCall" });
 Call.hasMany(Call, { foreignKey: "parent_call_id", as: "followUpCalls" });
  
+// Call → Client
+Call.belongsTo(Client, { foreignKey: "client_id", as: "client" });
+Client.hasMany(Call, { foreignKey: "client_id", as: "calls" });
+
+
 // ── Task ↔ User (assigned_to + assigned_by) ───────────────────
 User.hasMany(Task, { foreignKey: "assigned_to", as: "assignedTasks", onDelete: "RESTRICT" });
 Task.belongsTo(User, { foreignKey: "assigned_to", as: "assignee" });
@@ -82,6 +88,9 @@ Task.belongsTo(User, { foreignKey: "assigned_by", as: "assigner" });
 User.hasMany(WorkLog, { foreignKey: "user_id", onDelete: "CASCADE" });
 WorkLog.belongsTo(User, { foreignKey: "user_id" });
 
+
+// Client associations
+Client.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 
 //worklog to project
 Project.hasMany(WorkLog,{foreignKey: "project_id"});
@@ -137,6 +146,7 @@ module.exports = {
   Permission,
   Project,
   Call,
+  Client,
   Task,
   WorkLog,
   ProjectMember,

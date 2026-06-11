@@ -48,7 +48,7 @@ const createNotification = async (io, { user_id, type, title, message, data = {}
 const getNotifications = async (req, res) => {
   try {
     const page  = parseInt(req.query.page)  || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 5;
     const offset = (page - 1) * limit;
 
     const where = req.user.is_admin ? {} : { user_id: req.user.id };
