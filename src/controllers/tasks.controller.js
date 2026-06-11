@@ -166,6 +166,11 @@ if (assignedId !== req.user.id) {
   });
 }
     await newTask.reload({ include: taskIncludes });
+    const io = req.app.get("io");
+if (assignedId !== req.user.id) {
+  io.to(assignedId).emit("TASK_CREATED", newTask);
+}
+
     return res.status(201).json({ task: newTask });
 
   } catch (err) {
@@ -288,13 +293,15 @@ if (remarkText) {
   });
 }
 
-   const ut = await task.update(patch);
-    console.log("🚀 ~ updateTask ~ ut:", ut)
-    console.log("REQ BODY:", req.body);
-console.log("PATCH:", patch);
-console.log("PATCH DUE DATE:", patch.due_date);
-console.log("TYPE:", typeof patch.due_date);
+    await task.update(patch);
+
     await task.reload({ include: taskIncludes });
+    const io = req.app.get("io");
+io.to(task.assigned_to).emit("TASK_UPDATED", task);
+if (task.assigned_by !== task.assigned_to) {
+  io.to(task.assigned_by).emit("TASK_UPDATED", task);
+}
+
     return res.status(200).json({ task });
 
   } catch (err) {
@@ -312,9 +319,16 @@ const deleteTask = async (req, res) => {
     if (!req.user.is_admin && task.assigned_by !== req.user.id) {
       return res.status(403).json({ message: "Forbidden" });
     }
-
+const io = req.app.get("io");
+const { assigned_to, assigned_by } = task;
 await task.destroy();
-    return res.json({ message: "Task deleted" });
+io.to(assigned_to).emit("TASK_DELETED", { id: req.params.id });
+if (assigned_by !== assigned_to) {
+  io.to(assigned_by).emit("TASK_DELETED", { id: req.params.id });
+}
+return res.json({ message: "Task deleted" });
+
+
 
   } catch (err) {
     console.error("deleteTask error:", err);
