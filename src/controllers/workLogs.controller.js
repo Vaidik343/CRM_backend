@@ -66,7 +66,7 @@ const createWorkLog = async(req, res) => {
       date: req.body.date,
       remarks : remarksLog,
     });
-    console.log("🚀 ~ createWorkLog ~ workLog:", workLog)
+    // console.log("🚀 ~ createWorkLog ~ workLog:", workLog)
     return res.status(201).json({ workLog });
 
   } catch (err) {
@@ -102,7 +102,7 @@ const getWorkLog = async (req, res) => {
       
     
     const workLog = await WorkLog.findByPk(req.params.id, { include: workLogIncludes });
-    console.log("🚀 ~ getWorkLog ~ workLog:", workLog)
+    // console.log("🚀 ~ getWorkLog ~ workLog:", workLog)
     if (!workLog) return res.status(404).json({ message: "Work log not found" });
     if (!req.user.is_admin && workLog.user_id !== req.user.id)
       return res.status(403).json({ message: "Forbidden" });

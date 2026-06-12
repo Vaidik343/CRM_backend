@@ -218,13 +218,13 @@ if(req.body.remark)
 parent_call_id: parent_call_id || null,
       remarks: remarksLog,
     });
-    console.log("🚀 ~ createCall ~ call:", call)
+    // console.log("🚀 ~ createCall ~ call:", call)
 
     await call.reload({ include: callIncludes });
 
     // 5. If is_task → auto-create task from call data
     if (is_task) {
-  console.log("🚀 ~ createCall ~ is_task:", is_task)
+  // console.log("🚀 ~ createCall ~ is_task:", is_task)
 
    // ✅ CREATE TASK
 
@@ -314,12 +314,12 @@ const listCalls = async(req, res) => {
 }
 
 const getCall = async (req, res) => {
-  console.log("body call by id", req.body)
+  // console.log("body call by id", req.body)
   try {
     const callId = req.params.id;
-    console.log("🚀 ~ getCall ~ callId:", callId)
+    // console.log("🚀 ~ getCall ~ callId:", callId)
     const call = await Call.findByPk(callId);
-    console.log("🚀 ~ getCall ~ call:", call)
+    // console.log("🚀 ~ getCall ~ call:", call)
     if (!call) return res.status(404).json({ message: "Call not found" });
 
     if (!req.user.is_admin && call.user_id !== req.user.id) {
@@ -367,7 +367,7 @@ const updateCall = async  (req, res) => {
 });
     }
     const uc = await call.update(patch);
-    console.log("🚀 ~ updateCall ~ uc:", uc)
+    // console.log("🚀 ~ updateCall ~ uc:", uc)
     await call.reload({ include: callIncludes });
     return res.json({ call });
   } catch (err) {

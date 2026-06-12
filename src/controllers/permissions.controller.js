@@ -97,7 +97,7 @@ const updatePermission = async (req, res) => {
 const resetPermission = async(req, res) => {
   try {
     const permission = await Permission.findOne({ where: { user_id: req.params.user_id } });
-    console.log("🚀 ~ resetPermission ~ permission:", permission)
+    // console.log("🚀 ~ resetPermission ~ permission:", permission)
     if (!permission) return res.status(404).json({ message: "Permission record not found" });
 
     await permission.update({

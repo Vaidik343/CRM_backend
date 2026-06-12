@@ -77,7 +77,7 @@ const createUser = async(req, res) => {
       },
     });
   } catch (err) {
-      console.log("createUser full error:", err.name, err.message, err.errors);
+      // console.log("createUser full error:", err.name, err.message, err.errors);
     if (err.name === "SequelizeUniqueConstraintError") {
       return res.status(409).json({ message: "Email already in use" });
     }
@@ -89,14 +89,14 @@ const createUser = async(req, res) => {
 
 const listUsers = async(req, res) => {
   try {
-    console.log("✅ listUsers hit — user:", req.user?.id, "is_admin:", req.user?.is_admin);
+    // console.log("✅ listUsers hit — user:", req.user?.id, "is_admin:", req.user?.is_admin);
 
     const users = await User.findAll({
       attributes: safeAttributes,
       include: userIncludes,
       order: [["createdAt", "ASC"]],
     });
-    console.log("🚀 ~ listUsers ~ users:", users)
+    // console.log("🚀 ~ listUsers ~ users:", users)
   
     // console.log("listUsers hit, user:", req.user?.id, req.user?.is_admin);
     return res.json({ users });

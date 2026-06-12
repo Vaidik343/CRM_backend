@@ -247,7 +247,7 @@ if(req.body.remark)
       is_active: true,
       remarks : remarksLog
     }, { transaction });
-    console.log("🚀 ~ createProject ~ project:", project)
+    // console.log("🚀 ~ createProject ~ project:", project)
 
     // Validate that members is an array if passed
     if (members && !Array.isArray(members)) {
@@ -508,7 +508,7 @@ if (
   });
 }
   const up = await project.update(patch);
-    console.log("🚀 ~ updateProject ~ up:", up)
+    // console.log("🚀 ~ updateProject ~ up:", up)
     await project.reload({ include: projectIncludes }); 
     return res.status(200).json({
       message: "Project updated successfully",
@@ -618,7 +618,7 @@ const removeMember = async (req, res) => {
       });
 
   } catch (error) {
-     console.log("🚀 ~ removeMember ~ error:", error)
+    //  console.log("🚀 ~ removeMember ~ error:", error)
          res.status(500).json({message:"Something went wrong!"});  
            
   }

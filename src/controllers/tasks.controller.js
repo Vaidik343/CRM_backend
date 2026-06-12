@@ -79,7 +79,7 @@ const createTask = async (req, res) => {
     
     // // 1. Verify assignee exists
     const assignee = await User.findByPk(assignedId);
-    console.log("🚀 ~ createTask ~ assignee:", assignee)
+    // console.log("🚀 ~ createTask ~ assignee:", assignee)
     if (!assignee) {
       return res.status(404).json({ message: "Assignee not found" });
     }
@@ -152,7 +152,7 @@ if (remarkText) {
       status,
       remarks : remarksLog
     });
-    console.log("🚀 ~ createTask ~ newTask:", newTask)
+    // console.log("🚀 ~ createTask ~ newTask:", newTask)
 
     // notify assignee only if someone else was assigned
 if (assignedId !== req.user.id) {
@@ -266,7 +266,7 @@ if (
 const updateTask = async (req, res) => {
   try {
     const task = await Task.findByPk(req.params.id);
-    console.log("🚀 ~ updateTask ~ task:", task)
+    // console.log("🚀 ~ updateTask ~ task:", task)
     if (!task) return res.status(404).json({ message: "Task not found" });
 
    if (

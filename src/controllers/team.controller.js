@@ -135,7 +135,7 @@ const listTeams = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
-    console.log("🚀 ~ listTeams ~ teams:", teams)
+    // console.log("🚀 ~ listTeams ~ teams:", teams)
 
     return res.status(200).json({
       message: "List of all teams",

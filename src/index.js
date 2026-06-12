@@ -59,7 +59,7 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 
 
 app.use((req, res, next) => {
-  console.log(`📥 ${req.method} ${req.path}`);
+  // console.log(`📥 ${req.method} ${req.path}`);
   next();
 });
 
@@ -111,7 +111,6 @@ io.on("connection", (socket) => {
   socket.on("join", (userId) => {
     if (!userId) return;
     socket.join(`user:${userId}`);
-    console.log(`👤 User ${userId} joined room user:${userId}`);
   });
 
   socket.on("disconnect", () => {

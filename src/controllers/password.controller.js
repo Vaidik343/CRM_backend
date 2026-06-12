@@ -29,7 +29,7 @@ const changeOwnPassword = async(req, res) => {
 
     const hashed = await bcrypt.hash(req.body.new_password, 12);
     const pc = await user.update({ password: hashed });
-    console.log("🚀 ~ changeOwnPassword ~ pc:", pc)
+    // console.log("🚀 ~ changeOwnPassword ~ pc:", pc)
 
     return res.json({ message: "Password changed successfully" });
   } catch (err) {
@@ -50,7 +50,7 @@ const resetPassword = async (req, res) => {
     const hashed = await bcrypt.hash(plainPassword, 12);
 
    const rs=  await user.update({ password: hashed });
-   console.log("🚀 ~ resetPassword ~ rs:", rs)
+  //  console.log("🚀 ~ resetPassword ~ rs:", rs)
 
     return res.json({
       message: "Password reset successfully",
