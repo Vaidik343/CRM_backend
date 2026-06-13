@@ -196,7 +196,7 @@ const exportMyData = async (req, res) => {
 
       sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
-        project: r.Project?.name || "",
+        project: r.project?.name || "",
         remarks: flattenRemarks(r.remarks),
       })));
     }
@@ -250,18 +250,21 @@ const exportMyData = async (req, res) => {
 
       const rows = await WorkLog.findAll({
         where: workLogWhere,
+            include: [{ model: Project, as: "Project", attributes: ["name"] }],
         order: [["date", "DESC"]],
       });
 
       sheet.columns = [
         { header: "Description", key: "description", width: 30 },
         { header: "Date",        key: "date",        width: 15 },
+        { header: "Project",     key: "project",     width: 30 },
         { header: "Remarks",     key: "remarks",     width: 40 },
         { header: "Created At",  key: "createdAt",   width: 20 },
       ];
 
       sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
+        project: r.Project?.name || "",  //
         remarks: flattenRemarks(r.remarks),
       })));
     }
@@ -284,7 +287,169 @@ const exportMyData = async (req, res) => {
   }
 };
 
-module.exports = { exportData, exportMyData };
+const exportEmployeeData = async (req, res) => {
+  try {
+    const type = String(req.query.type || "").toLowerCase();
+    console.log("🚀 ~ exportEmployeeData ~ type:", type)
+    if (!["calls", "tasks", "work-logs"].includes(type)) {
+      return res.status(400).json({ message: "type must be one of: calls, tasks, work-logs" });
+    }
+
+    const { from, to } = req.query;
+    const targetUserId = req.params.userId;
+
+    // Verify target user exists
+    const targetUser = await User.findByPk(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const start = new Date(from || new Date());
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(to || new Date());
+    end.setHours(23, 59, 59, 999);
+    const dateWhere = { createdAt: { [Op.between]: [start, end] } };
+
+    const flattenRemarks = (remarks) => {
+      if (!Array.isArray(remarks) || remarks.length === 0) return "";
+      return remarks
+        .map((r) => `[${new Date(r.created_at).toLocaleDateString()} - ${r.added_by_name}]: ${r.text}`)
+        .join("\n");
+    };
+
+    const workbook = new ExcelJS.Workbook();
+    console.log("🚀 ~ exportEmployeeData ~ workbook:", workbook)
+    
+    const sheet = workbook.addWorksheet(type);
+    console.log("🚀 ~ exportEmployeeData ~ sheet:", sheet)
+
+    if (type === "calls") {
+      const rows = await Call.findAll({
+        
+        where: {
+          ...dateWhere,
+          [Op.or]: [
+            { user_id: targetUserId },
+            { transfer_to: targetUserId },
+          ],
+          
+        },
+        include: [{ model: Project, as: "project", attributes: ["name"] }],
+        order: [["createdAt", "DESC"]],
+        
+      });
+      console.log("🚀 ~ exportEmployeeData ~ rows:", rows)
+
+      sheet.columns = [
+        
+        { header: "Display ID",    key: "display_id",    width: 20 },
+        { header: "Project",       key: "project",       width: 20 },
+        { header: "Caller Name",   key: "caller_name",   width: 20 },
+        { header: "Caller Number", key: "caller_number", width: 18 },
+        { header: "Call Type",     key: "call_type",     width: 15 },
+        { header: "Call Subtype",  key: "call_subtype",  width: 20 },
+        { header: "Medium",        key: "receive_type",  width: 15 },
+        { header: "Summary",       key: "call_summary",  width: 30 },
+        { header: "Remarks",       key: "remarks",       width: 40 },
+        { header: "Created At",    key: "createdAt",     width: 20 },
+      ];
+
+    const cc = sheet.addRows(rows.map((r) => ({
+        ...r.toJSON(),
+        project: r.project?.name || "",
+        remarks: flattenRemarks(r.remarks),
+      })));
+    console.log("🚀 ~ exportEmployeeData ~ cc:", cc)
+    }
+
+    if (type === "tasks") {
+      const rows = await Task.findAll({
+        where: {
+          ...dateWhere,
+          [Op.or]: [
+            { assigned_to: targetUserId },
+            { assigned_by: targetUserId },
+          ],
+        },
+        include: [
+          { model: User, as: "assignee", attributes: ["name"] },
+          { model: User, as: "assigner", attributes: ["name"] },
+          { model: Project, as: "project", attributes: ["name"] },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      sheet.columns = [
+        { header: "Display ID",   key: "display_id",       width: 20 },
+        { header: "Task",         key: "task",             width: 25 },
+        { header: "Description",  key: "description",      width: 25 },
+        { header: "Project",      key: "project",          width: 20 },
+        { header: "Assigned To",  key: "assigned_to_name", width: 20 },
+        { header: "Assigned By",  key: "assigned_by_name", width: 20 },
+        { header: "Status",       key: "status",           width: 15 },
+        { header: "Due Date",     key: "due_date",         width: 15 },
+        { header: "Remarks",      key: "remarks",          width: 40 },
+        { header: "Created At",   key: "createdAt",        width: 20 },
+      ];
+
+      sheet.addRows(rows.map((r) => ({
+        ...r.toJSON(),
+        project:          r.project?.name  || "",
+        assigned_to_name: r.assignee?.name || "",
+        assigned_by_name: r.assigner?.name || "",
+        remarks:          flattenRemarks(r.remarks),
+      })));
+    }
+
+if (type === "work-logs") {
+  let workLogWhere = { user_id: targetUserId };
+  if (from && to) {
+    workLogWhere.date = { [Op.between]: [from, to] };
+  } else {
+    workLogWhere.date = new Date().toISOString().split("T")[0];
+  }
+
+  const rows = await WorkLog.findAll({
+    where: workLogWhere,
+    include: [{ model: Project, as: "Project", attributes: ["name"] }],  // ← add this
+    order: [["date", "DESC"]],
+  });
+  console.log("🚀 ~ exportEmployeeData ~ rows:", rows)
+
+  sheet.columns = [
+    { header: "Description", key: "description", width: 30 },
+    { header: "Date",        key: "date",        width: 15 },
+    { header: "Project",     key: "project",     width: 30 },
+    { header: "Remarks",     key: "remarks",     width: 40 },
+    { header: "Created At",  key: "createdAt",   width: 20 },
+  ];
+
+ const cw =  sheet.addRows(rows.map((r) => ({
+    ...r.toJSON(),
+    project: r.Project?.name || "",  // 
+    remarks: flattenRemarks(r.remarks),
+  })));
+ console.log("🚀 ~ exportEmployeeData ~ cw:", cw)
+}
+    sheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
+    });
+
+    const fileLabel = from && to ? `${from}_to_${to}` : new Date().toISOString().split("T")[0];
+    const empLabel = targetUser.employee_id || targetUser.name.replace(/\s+/g, "_");
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${empLabel}_${type}_${fileLabel}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("exportEmployeeData error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+module.exports = { exportData, exportMyData, exportEmployeeData };
 // module.exports = { exportData };
 
 

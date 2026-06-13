@@ -81,6 +81,24 @@ const getDashboard = async (req, res) => {
     taskStatusBreakdown.due     = dueCount;
     taskStatusBreakdown.overdue = overdueCount;
 
+
+    // ── Task status breakdown — ALL TIME (no date filter) ─────────
+const taskStatusRowsAllTime = await Task.findAll({
+  attributes: ["status", [Task.sequelize.fn("COUNT", Task.sequelize.col("status")), "count"]],
+  group: ["status"],
+  raw: true,
+});
+const taskStatusBreakdownAllTime = { open: 0, ongoing: 0, closed: 0, due: 0, overdue: 0 };
+taskStatusRowsAllTime.forEach((r) => { taskStatusBreakdownAllTime[r.status] = parseInt(r.count); });
+
+const [dueCountAllTime, overdueCountAllTime] = await Promise.all([
+  Task.count({ where: { due_date: todayDateStr, status: { [Op.ne]: 'closed' } } }),
+  Task.count({ where: { due_date: { [Op.lt]: todayDateStr }, status: { [Op.ne]: 'closed' } } }),
+]);
+taskStatusBreakdownAllTime.due     = dueCountAllTime;
+taskStatusBreakdownAllTime.overdue = overdueCountAllTime;
+
+
     // ── Call type breakdown ───────────────────────────────
     const callTypeRows = await Call.findAll({
       attributes: ["call_type", [Call.sequelize.fn("COUNT", Call.sequelize.col("call_type")), "count"]],
@@ -190,6 +208,7 @@ const getDashboard = async (req, res) => {
       },
       last_7_days:           { calls: recentCalls, tasks: recentTasks, work_logs: recentWorkLogs },
       task_status_breakdown: taskStatusBreakdown,
+        task_status_breakdown_all_time: taskStatusBreakdownAllTime,
       call_type_breakdown:   callTypeBreakdown,
       employee_breakdown:    employeeBreakdown,
       calls_section: {

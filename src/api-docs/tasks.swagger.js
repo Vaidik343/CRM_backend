@@ -166,6 +166,7 @@
  *     summary: Get all tasks
  *     description: |
  *       Admin sees all tasks. Employees see tasks they created or are assigned to.
+ *       Defaults to today's tasks if `from`/`to` not provided.
  *     tags: [Tasks]
  *     security:
  *       - bearerAuth: []
@@ -180,6 +181,18 @@
  *         schema:
  *           type: integer
  *           default: 10
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date (YYYY-MM-DD). If omitted along with `to`, defaults to today.
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date (YYYY-MM-DD). If omitted along with `from`, defaults to today.
  *     responses:
  *       200:
  *         description: List of tasks
@@ -205,7 +218,6 @@
  *       500:
  *         description: Internal server error
  */
-
 /**
  * @swagger
  * /api/tasks/{id}:

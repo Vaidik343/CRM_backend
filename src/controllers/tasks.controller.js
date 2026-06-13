@@ -168,7 +168,7 @@ if (assignedId !== req.user.id) {
     await newTask.reload({ include: taskIncludes });
     const io = req.app.get("io");
 if (assignedId !== req.user.id) {
-  io.to(assignedId).emit("TASK_CREATED", newTask);
+  io.to(`user:${assignedId}`).emit("TASK_CREATED", newTask);
 }
 
     return res.status(201).json({ task: newTask });
@@ -184,6 +184,25 @@ const listTasks = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+
+
+       const { from, to } = req.query;
+
+let dateWhere = {};
+if (from && to) {
+  const start = new Date(from);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(to);
+  end.setHours(23, 59, 59, 999);
+  dateWhere = { createdAt: { [Op.between]: [start, end] } };
+} else if (!req.user.is_admin) {
+  // employee default: today only
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  dateWhere = { createdAt: { [Op.between]: [start, end] } };
+}
 
     // Get all teams user belongs to
     const membership = await ProjectMember.findAll({
@@ -214,6 +233,17 @@ if (!req.user.is_admin) {
     ],
   };
 }
+
+
+if (!req.user.is_admin) {
+  // employee: always scoped to today/selected range
+  where = { ...where, ...dateWhere };
+} else if (from && to) {
+  // admin: only filter by date if explicitly provided
+  where = { ...where, ...dateWhere };
+}
+// else admin with no from/to → no date filter, sees everything
+
     const { count, rows } = await Task.findAndCountAll({
       where,
       include: taskIncludes,
@@ -297,9 +327,9 @@ if (remarkText) {
 
     await task.reload({ include: taskIncludes });
     const io = req.app.get("io");
-io.to(task.assigned_to).emit("TASK_UPDATED", task);
+io.to(`user:${task.assigned_to}`).emit("TASK_UPDATED", task);
 if (task.assigned_by !== task.assigned_to) {
-  io.to(task.assigned_by).emit("TASK_UPDATED", task);
+  io.to(`user:${task.assigned_by}`).emit("TASK_UPDATED", task);
 }
 
     return res.status(200).json({ task });
@@ -320,14 +350,15 @@ const deleteTask = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 const io = req.app.get("io");
+
 const { assigned_to, assigned_by } = task;
 await task.destroy();
-io.to(assigned_to).emit("TASK_DELETED", { id: req.params.id });
+
+io.to(`user:${assigned_to}`).emit("TASK_DELETED", { id: req.params.id });
 if (assigned_by !== assigned_to) {
-  io.to(assigned_by).emit("TASK_DELETED", { id: req.params.id });
+  io.to(`user:${assigned_by}`).emit("TASK_DELETED", { id: req.params.id });
 }
 return res.json({ message: "Task deleted" });
-
 
 
   } catch (err) {

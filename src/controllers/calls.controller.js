@@ -5,7 +5,7 @@ const CALL_TYPES = require("../constants/callTypes");
 const { appendRemark } = require("../utils/remarksLog");
 const generateDisplayId = require("../utils/generateDisplayId");
 const { createNotification } = require("./notifications.controller");
-
+const { Op } = require("sequelize");
 
 const createCallValidators = [
   body("caller_name").isString().trim().notEmpty(),
@@ -255,6 +255,19 @@ const task = await Task.create({
         ],
       });
 
+      // NEW: emit live update to assignee if it's someone else
+  if (taskAssignee !== req.user.id) {
+    const io = req.app.get("io");
+    io.to(`user:${taskAssignee}`).emit("TASK_CREATED", task);
+    await createNotification(io, {
+      user_id: taskAssignee,
+      type:    "TASK_ASSIGNED",
+      title:   "New Task Assigned",
+      message: `You have been assigned a task from call: ${call.display_id}`,
+      data:    { task_id: task.id, display_id: task.display_id, call_id: call.id },
+    });
+  }
+
       return res.status(201).json({ call, task});
     }
 
@@ -269,6 +282,7 @@ if (transfer_to) {
     message: `A call from ${caller_name} has been transferred to you`,
     data:    { call_id: call.id, display_id: call.display_id },
   });
+    io.to(`user:${transfer_to}`).emit("CALL_TRANSFERRED", call);
 }
 
 // task auto-created and assigned to someone else
@@ -295,7 +309,39 @@ const listCalls = async(req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page -1) * limit;
-    const where = req.user.is_admin ? {} : { user_id: req.user.id };
+    let where = req.user.is_admin ? {} : { user_id: req.user.id };
+
+
+     
+       const { from, to } = req.query;
+
+let dateWhere = {};
+if (from && to) {
+  const start = new Date(from);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(to);
+  end.setHours(23, 59, 59, 999);
+  dateWhere = { createdAt: { [Op.between]: [start, end] } };
+} else if (!req.user.is_admin) {
+  // employee default: today only
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  dateWhere = { createdAt: { [Op.between]: [start, end] } };
+}
+
+    
+ if (!req.user.is_admin) {
+  // employee: always scoped to today/selected range
+  where = { ...where, ...dateWhere };
+} else if (from && to) {
+  // admin: only filter by date if explicitly provided
+  where = { ...where, ...dateWhere };
+}
+// else admin with no from/to → no date filter, sees everything
+
+
 
     const {count,rows} = await Call.findAndCountAll({
       limit,
@@ -369,6 +415,11 @@ const updateCall = async  (req, res) => {
     const uc = await call.update(patch);
     // console.log("🚀 ~ updateCall ~ uc:", uc)
     await call.reload({ include: callIncludes });
+ const io = req.app.get("io");
+    io.to(`user:${call.user_id}`).emit("CALL_UPDATED", call);
+    if (call.transfer_to) {
+      io.to(`user:${call.transfer_to}`).emit("CALL_UPDATED", call);
+    }
     return res.json({ call });
   } catch (err) {
     console.error("updateCall error:", err);
@@ -386,6 +437,11 @@ const deleteCall = async  (req, res) => {
     }
 
     await call.destroy();
+      const io = req.app.get("io");
+    io.to(`user:${user_id}`).emit("CALL_DELETED", { id: req.params.id });
+    if (transfer_to) {
+      io.to(`user:${transfer_to}`).emit("CALL_DELETED", { id: req.params.id });
+    }
     return res.json({ message: "Call deleted" });
   } catch (err) {
     console.error("deleteCall error:", err);

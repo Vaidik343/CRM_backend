@@ -2,6 +2,8 @@ const { body, param } = require("express-validator");
 const { WorkLog, User ,Project } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const {appendRemark} = require("../utils/remarksLog")
+const { Op } = require("sequelize");
+
 // ── Validators ────────────────────────────────────────────────────────────────
 
 const createWorkLogValidators = [
@@ -81,7 +83,28 @@ const listWorkLogs = async(req, res) => {
     const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 20;
   const offset = (page -1) * limit;
-    const where = req.user.is_admin ? {} : { user_id: req.user.id };
+    let where = req.user.is_admin ? {} : { user_id: req.user.id };
+
+const { from, to } = req.query;
+
+let dateWhere = {};
+if (from && to) {
+  dateWhere = { date: { [Op.between]: [from, to] } };
+} else if (!req.user.is_admin) {
+  // employee default: today only
+  const todayStr = new Date().toISOString().split("T")[0];
+  dateWhere = { date: todayStr };
+}
+        
+ if (!req.user.is_admin) {
+  // employee: always scoped to today/selected range
+  where = { ...where, ...dateWhere };
+} else if (from && to) {
+  // admin: only filter by date if explicitly provided
+  where = { ...where, ...dateWhere };
+}
+// else admin with no from/to → no date filter, sees everything
+
 
     const {count, rows} = await WorkLog.findAndCountAll({
       limit,
