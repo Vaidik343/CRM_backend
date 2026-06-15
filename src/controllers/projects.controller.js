@@ -363,30 +363,20 @@ if(req.body.remark)
 
 const listProjects = async (req, res) => {
   try {
-
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    const search = req.query.search?.trim();
 
-    let where = {
-      is_active: true,
-    };
+    let where = { is_active: true };
 
-    // EMPLOYEE
     if (!req.user.is_admin) {
-
-      // Get all active project memberships
       const memberships = await ProjectMember.findAll({
-        where: {
-          user_id: req.user.id,
-          is_active: true,
-        },
+        where: { user_id: req.user.id, is_active: true },
         attributes: ["project_id"],
       });
-
       const projectIds = memberships.map((m) => m.project_id);
 
-      // No projects assigned
       if (!projectIds.length) {
         return res.status(200).json({
           message: "No projects found",
@@ -397,8 +387,19 @@ const listProjects = async (req, res) => {
         });
       }
 
-      // Filter projects
-      where.id = projectIds;
+      where.id = { [Op.in]: projectIds };
+    }
+
+    if (search) {
+      where[Op.and] = [
+        ...(where[Op.and] || []),
+        {
+          [Op.or]: [
+            { name: { [Op.iLike]: `%${search}%` } },
+            { code: { [Op.iLike]: `%${search}%` } },
+          ],
+        },
+      ];
     }
 
     const { count, rows } = await Project.findAndCountAll({
@@ -417,17 +418,11 @@ const listProjects = async (req, res) => {
       page,
       limit,
     });
-
   } catch (err) {
-
     console.error("listProjects error:", err);
-
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
-
 const getProject = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id, { include: projectIncludes });

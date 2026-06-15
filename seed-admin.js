@@ -1,6 +1,6 @@
 // seed-admin.js
 const bcrypt = require("bcryptjs");
-const { sequelize, Users, Roles, Permission } = require("./src/models");
+const { sequelize, User, Role, Permission } = require("./src/models");
 const ADMIN_EMPLOYEE_ID = "EMP001";
 const ADMIN_NAME = "Admin";
 const ADMIN_EMAIL = "admin@crm.com";
@@ -11,12 +11,12 @@ const ADMIN_ROLE_NAME = "Admin";
     await sequelize.authenticate();
     await sequelize.sync();
     // 1 — ensure Admin role exists
-    const [adminRole] = await Roles.findOrCreate({
+    const [adminRole] = await Role.findOrCreate({
       where: { name: ADMIN_ROLE_NAME },
       defaults: { name: ADMIN_ROLE_NAME },
     });
     // 2 — check if admin user already exists
-    const existing = await Users.findOne({ where: { employee_id: ADMIN_EMPLOYEE_ID } });
+    const existing = await User.findOne({ where: { employee_id: ADMIN_EMPLOYEE_ID } });
     const hash = await bcrypt.hash(ADMIN_PASSWORD, 12);
     let adminUser;
     if (existing) {
@@ -24,7 +24,7 @@ const ADMIN_ROLE_NAME = "Admin";
       adminUser = existing;
       console.log("Existing admin user updated.");
     } else {
-      adminUser = await Users.create({
+      adminUser = await User.create({
         employee_id: ADMIN_EMPLOYEE_ID,
         name: ADMIN_NAME,
         email: ADMIN_EMAIL,

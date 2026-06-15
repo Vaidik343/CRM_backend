@@ -68,6 +68,7 @@ const createWorkLog = async(req, res) => {
       date: req.body.date,
       remarks : remarksLog,
     });
+    console.log("🚀 ~ createWorkLog ~ workLog:", workLog)
     // console.log("🚀 ~ createWorkLog ~ workLog:", workLog)
     return res.status(201).json({ workLog });
 

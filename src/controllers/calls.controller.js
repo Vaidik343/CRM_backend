@@ -312,6 +312,9 @@ const listCalls = async(req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page -1) * limit;
 
+  const search = req.query.search?.trim();
+
+  
     let where = req.user.is_admin
       ? {}
       : {
@@ -342,6 +345,23 @@ const listCalls = async(req, res) => {
     } else if (from && to) {
       where = { ...where, ...dateWhere };
     }
+
+
+    // Search
+    if (search) {
+      where = {
+        [Op.and]: [
+          where,
+          {
+            [Op.or]: [
+              { customer_name: { [Op.iLike]: `%${search}%` } },
+              { mobile_number: { [Op.iLike]: `%${search}%` } },
+            ],
+          },
+        ],
+      };
+    }
+
 
     const { count, rows } = await Call.findAndCountAll({
       limit,
