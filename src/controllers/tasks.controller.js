@@ -170,6 +170,7 @@ if (assignedId !== req.user.id) {
 if (assignedId !== req.user.id) {
   io.to(`user:${assignedId}`).emit("TASK_CREATED", newTask);
 }
+io.to("user:admins_room").emit("TASK_CREATED", newTask);
 
     return res.status(201).json({ task: newTask });
 
@@ -331,6 +332,7 @@ io.to(`user:${task.assigned_to}`).emit("TASK_UPDATED", task);
 if (task.assigned_by !== task.assigned_to) {
   io.to(`user:${task.assigned_by}`).emit("TASK_UPDATED", task);
 }
+io.to("user:admins_room").emit("TASK_UPDATED", task);
 
     return res.status(200).json({ task });
 
@@ -358,6 +360,7 @@ io.to(`user:${assigned_to}`).emit("TASK_DELETED", { id: req.params.id });
 if (assigned_by !== assigned_to) {
   io.to(`user:${assigned_by}`).emit("TASK_DELETED", { id: req.params.id });
 }
+io.to("user:admins_room").emit("TASK_DELETED", { id: req.params.id });
 return res.json({ message: "Task deleted" });
 
 

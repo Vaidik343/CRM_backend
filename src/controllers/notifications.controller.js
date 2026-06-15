@@ -23,7 +23,7 @@ const createNotification = async (io, { user_id, type, title, message, data = {}
 
     // Emit to user's private room
     if (io) {
-      io.to(`user:${user_id}`).emit("notification", {
+      const payload = {
         id:         notification.id,
         type:       notification.type,
         title:      notification.title,
@@ -31,7 +31,13 @@ const createNotification = async (io, { user_id, type, title, message, data = {}
         data:       notification.data,
         is_read:    notification.is_read,
         createdAt:  notification.createdAt,
-      });
+      };
+
+      io.to(`user:${user_id}`).emit("notification", payload);
+
+      // also notify admins in real-time, even though this notification
+      // belongs to an employee
+      io.to("user:admins_room").emit("notification", payload);
     }
 
     return notification;

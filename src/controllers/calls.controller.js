@@ -259,6 +259,7 @@ const task = await Task.create({
   if (taskAssignee !== req.user.id) {
     const io = req.app.get("io");
     io.to(`user:${taskAssignee}`).emit("TASK_CREATED", task);
+    io.to("user:admins_room").emit("TASK_CREATED", task);
     await createNotification(io, {
       user_id: taskAssignee,
       type:    "TASK_ASSIGNED",
@@ -283,6 +284,7 @@ if (transfer_to) {
     data:    { call_id: call.id, display_id: call.display_id },
   });
     io.to(`user:${transfer_to}`).emit("CALL_TRANSFERRED", call);
+    io.to("user:admins_room").emit("CALL_TRANSFERRED", call);
 }
 
 // task auto-created and assigned to someone else
@@ -309,41 +311,39 @@ const listCalls = async(req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page -1) * limit;
-    let where = req.user.is_admin ? {} : { user_id: req.user.id };
 
+    let where = req.user.is_admin
+      ? {}
+      : {
+          [Op.or]: [
+            { user_id: req.user.id },
+            { transfer_to: req.user.id },
+          ],
+        };
 
-     
-       const { from, to } = req.query;
+    const { from, to } = req.query;
+    let dateWhere = {};
+    if (from && to) {
+      const start = new Date(from);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      dateWhere = { createdAt: { [Op.between]: [start, end] } };
+    } else if (!req.user.is_admin) {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      dateWhere = { createdAt: { [Op.between]: [start, end] } };
+    }
 
-let dateWhere = {};
-if (from && to) {
-  const start = new Date(from);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(to);
-  end.setHours(23, 59, 59, 999);
-  dateWhere = { createdAt: { [Op.between]: [start, end] } };
-} else if (!req.user.is_admin) {
-  // employee default: today only
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  dateWhere = { createdAt: { [Op.between]: [start, end] } };
-}
+    if (!req.user.is_admin) {
+      where = { [Op.and]: [where, dateWhere] };
+    } else if (from && to) {
+      where = { ...where, ...dateWhere };
+    }
 
-    
- if (!req.user.is_admin) {
-  // employee: always scoped to today/selected range
-  where = { ...where, ...dateWhere };
-} else if (from && to) {
-  // admin: only filter by date if explicitly provided
-  where = { ...where, ...dateWhere };
-}
-// else admin with no from/to → no date filter, sees everything
-
-
-
-    const {count,rows} = await Call.findAndCountAll({
+    const { count, rows } = await Call.findAndCountAll({
       limit,
       offset,
       where,
@@ -351,8 +351,7 @@ if (from && to) {
       order: [["createdAt", "DESC"]],
     });
 
-    // console.log("call all", count, rows)
-    return res.status(200).json({message:"List of All calls", data: rows, total: count, page, limit})
+    return res.status(200).json({ message: "List of All calls", data: rows, total: count, page, limit });
   } catch (err) {
     console.error("listCalls error:", err);
     return res.status(500).json({ message: "Internal server error" });
@@ -420,6 +419,7 @@ const updateCall = async  (req, res) => {
     if (call.transfer_to) {
       io.to(`user:${call.transfer_to}`).emit("CALL_UPDATED", call);
     }
+    io.to("user:admins_room").emit("CALL_UPDATED", call);
     return res.json({ call });
   } catch (err) {
     console.error("updateCall error:", err);
@@ -436,12 +436,14 @@ const deleteCall = async  (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
+    const { user_id, transfer_to } = call;
     await call.destroy();
       const io = req.app.get("io");
     io.to(`user:${user_id}`).emit("CALL_DELETED", { id: req.params.id });
     if (transfer_to) {
       io.to(`user:${transfer_to}`).emit("CALL_DELETED", { id: req.params.id });
     }
+    io.to("user:admins_room").emit("CALL_DELETED", { id: req.params.id });
     return res.json({ message: "Call deleted" });
   } catch (err) {
     console.error("deleteCall error:", err);
