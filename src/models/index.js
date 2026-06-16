@@ -85,8 +85,8 @@ Task.belongsTo(User, { foreignKey: "assigned_by", as: "assigner" });
  
  
 // ── WorkLog ↔ User ────────────────────────────────────────────
-User.hasMany(WorkLog, { foreignKey: "user_id", onDelete: "CASCADE" });
-WorkLog.belongsTo(User, { foreignKey: "user_id" });
+User.hasMany(WorkLog, { foreignKey: "user_id",  as: "workLogs",  onDelete: "CASCADE" });
+WorkLog.belongsTo(User, { foreignKey: "user_id",  as: "user"  });
 
 
 // Client associations

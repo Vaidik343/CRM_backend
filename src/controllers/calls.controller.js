@@ -306,15 +306,14 @@ if (is_task && task_assigned_to) {
   }
 };
 
-const listCalls = async(req, res) => {
+const listCalls = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const offset = (page -1) * limit;
+    const offset = (page - 1) * limit;
 
-  const search = req.query.search?.trim();
+    const search = req.query.search?.trim();
 
-  
     let where = req.user.is_admin
       ? {}
       : {
@@ -346,7 +345,6 @@ const listCalls = async(req, res) => {
       where = { ...where, ...dateWhere };
     }
 
-
     // Search
     if (search) {
       where = {
@@ -354,14 +352,14 @@ const listCalls = async(req, res) => {
           where,
           {
             [Op.or]: [
-              { customer_name: { [Op.iLike]: `%${search}%` } },
-              { mobile_number: { [Op.iLike]: `%${search}%` } },
+              { caller_name: { [Op.iLike]: `%${search}%` } },
+              { caller_number: { [Op.iLike]: `%${search}%` } },
+              { display_id: { [Op.iLike]: `%${search}%` } },
             ],
           },
         ],
       };
     }
-
 
     const { count, rows } = await Call.findAndCountAll({
       limit,
@@ -376,7 +374,7 @@ const listCalls = async(req, res) => {
     console.error("listCalls error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
-}
+};
 
 const getCall = async (req, res) => {
   // console.log("body call by id", req.body)

@@ -186,12 +186,12 @@ taskStatusBreakdownAllTime.overdue = overdueCountAllTime;
     // ── WorkLogs center ───────────────────────────────────
     const todayWorkLogs = await WorkLog.findAll({
       where: { date: todayDateStr },
-      include: [{ model: User, attributes: ["id", "name", "employee_id"] }],
+      include: [{ model: User, as: "user", attributes: ["id", "name", "employee_id"] }],
       order: [["date", "DESC"]],
     });
     const filteredWorkLogs = from ? await WorkLog.findAll({
       where: { date: { [Op.between]: [from, todayDateStr] } },
-      include: [{ model: User, attributes: ["id", "name", "employee_id"] }],
+      include: [{ model: User, as:"user", attributes: ["id", "name", "employee_id"] }],
       order: [["date", "DESC"]],
     }) : todayWorkLogs;
 
@@ -705,9 +705,10 @@ const getEmployeeDashboard = async (req, res) => {
     });
     const myProjectIds = myMemberships.map((m) => m.project_id);
 
-    const myProjects = await Project.findAll({
+const myProjects = myProjectIds.length > 0
+  ? await Project.findAll({
       where: {
-        id: { [Op.in]: myProjectIds.length > 0 ? myProjectIds : ["none"] },
+        id: { [Op.in]: myProjectIds },
         is_active: true,
       },
       include: [
@@ -722,8 +723,8 @@ const getEmployeeDashboard = async (req, res) => {
         },
       ],
       order: [["createdAt", "DESC"]],
-    });
-
+    })
+  : [];
     // ── My Tasks ──────────────────────────────────────────────────────────
     const myTasks = await Task.findAll({
       where: {

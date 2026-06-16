@@ -368,7 +368,15 @@ const listProjects = async (req, res) => {
     const offset = (page - 1) * limit;
     const search = req.query.search?.trim();
 
-    let where = { is_active: true };
+
+    // Default: only active projects (safe for task-assign dropdowns, etc.)
+    // Only the admin Projects management page passes include_inactive=true
+    const includeInactive = req.query.include_inactive === "true" && req.user.is_admin;
+
+    let where = {};
+    if (!includeInactive) {
+      where.is_active = true;
+    }
 
     if (!req.user.is_admin) {
       const memberships = await ProjectMember.findAll({

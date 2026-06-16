@@ -8,7 +8,7 @@ function signAccessToken(user) {
       role_id: user.role_id,
     },
     process.env.JWT_SECRET,
-    { subject: String(user.id), expiresIn: "12h" },
+    { subject: String(user.id), expiresIn: "15d" },
   );
 }
 

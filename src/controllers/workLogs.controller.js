@@ -22,7 +22,7 @@ const updateWorkLogValidators = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const workLogIncludes = [
-  { model: User, attributes: ["id", "name", "employee_id",] },
+  { model: User, as: "user", attributes: ["id", "name", "employee_id",] },
   {model: Project, attributes: ["id", "name"]}
 ];
 
@@ -82,9 +82,12 @@ const listWorkLogs = async(req, res) => {
   
   try {
     const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
+  const limit = parseInt(req.query.limit) || 10;
   const offset = (page -1) * limit;
     let where = req.user.is_admin ? {} : { user_id: req.user.id };
+        const search = req.query.search?.trim();
+
+    
 
 const { from, to } = req.query;
 
@@ -107,12 +110,22 @@ if (from && to) {
 // else admin with no from/to → no date filter, sees everything
 
 
+if (search) {
+  where = {
+    [Op.and]: [
+      where,
+      { '$user.name$': { [Op.iLike]: `%${search}%` } },
+    ],
+  };
+}
+
     const {count, rows} = await WorkLog.findAndCountAll({
       limit,
       offset,
       where,
       include: workLogIncludes,
       order: [["date", "DESC"], ["createdAt", "DESC"]],
+       subQuery: false,
     });
     return res.status(200).json({message:"List of All Work logs", data: rows, total: count, page, limit});
   } catch (err) {

@@ -186,6 +186,7 @@ const listTasks = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
+    const search = req.query.search?.trim();
 
        const { from, to } = req.query;
 
@@ -244,6 +245,24 @@ if (!req.user.is_admin) {
   where = { ...where, ...dateWhere };
 }
 // else admin with no from/to → no date filter, sees everything
+
+
+
+// search
+ if (search) {
+      where = {
+        [Op.and]: [
+          where,
+          {
+            [Op.or]: [
+              { task: { [Op.iLike]: `%${search}%` } },
+              { display_id: { [Op.iLike]: `%${search}%` } },
+              // { project_id: { [Op.iLike]: `%${search}%` } },
+            ],
+          },
+        ],
+      };
+    }
 
     const { count, rows } = await Task.findAndCountAll({
       where,
