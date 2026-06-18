@@ -6,6 +6,8 @@ const { appendRemark } = require("../utils/remarksLog");
 const generateDisplayId = require("../utils/generateDisplayId");
 const { createNotification } = require("./notifications.controller");
 const { Op } = require("sequelize");
+const {findOrCreateClientForCall} = require("./client.controller");
+
 
 const createCallValidators = [
   body("caller_name").isString().trim().notEmpty(),
@@ -66,7 +68,7 @@ const callIncludes = [
   {
   model: Client,
   as: "client",
-  attributes: ["id", "name", "phone", "company"],
+  attributes: ["id", "names", "phone", "company"],
   required: false,
 },
 ];
@@ -152,8 +154,6 @@ const createCall = async (req, res) => {
       }
     }
 
-
-
     // prefix display id
 
     let prefix = "C"
@@ -198,12 +198,26 @@ if(req.body.remark)
     
   )
 }
+
+
+let resolvedClientId = client_id || null;
+
+if (!resolvedClientId && caller_number) {
+  const client = await findOrCreateClientForCall({
+    phone: caller_number,
+    name: caller_name,
+    created_by: req.user.id,
+  });
+
+  resolvedClientId = client?.id || null;
+}
+
     
     // 4. Create the call
     const call = await Call.create({
       user_id:      req.user.id,
       display_id: displayId,
-      client_id: client_id || null,
+      client_id: resolvedClientId,
       caller_name,
       caller_number: caller_number || null,
       project_id:   project_id || null,
@@ -218,6 +232,7 @@ if(req.body.remark)
 parent_call_id: parent_call_id || null,
       remarks: remarksLog,
     });
+    console.log("🚀 ~ createCall ~ call:", call)
     // console.log("🚀 ~ createCall ~ call:", call)
 
     await call.reload({ include: callIncludes });
@@ -236,8 +251,8 @@ const task = await Task.create({
   project_id,
   display_id: call.display_id,
   task: call_summary
-    ? `Follow up: ${call_summary}`.slice(0, 255)
-    : `Follow up: ${call_subtype} from ${caller_name}`,
+    ? `${call_summary}`.slice(0, 255)
+    : `${call_subtype} from ${caller_name}`,
   description: call_summary || null,
   assigned_to: taskAssignee,
   assigned_by: req.user.id,
@@ -245,13 +260,14 @@ const task = await Task.create({
   start_date: new Date(),
   remarks: remarksLog,
 });
+  console.log("🚀 ~ createCall ~ task:", task)
   
       await task.reload({
         include: [
           { model: User, as: "assignee", attributes: ["id", "name", "employee_id"] },
           { model: User, as: "assigner", attributes: ["id", "name", "employee_id"] },
           { model: Project, as: "project" , attributes: ["id", "name"] },
-          { model: Team, as: "team", attributes: ["id", "name"] },
+          // { model: Team, as: "team", attributes: ["id", "name"] },
         ],
       });
 
@@ -311,19 +327,12 @@ const listCalls = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
-
     const search = req.query.search?.trim();
-
-    let where = req.user.is_admin
-      ? {}
-      : {
-          [Op.or]: [
-            { user_id: req.user.id },
-            { transfer_to: req.user.id },
-          ],
-        };
+    const project_id = req.query.project_id?.trim();
 
     const { from, to } = req.query;
+
+    // ── Date range logic (unchanged in behavior, just computed before assembly) ──
     let dateWhere = {};
     if (from && to) {
       const start = new Date(from);
@@ -331,35 +340,41 @@ const listCalls = async (req, res) => {
       const end = new Date(to);
       end.setHours(23, 59, 59, 999);
       dateWhere = { createdAt: { [Op.between]: [start, end] } };
-    } else if (!req.user.is_admin) {
+    } else if (!req.user.is_admin && req.query.all_dates !== "true") {
       const start = new Date();
+      start.setDate(start.getDate() - 7);
       start.setHours(0, 0, 0, 0);
+
       const end = new Date();
       end.setHours(23, 59, 59, 999);
+
       dateWhere = { createdAt: { [Op.between]: [start, end] } };
     }
 
-    if (!req.user.is_admin) {
-      where = { [Op.and]: [where, dateWhere] };
-    } else if (from && to) {
-      where = { ...where, ...dateWhere };
+    // ── Assemble all conditions into one array, wrapped once at the end ──
+    const conditions = [];
+
+    conditions.push(
+      req.user.is_admin
+        ? {}
+        : { [Op.or]: [{ user_id: req.user.id }, { transfer_to: req.user.id }] }
+    );
+
+    if (Object.keys(dateWhere).length) conditions.push(dateWhere);
+
+    if (project_id) conditions.push({ project_id });
+
+    if (search) {
+      conditions.push({
+        [Op.or]: [
+          { caller_name: { [Op.iLike]: `%${search}%` } },
+          { caller_number: { [Op.iLike]: `%${search}%` } },
+          { display_id: { [Op.iLike]: `%${search}%` } },
+        ],
+      });
     }
 
-    // Search
-    if (search) {
-      where = {
-        [Op.and]: [
-          where,
-          {
-            [Op.or]: [
-              { caller_name: { [Op.iLike]: `%${search}%` } },
-              { caller_number: { [Op.iLike]: `%${search}%` } },
-              { display_id: { [Op.iLike]: `%${search}%` } },
-            ],
-          },
-        ],
-      };
-    }
+    const where = { [Op.and]: conditions };
 
     const { count, rows } = await Call.findAndCountAll({
       limit,

@@ -185,11 +185,11 @@ const listTasks = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
-
     const search = req.query.search?.trim();
+        const due_filter = req.query.due_filter; // "overdue" | "due_soon" | undefined
 
-       const { from, to } = req.query;
 
+const { from, to } = req.query;
 let dateWhere = {};
 if (from && to) {
   const start = new Date(from);
@@ -197,12 +197,14 @@ if (from && to) {
   const end = new Date(to);
   end.setHours(23, 59, 59, 999);
   dateWhere = { createdAt: { [Op.between]: [start, end] } };
-} else if (!req.user.is_admin) {
-  // employee default: today only
+} else if (!req.user.is_admin && req.query.all_dates !== "true") {
   const start = new Date();
+  start.setDate(start.getDate() - 7);
   start.setHours(0, 0, 0, 0);
+
   const end = new Date();
   end.setHours(23, 59, 59, 999);
+
   dateWhere = { createdAt: { [Op.between]: [start, end] } };
 }
 
@@ -225,44 +227,49 @@ if (from && to) {
     //   where = { assigned_to: req.user.id }; // Developer: see only own tasks
     // }
 
-    let where = {};
 
-if (!req.user.is_admin) {
-  where = {
-    [Op.or]: [
-      { assigned_to: req.user.id },
-      { assigned_by: req.user.id },
-    ],
-  };
-}
+    // ── Assemble all conditions into one array, wrapped once at the end ──
+    const conditions = [];
 
+    conditions.push(
+      req.user.is_admin
+        ? {}
+        : { [Op.or]: [{ assigned_to: req.user.id }, { assigned_by: req.user.id }] }
+    );
 
-if (!req.user.is_admin) {
-  // employee: always scoped to today/selected range
-  where = { ...where, ...dateWhere };
-} else if (from && to) {
-  // admin: only filter by date if explicitly provided
-  where = { ...where, ...dateWhere };
-}
-// else admin with no from/to → no date filter, sees everything
-
-
-
-// search
- if (search) {
-      where = {
-        [Op.and]: [
-          where,
-          {
-            [Op.or]: [
-              { task: { [Op.iLike]: `%${search}%` } },
-              { display_id: { [Op.iLike]: `%${search}%` } },
-              // { project_id: { [Op.iLike]: `%${search}%` } },
-            ],
-          },
-        ],
-      };
+    // Employee: dateWhere always applies (today/7-day default or explicit range).
+    // Admin: dateWhere only applies if explicitly provided via from/to.
+    if (!req.user.is_admin) {
+      if (Object.keys(dateWhere).length) conditions.push(dateWhere);
+    } else if (from && to) {
+      if (Object.keys(dateWhere).length) conditions.push(dateWhere);
     }
+
+    if (search) {
+      conditions.push({
+        [Op.or]: [
+          { task: { [Op.iLike]: `%${search}%` } },
+          { display_id: { [Op.iLike]: `%${search}%` } },
+        ],
+      });
+    }
+
+    const now = new Date();
+
+    if (due_filter === "overdue") {
+      conditions.push({
+        due_date: { [Op.lt]: now },
+        status: { [Op.ne]: "closed" },
+      });
+    } else if (due_filter === "due_soon") {
+      const in48hrs = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      conditions.push({
+        due_date: { [Op.between]: [now, in48hrs] },
+        status: { [Op.ne]: "closed" },
+      });
+    }
+
+    const where = { [Op.and]: conditions };
 
     const { count, rows } = await Task.findAndCountAll({
       where,

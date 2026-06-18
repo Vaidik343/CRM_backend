@@ -1,6 +1,6 @@
 const { body, param } = require("express-validator");
 const { Client, User } = require("../models");
-const { Op } = require("sequelize");
+const { Op, literal } = require("sequelize");
 const { handleValidation } = require("../utils/validate");
 
 // ── Validators ────────────────────────────────────────────────────
@@ -22,13 +22,65 @@ const updateClientValidators = [
   handleValidation,
 ];
 
+// ── Internal helper — called from calls.controller.js ──────────────────────
+const findOrCreateClientForCall = async ({ phone, name, company, created_by }) => {
+  if (!phone) return null;
+
+  let client = await Client.findOne({ where: { phone } });
+
+  if (!client) {
+    return await Client.create({
+      phone,
+      names: name ? [name] : [],
+      company: company || null,
+      created_by,
+      is_active: true,
+    });
+  }
+
+  let changed = false;
+  const names = [...(client.names || [])];
+
+  // merge new name if not already present (case-insensitive)
+  if (name && !names.some((n) => n.toLowerCase() === name.toLowerCase())) {
+    names.push(name);
+    changed = true;
+  }
+
+  // update company if a new/different one is provided
+  if (company && company !== client.company) {
+    client.company = company;
+    changed = true;
+  }
+
+  if (changed) {
+    client.names = names;
+    await client.save();
+  }
+
+  return client;
+};
+
 // ── Controllers ───────────────────────────────────────────────────
 
 const listClients = async (req, res) => {
   try {
+
+
+     const search = req.query.search?.trim();
+    let where = { is_active: true };
+
+    if (search) {
+      where[Op.or] = [
+        { phone: { [Op.iLike]: `%${search}%` } },
+        { company: { [Op.iLike]: `%${search}%` } },
+        literal(`"Client"."names"::text ILIKE '%${search.replace(/'/g, "''")}%'`),
+      ];
+    }
+
     const clients = await Client.findAll({
-      where: { is_active: true },
-      order: [["name", "ASC"]],
+      where,
+      order: [["createdAt", "DESC"]],
       include: [{ model: User, as: "creator", attributes: ["id", "name"] }],
     });
     return res.status(200).json({ message: "List of Clients", data: clients });
@@ -42,21 +94,32 @@ const createClient = async (req, res) => {
   try {
     const { name, phone, email, company } = req.body;
 
-    // Prevent duplicate name
-    const existing = await Client.findOne({
-      where: { name: { [Op.iLike]: name }, is_active: true },
-    });
-    if (existing) {
-      return res.status(409).json({ message: "Client with this name already exists" });
+      if (!phone || !name) {
+      return res.status(400).json({ message: "Name and phone are required" });
     }
 
+    // Prevent duplicate name
+    const existing = await Client.findOne({ where: { phone } });
+    if (existing) {
+      // merge instead of erroring — same "update details" behavior
+      const client = await findOrCreateClientForCall({
+        phone, name, company, created_by: req.user.id,
+      });
+      return res.status(200).json({ message: "Client updated (existing number)", client });
+    }
+    // if (existing) {
+    //   return res.status(409).json({ message: "Client with this name already exists" });
+    // }
+
     const client = await Client.create({
-      name,
-      phone: phone || null,
-      email: email || null,
+      phone,
+      names: [name],
       company: company || null,
+      email: email || null,
       created_by: req.user.id,
+      is_active: true,
     });
+
 
     return res.status(201).json({ message: "Client created", client });
   } catch (err) {
@@ -72,22 +135,21 @@ const updateClient = async (req, res) => {
       return res.status(404).json({ message: "Client not found" });
     }
 
-    // Duplicate check on name change
-    if (req.body.name && req.body.name.toLowerCase() !== client.name.toLowerCase()) {
-      const existing = await Client.findOne({
-        where: {
-          name: { [Op.iLike]: req.body.name },
-          is_active: true,
-          id: { [Op.ne]: client.id },
-        },
-      });
-      if (existing) {
-        return res.status(409).json({ message: "Client with this name already exists" });
-      }
-    }
+    // Duplicate check on name change - no use now after its change to names
+      // const existing = await Client.findOne({
+      //   where: {
+      //     names: [] ,
+      //     is_active: true,
+      //     id: { [Op.ne]: client.id },
+      //   },
+      // });
+      // if (existing) {
+      //   return res.status(409).json({ message: "Client with this name already exists" });
+      // }
+    
 
     const patch = {};
-    ["name", "phone", "email", "company"].forEach((f) => {
+    ["names", "phone", "email", "company"].forEach((f) => {
       if (typeof req.body[f] !== "undefined") patch[f] = req.body[f];
     });
 
@@ -116,6 +178,7 @@ module.exports = {
   createClient,
   updateClient,
   deleteClient,
+  findOrCreateClientForCall,
   createClientValidators,
   updateClientValidators,
 };

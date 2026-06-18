@@ -9,6 +9,24 @@
  * @swagger
  * components:
  *   schemas:
+ *  Client:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         names:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: JSONB array of names associated with this phone number. First element is the display name.
+ *           example: ["Jay Shah", "Jay's Assistant"]
+ *         phone:
+ *           type: string
+ *           description: Unique key for the client record
+ *         company:
+ *           type: string
+ *           nullable: true
  *     RemarkEntry:
  *       type: object
  *       properties:
@@ -41,6 +59,11 @@
  *         caller_number:
  *           type: string
  *           nullable: true
+ *         client_id:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *           description: Resolved/linked client record. Auto-resolved from caller_number via findOrCreateClientForCall if not provided.
  *         project_id:
  *           type: string
  *           format: uuid
@@ -146,6 +169,11 @@
  *                 type: string
  *                 format: uuid
  *                 nullable: true
+ *               client_id:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *                 description: Link call to an existing client. If omitted and caller_number is provided, a client is auto-resolved or created via findOrCreateClientForCall.
  *               call_type:
  *                 type: string
  *                 enum: [inquiry, request, complaint]
@@ -318,6 +346,10 @@
  *               project_id:
  *                 type: string
  *                 format: uuid
+ *              client_id:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
  *               call_type:
  *                 type: string
  *                 enum: [inquiry, request, complaint]
