@@ -35,9 +35,8 @@ const createNotification = async (io, { user_id, type, title, message, data = {}
 
       io.to(`user:${user_id}`).emit("notification", payload);
 
-      // also notify admins in real-time, even though this notification
-      // belongs to an employee
-      io.to("user:admins_room").emit("notification", payload);
+      // Removed admin room broadcast to avoid admin receiving employee notifications
+      // io.to("user:admins_room").emit("notification", payload);
     }
 
     return notification;
@@ -57,7 +56,7 @@ const getNotifications = async (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
     const offset = (page - 1) * limit;
 
-    const where = req.user.is_admin ? {} : { user_id: req.user.id };
+  const where = { user_id: req.user.id };
 
     const { count, rows } = await Notification.findAndCountAll({
       where,
@@ -93,8 +92,8 @@ const markRead = async (req, res) => {
       return res.status(404).json({ message: "Notification not found" });
     }
 
-    // Employee can only mark their own
-    if (!req.user.is_admin && notification.user_id !== req.user.id) {
+    // Only allow marking read for own notifications
+    if (notification.user_id !== req.user.id) {
       return res.status(403).json({ message: "Forbidden" });
     }
 

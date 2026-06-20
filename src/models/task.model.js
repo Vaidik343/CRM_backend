@@ -26,7 +26,7 @@ display_id: {
 
 
       task: {
-         type: DataTypes.STRING,
+         type: DataTypes.TEXT,
         allowNull: false,
       },
       description : { 

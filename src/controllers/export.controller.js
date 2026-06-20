@@ -1,5 +1,5 @@
 const ExcelJS = require("exceljs");
-const { Call, Task, WorkLog, User, Project } = require("../models");
+const { Call, Task, WorkLog, User, Project, ProjectMember, Role } = require("../models");
 const { Op } = require("sequelize");
 
 const exportData = async (req, res) => {
@@ -449,7 +449,168 @@ if (type === "work-logs") {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-module.exports = { exportData, exportMyData, exportEmployeeData };
+
+const exportProjectData = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { from, to } = req.query;
+
+    const project = await Project.findByPk(projectId, {
+      include: [
+        { model: User, as: "creator", attributes: ["name"] },
+        { model: ProjectMember, as: "members", include: [
+          { model: User, as: "user", attributes: ["name", "employee_id"] },
+          { model: Role, as: "role", attributes: ["name"] },
+        ]},
+      ],
+    });
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (!req.user.is_admin) {
+      const membership = await ProjectMember.findOne({
+        where: { project_id: projectId, user_id: req.user.id, is_active: true },
+      });
+      if (!membership) {
+        return res.status(403).json({ message: "You are not a member of this project" });
+      }
+    }
+
+    let dateWhere = {};
+    if (from && to) {
+      const start = new Date(from);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      dateWhere = { createdAt: { [Op.between]: [start, end] } };
+    }
+
+    const flattenRemarks = (remarks) => {
+      if (!Array.isArray(remarks) || remarks.length === 0) return "";
+      return remarks
+        .map((r) => `[${new Date(r.created_at).toLocaleDateString()} - ${r.added_by_name}]: ${r.text}`)
+        .join("\n");
+    };
+
+    const workbook = new ExcelJS.Workbook();
+
+    // --- Project Info sheet ---
+    const infoSheet = workbook.addWorksheet("Project Info");
+    infoSheet.columns = [
+      { header: "Field", key: "field", width: 22 },
+      { header: "Value", key: "value", width: 60 },
+    ];
+
+    const projectTypesStr = Object.entries(project.project_types || {})
+      .map(([cat, subs]) => `${cat}: ${(subs || []).join(", ")}`)
+      .join(" | ") || "—";
+
+    const techDetailsStr = Array.isArray(project.tech_details)
+      ? project.tech_details.map((t) => {
+          const dbs = Array.isArray(t.databases) && t.databases.length
+            ? ` [DB: ${t.databases.map((d) => `${d.name}${d.version ? ` v${d.version}` : ""}`).join(", ")}]`
+            : "";
+          return `${t.name || "—"}${t.version ? ` v${t.version}` : ""}${dbs}`;
+        }).join(" | ")
+      : (project.tech_details || "—");
+
+    const membersStr = (project.members || [])
+      .map((m) => `${m.user?.name || "—"} (${m.role?.name || "No role"})`)
+      .join(" | ") || "—";
+
+    infoSheet.addRows([
+      { field: "Name", value: project.name },
+      { field: "Code", value: project.code || "—" },
+      { field: "Status", value: project.development_status },
+      { field: "Description", value: project.description || "—" },
+      { field: "Project Type", value: projectTypesStr },
+      { field: "Tech Stack", value: techDetailsStr },
+      { field: "Members & Roles", value: membersStr },
+      { field: "Created By", value: project.creator?.name || "—" },
+      { field: "Created At", value: new Date(project.createdAt).toLocaleDateString() },
+    ]);
+
+    // --- Calls sheet ---
+    const callsSheet = workbook.addWorksheet("Calls");
+    const calls = await Call.findAll({
+      where: { ...dateWhere, project_id: projectId },
+      include: [{ model: Project, as: "project", attributes: ["name"] }],
+      order: [["createdAt", "DESC"]],
+    });
+
+    callsSheet.columns = [
+      { header: "Display ID",    key: "display_id",    width: 20 },
+      { header: "Project",       key: "project",       width: 20 },
+      { header: "Caller Name",   key: "caller_name",   width: 20 },
+      { header: "Caller Number", key: "caller_number", width: 18 },
+      { header: "Call Type",     key: "call_type",     width: 15 },
+      { header: "Call Subtype",  key: "call_subtype",  width: 20 },
+      { header: "Medium",        key: "receive_type",  width: 15 },
+      { header: "Summary",       key: "call_summary",  width: 30 },
+      { header: "Remarks",       key: "remarks",       width: 40 },
+      { header: "Created At",    key: "createdAt",     width: 20 },
+    ];
+
+    callsSheet.addRows(calls.map((r) => ({
+      ...r.toJSON(),
+      project: r.project?.name || "",
+      remarks: flattenRemarks(r.remarks),
+    })));
+
+    // --- Tasks sheet ---
+    const tasksSheet = workbook.addWorksheet("Tasks");
+    const tasks = await Task.findAll({
+      where: { ...dateWhere, project_id: projectId },
+      include: [
+        { model: User, as: "assignee", attributes: ["name"] },
+        { model: User, as: "assigner", attributes: ["name"] },
+        { model: Project, as: "project", attributes: ["name"] },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    tasksSheet.columns = [
+      { header: "Display ID",   key: "display_id",       width: 20 },
+      { header: "Task",         key: "task",             width: 25 },
+      { header: "Description",  key: "description",      width: 25 },
+      { header: "Project",      key: "project",          width: 20 },
+      { header: "Assigned To",  key: "assigned_to_name", width: 20 },
+      { header: "Assigned By",  key: "assigned_by_name", width: 20 },
+      { header: "Status",       key: "status",           width: 15 },
+      { header: "Due Date",     key: "due_date",         width: 15 },
+      { header: "Remarks",      key: "remarks",          width: 40 },
+      { header: "Created At",   key: "createdAt",        width: 20 },
+    ];
+
+    tasksSheet.addRows(tasks.map((r) => ({
+      ...r.toJSON(),
+      project:          r.project?.name  || "",
+      assigned_to_name: r.assignee?.name || "",
+      assigned_by_name: r.assigner?.name || "",
+      remarks:          flattenRemarks(r.remarks),
+    })));
+
+    // style header rows on all sheets
+    [infoSheet, callsSheet, tasksSheet].forEach((sheet) => {
+      sheet.getRow(1).eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
+      });
+    });
+
+    const fileLabel = from && to ? `${from}_to_${to}` : new Date().toISOString().split("T")[0];
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${project.name}_activity_${fileLabel}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("exportProjectData error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+module.exports = { exportData, exportMyData, exportEmployeeData, exportProjectData  };
 // module.exports = { exportData };
 
 

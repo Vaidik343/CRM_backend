@@ -78,6 +78,11 @@ task_assigned_to: {
         defaultValue: false,
         allowNull: true,
       },
+      attendees: {
+  type: DataTypes.JSONB,
+  allowNull: true,
+  defaultValue: [],
+},
       remarks: {
         type: DataTypes.JSONB,
         allowNull:true, // change it to false
@@ -85,6 +90,7 @@ task_assigned_to: {
 
         
       }
+      
 
     },
      {

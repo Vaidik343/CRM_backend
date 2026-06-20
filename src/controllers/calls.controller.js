@@ -22,6 +22,14 @@ const createCallValidators = [
   body("remark").optional().isString().trim().notEmpty(),
   body("receive_type").isIn(["call", "msg", "email", "meeting"]),
    body("is_task").optional({ nullable: true }).isBoolean(),
+   body("attendees")
+  .optional({ nullable: true })
+  .isArray()
+  .withMessage("attendees must be an array of user IDs"),
+  body("attendees.*")
+  .optional()
+  .isUUID()
+  .withMessage("Each attendee must be a valid user ID"),
   handleValidation,
 ];
 
@@ -36,6 +44,15 @@ const updateCallValidators = [
   body("call_type").optional().isIn(["inquiry", "request", "complaint"]),
   body("call_subtype").optional().isString().trim().notEmpty(),
   body("call_summary").optional({ nullable: true }).isString(),
+     body("attendees")
+  .optional({ nullable: true })
+  .isArray()
+  .withMessage("attendees must be an array of user IDs"),
+  body("attendees.*")
+  .optional()
+  .isUUID()
+  .withMessage("Each attendee must be a valid user ID"),
+
   body("remark").optional().trim().notEmpty(),
   body("receive_type").optional().isIn(["call", "msg", "email", "meeting"]),
   handleValidation,
@@ -96,7 +113,8 @@ const createCall = async (req, res) => {
       transfer_to,
       task_assigned_to,
       follow_up,
-      parent_call_id
+      parent_call_id,
+        attendees,   
     } = req.body;
 
     const assignedTo = req.user?.id;
@@ -212,6 +230,12 @@ if (!resolvedClientId && caller_number) {
   resolvedClientId = client?.id || null;
 }
 
+// Attendees only make sense for meetings; ignore if sent for other receive_types.
+// Exclude the acting employee — they're implicitly present, no need to self-select.
+let resolvedAttendees = [];
+if (receive_type === "meeting" && Array.isArray(attendees)) {
+  resolvedAttendees = attendees.filter((id) => id !== req.user.id);
+}
     
     // 4. Create the call
     const call = await Call.create({
@@ -230,12 +254,28 @@ if (!resolvedClientId && caller_number) {
       task_assigned_to: task_assigned_to || null,
       // follow_up : follow_up || null,
 parent_call_id: parent_call_id || null,
+ attendees: resolvedAttendees, 
       remarks: remarksLog,
     });
     console.log("🚀 ~ createCall ~ call:", call)
     // console.log("🚀 ~ createCall ~ call:", call)
 
     await call.reload({ include: callIncludes });
+
+    // Notify each attendee that they were added to a meeting record
+if (resolvedAttendees.length > 0) {
+  const io = req.app.get("io");
+  for (const attendeeId of resolvedAttendees) {
+    await createNotification(io, {
+      user_id: attendeeId,
+      type: "MEETING_ATTENDEE",
+      title: "Added to a Meeting Log",
+      message: `${req.user.name} logged a meeting with ${caller_name} and added you as an attendee`,
+      data: { call_id: call.id, display_id: call.display_id },
+    });
+    io.to(`user:${attendeeId}`).emit("CALL_ATTENDEE_ADDED", call);
+  }
+}
 
     // 5. If is_task → auto-create task from call data
     if (is_task) {
@@ -357,7 +397,7 @@ const listCalls = async (req, res) => {
     conditions.push(
       req.user.is_admin
         ? {}
-        : { [Op.or]: [{ user_id: req.user.id }, { transfer_to: req.user.id }] }
+        : { [Op.or]: [{ user_id: req.user.id }, { transfer_to: req.user.id },  { attendees: { [Op.contains]: [req.user.id] } },] }
     );
 
     if (Object.keys(dateWhere).length) conditions.push(dateWhere);
@@ -411,7 +451,9 @@ const getCall = async (req, res) => {
   }
 }
 
-const updateCall = async  (req, res) => {
+
+
+const updateCall = async (req, res) => {
   try {
     const call = await Call.findByPk(req.params.id);
     if (!call) return res.status(404).json({ message: "Call not found" });
@@ -420,7 +462,6 @@ const updateCall = async  (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    // If either call_type or call_subtype is being updated, validate the pair
     const newType    = req.body.call_type    || call.call_type;
     const newSubtype = req.body.call_subtype || call.call_subtype;
     if ((req.body.call_type || req.body.call_subtype) && !validateSubtype(newType, newSubtype)) {
@@ -428,37 +469,57 @@ const updateCall = async  (req, res) => {
         message: `Invalid call_subtype "${newSubtype}" for call_type "${newType}". Valid options: ${CALL_TYPES[newType]?.join(", ")}`,
       });
     }
+const fields = ["caller_name", "caller_number", "project_id", "call_type", "call_subtype", "call_summary", "remarks", "receive_type", "client_id", "attendees"];
+const uuidFields = ["project_id", "client_id"];
 
-    const fields = ["caller_name", "caller_number", "project_id", "call_type", "call_subtype", "call_summary", "remarks", "receive_type", "client_id"];
-    const patch = {};
-    fields.forEach((f) => {
-      if (typeof req.body[f] !== "undefined") patch[f] = req.body[f];
-    });
-
-    if(req.body.remark)
-    {
-     patch.remarks = appendRemark({
-  existingRemarks: call.remarks,
-  text: req.body.remark,
-  user_id: req.user.id,
-    user_name: req.user.name,
+const patch = {};
+fields.forEach((f) => {
+  if (typeof req.body[f] !== "undefined") {
+    const value = req.body[f];
+    patch[f] = uuidFields.includes(f) && value === "" ? null : value;
+  }
 });
+    // Track newly-added attendees before overwriting, so we can notify just them
+    const previousAttendees = call.attendees || [];
+    const incomingAttendees = Array.isArray(req.body.attendees) ? req.body.attendees : previousAttendees;
+    const newlyAdded = incomingAttendees.filter((id) => !previousAttendees.includes(id));
+
+    if (req.body.remark) {
+      patch.remarks = appendRemark({
+        existingRemarks: call.remarks,
+        text: req.body.remark,
+        user_id: req.user.id,
+        user_name: req.user.name,
+      });
     }
-    const uc = await call.update(patch);
-    // console.log("🚀 ~ updateCall ~ uc:", uc)
+    await call.update(patch);
     await call.reload({ include: callIncludes });
- const io = req.app.get("io");
+
+    const io = req.app.get("io");
     io.to(`user:${call.user_id}`).emit("CALL_UPDATED", call);
     if (call.transfer_to) {
       io.to(`user:${call.transfer_to}`).emit("CALL_UPDATED", call);
     }
     io.to("user:admins_room").emit("CALL_UPDATED", call);
+
+    // Notify only attendees newly added on this edit
+    for (const attendeeId of newlyAdded) {
+      await createNotification(io, {
+        user_id: attendeeId,
+        type: "MEETING_ATTENDEE",
+        title: "Added to a Meeting Log",
+        message: `${req.user.name} added you as an attendee on a meeting log`,
+        data: { call_id: call.id, display_id: call.display_id },
+      });
+      io.to(`user:${attendeeId}`).emit("CALL_ATTENDEE_ADDED", call);
+    }
+
     return res.json({ call });
   } catch (err) {
     console.error("updateCall error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
-}
+};
 
 const deleteCall = async  (req, res) => {
   try {
