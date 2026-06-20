@@ -1,4 +1,7 @@
 const { Notification, User } = require("../models");
+const { Op } = require("sequelize");
+
+
 
 /**
  * Internal helper — called by other controllers (tasks, calls, projects)
@@ -49,14 +52,23 @@ const createNotification = async (io, { user_id, type, title, message, data = {}
 
 // ── Route handlers ────────────────────────────────────────────────────────────
 
+
 // GET /api/notifications
 const getNotifications = async (req, res) => {
   try {
     const page  = parseInt(req.query.page)  || 1;
-    const limit = parseInt(req.query.limit) || 5;
+    const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    const { is_read, type } = req.query;
 
-  const where = { user_id: req.user.id };
+    const conditions = [{ user_id: req.user.id }];
+
+    if (is_read === "true")  conditions.push({ is_read: true });
+    if (is_read === "false") conditions.push({ is_read: false });
+
+    if (type) conditions.push({ type });
+
+    const where = { [Op.and]: conditions };
 
     const { count, rows } = await Notification.findAndCountAll({
       where,
@@ -66,7 +78,7 @@ const getNotifications = async (req, res) => {
     });
 
     const unreadCount = await Notification.count({
-      where: { ...where, is_read: false },
+      where: { user_id: req.user.id, is_read: false },
     });
 
     return res.status(200).json({
@@ -82,7 +94,6 @@ const getNotifications = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-
 // PATCH /api/notifications/:id/read
 const markRead = async (req, res) => {
   try {

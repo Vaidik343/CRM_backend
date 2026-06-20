@@ -14,6 +14,9 @@ const { Server } = require("socket.io");
 const { startDueDateCron } = require("./utils/dueDateCron");
 const app = express();
 const server = http.createServer(app);  // wrap express in http server for socket.io
+const cron = require("node-cron");
+const { cleanupOldNotifications } = require("./utils/notificationCleanup");
+
 
 const io = new Server(server, {
   cors: {
@@ -118,11 +121,17 @@ io.on("connection", (socket) => {
   });
 });
 
+
 // ── Start ─────────────────────────────────────────────────────
 const startServer = async () => {
   try {
     await connectDB();
-      startDueDateCron(io);
+    startDueDateCron(io);
+
+    cron.schedule("0 2 * * *", () => {
+      cleanupOldNotifications();
+    });
+
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on 0.0.0.0:${PORT}`);
     });
