@@ -62,6 +62,12 @@ display_id: {
         defaultValue: "open",
         allowNull:false
       },
+completedAt: {
+  type: DataTypes.DATE,
+  allowNull: true,
+  defaultValue: null,
+  field: 'completed_at',
+},
 
       remarks: {
         type: DataTypes.JSONB,

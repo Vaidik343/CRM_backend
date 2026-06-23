@@ -34,9 +34,20 @@ const getDashboard = async (req, res) => {
       const end   = new Date(actTo);   end.setHours(23, 59, 59, 999);
       activityWhere = { createdAt: { [Op.between]: [start, end] } };
     } else {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      activityWhere = { createdAt: { [Op.gte]: sevenDaysAgo } };
+      // const sevenDaysAgo = new Date();
+      // sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      // activityWhere = { createdAt: { [Op.gte]: sevenDaysAgo } };
+const todayStart = new Date();
+todayStart.setHours(0, 0, 0, 0);
+
+const todayEnd = new Date();
+todayEnd.setHours(23, 59, 59, 999);
+
+activityWhere = {
+  createdAt: {
+    [Op.between]: [todayStart, todayEnd]
+  }
+};
     }
 
     // ── Totals — employees & teams always all-time ────────
@@ -89,6 +100,7 @@ const taskStatusRowsAllTime = await Task.findAll({
   raw: true,
 });
 const taskStatusBreakdownAllTime = { open: 0, ongoing: 0, closed: 0, due: 0, overdue: 0 };
+console.log("🚀 ~ getDashboard ~ taskStatusBreakdownAllTime:", taskStatusBreakdownAllTime)
 taskStatusRowsAllTime.forEach((r) => { taskStatusBreakdownAllTime[r.status] = parseInt(r.count); });
 
 const [dueCountAllTime, overdueCountAllTime] = await Promise.all([
@@ -206,7 +218,7 @@ taskStatusBreakdownAllTime.overdue = overdueCountAllTime;
         tasks:     totalTasks,        // date filtered
         work_logs: totalWorkLogs,     // date filtered
       },
-      last_7_days:           { calls: recentCalls, tasks: recentTasks, work_logs: recentWorkLogs },
+      today:           { calls: recentCalls, tasks: recentTasks, work_logs: recentWorkLogs },
       task_status_breakdown: taskStatusBreakdown,
         task_status_breakdown_all_time: taskStatusBreakdownAllTime,
       call_type_breakdown:   callTypeBreakdown,

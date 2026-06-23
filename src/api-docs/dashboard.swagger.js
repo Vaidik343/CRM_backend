@@ -1,69 +1,100 @@
 /**
  * @swagger
- * tags:
- *     name: Dashboard
- *     description: Dashboard analytics APIs
+ * /api/dashboard:
+ *   get:
+ *     summary: Get admin dashboard analytics
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: actFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: actTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *
+ *     responses:
+ *       200:
+ *         description: Dashboard analytics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DashboardResponse'
+ *
+ *       401:
+ *         description: Unauthorized
+ *
+ *       403:
+ *         description: Admin access required
+ *
+ *       500:
+ *         description: Internal server error
  */
-
 /**
  * @swagger
  * components:
  *   schemas:
- *
- *     DashboardTotals:
- *       type: object
- *       properties:
- *         employees:
- *           type: integer
- *           example: 12
- *         calls:
- *           type: integer
- *           example: 245
- *         tasks:
- *           type: integer
- *           example: 58
- *         work_logs:
- *           type: integer
- *           example: 102
- *
- *     DashboardActivity:
- *       type: object
- *       properties:
- *         calls:
- *           type: integer
- *           example: 25
- *         tasks:
- *           type: integer
- *           example: 12
- *         work_logs:
- *           type: integer
- *           example: 18
  *
  *     DashboardTaskStatusBreakdown:
  *       type: object
  *       properties:
  *         open:
  *           type: integer
- *           example: 20
  *         ongoing:
  *           type: integer
- *           example: 15
  *         closed:
  *           type: integer
- *           example: 23
+ *         due:
+ *           type: integer
+ *         overdue:
+ *           type: integer
+ *
+ *     DashboardTotals:
+ *       type: object
+ *       properties:
+ *         employees:
+ *           type: integer
+ *         teams:
+ *           type: integer
+ *         projects:
+ *           type: integer
+ *         calls:
+ *           type: integer
+ *         tasks:
+ *           type: integer
+ *         work_logs:
+ *           type: integer
+ *
+ *     DashboardActivity:
+ *       type: object
+ *       properties:
+ *         calls:
+ *           type: integer
+ *         tasks:
+ *           type: integer
+ *         work_logs:
+ *           type: integer
  *
  *     DashboardCallTypeBreakdown:
  *       type: object
  *       properties:
  *         inquiry:
  *           type: integer
- *           example: 120
  *         request:
  *           type: integer
- *           example: 80
  *         complaint:
  *           type: integer
- *           example: 45
  *
  *     DashboardEmployeeItem:
  *       type: object
@@ -85,30 +116,85 @@
  *         work_logs:
  *           type: integer
  *
+ *     DashboardCallsSection:
+ *       type: object
+ *       properties:
+ *         total_calls:
+ *           type: integer
+ *         today_count:
+ *           type: integer
+ *         task_call_count:
+ *           type: integer
+ *         today_calls:
+ *           type: array
+ *           items:
+ *             type: object
+ *         task_calls:
+ *           type: array
+ *           items:
+ *             type: object
+ *
+ *     DashboardTasksSection:
+ *       type: object
+ *       properties:
+ *         today_count:
+ *           type: integer
+ *         today_tasks:
+ *           type: array
+ *           items:
+ *             type: object
+ *
+ *     DashboardWorklogsSection:
+ *       type: object
+ *       properties:
+ *         today_count:
+ *           type: integer
+ *         today_logs:
+ *           type: array
+ *           items:
+ *             type: object
+ *
  *     DashboardResponse:
  *       type: object
  *       properties:
  *         totals:
  *           $ref: '#/components/schemas/DashboardTotals'
+ *
  *         last_7_days:
  *           $ref: '#/components/schemas/DashboardActivity'
+ *
  *         task_status_breakdown:
  *           $ref: '#/components/schemas/DashboardTaskStatusBreakdown'
+ *
+ *         task_status_breakdown_all_time:
+ *           $ref: '#/components/schemas/DashboardTaskStatusBreakdown'
+ *
  *         call_type_breakdown:
  *           $ref: '#/components/schemas/DashboardCallTypeBreakdown'
+ *
  *         employee_breakdown:
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/DashboardEmployeeItem'
  *
- *     TeamDashboard:
+ *         calls_section:
+ *           $ref: '#/components/schemas/DashboardCallsSection'
+ *
+ *         tasks_section:
+ *           $ref: '#/components/schemas/DashboardTasksSection'
+ *
+ *         worklogs_section:
+ *           $ref: '#/components/schemas/DashboardWorklogsSection'
+ */
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *
+ *     ProjectDashboard:
  *       type: object
  *       properties:
- *         message:
- *           type: string
- *           example: Team Dashboard
- *
- *         team:
+ *         project:
  *           type: object
  *           properties:
  *             id:
@@ -116,18 +202,30 @@
  *               format: uuid
  *             name:
  *               type: string
+ *             code:
+ *               type: string
  *             description:
+ *               type: string
+ *             project_types:
+ *               type: string
+ *             tech_details:
+ *               type: string
+ *             development_status:
  *               type: string
  *             is_active:
  *               type: boolean
+ *             creator:
+ *               type: object
+ *             createdAt:
+ *               type: string
+ *               format: date-time
  *
  *         summary:
  *           type: object
  *           properties:
  *             total_members:
  *               type: integer
- *             total_projects:
- *               type: integer
+ *
  *             task_stats:
  *               type: object
  *               properties:
@@ -138,6 +236,18 @@
  *                 ongoing:
  *                   type: integer
  *                 closed:
+ *                   type: integer
+ *
+ *             call_stats:
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 inquiry:
+ *                   type: integer
+ *                 request:
+ *                   type: integer
+ *                 complaint:
  *                   type: integer
  *
  *         alerts:
@@ -165,72 +275,137 @@
  *           type: array
  *           items:
  *             type: object
- *             properties:
- *               user_id:
- *                 type: string
- *                 format: uuid
- *               name:
- *                 type: string
- *               employee_id:
- *                 type: string
- *               role:
- *                 type: string
- *               tasks_total:
- *                 type: integer
- *               tasks_open:
- *                 type: integer
- *               tasks_ongoing:
- *                 type: integer
- *               tasks_closed:
- *                 type: integer
- *
- *         project_stats:
- *           type: array
- *           items:
- *             type: object
- *             properties:
- *               project_id:
- *                 type: string
- *                 format: uuid
- *               project_name:
- *                 type: string
- *               total:
- *                 type: integer
- *               open:
- *                 type: integer
- *               ongoing:
- *                 type: integer
- *               closed:
- *                 type: integer
  *
  *         recent_calls:
  *           type: array
  *           items:
  *             type: object
  *
- *         recent_activity:
+ *         recent_tasks:
  *           type: array
  *           items:
  *             type: object
+ */
+/**
+ * @swagger
+ * /api/projects/{id}/dashboard:
+ *   get:
+ *     summary: Get project dashboard
+ *     description: |
+ *       Retrieve analytics and activity for a specific project.
+ *
+ *       Includes:
+ *       - Project details
+ *       - Project members
+ *       - Task statistics
+ *       - Call statistics
+ *       - Overdue tasks
+ *       - Due soon tasks
+ *       - Member productivity
+ *       - Recent calls
+ *       - Recent tasks
+ *
+ *       Access:
+ *       - Admin can access any project
+ *       - Active project members can access their project dashboard
+ *
+ *     tags: [Dashboard]
+ *
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *
+ *     responses:
+ *       200:
+ *         description: Project dashboard fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ProjectDashboard'
+ *
+ *       401:
+ *         description: Unauthorized
+ *
+ *       403:
+ *         description: Access denied
+ *
+ *       404:
+ *         description: Project not found
+ *
+ *       500:
+ *         description: Internal server error
+ */
+/**
+ * @swagger
+ * /api/me/dashboard:
+ *   get:
+ *     summary: Get employee dashboard
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *
+ *     responses:
+ *       200:
+ *         description: Employee dashboard fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/EmployeeDashboard'
+ *
+ *       401:
+ *         description: Unauthorized
+ *
+ *       500:
+ *         description: Internal server error
+ */
+/**
+ * @swagger
+ * components:
+ *   schemas:
  *
  *     EmployeeDashboard:
  *       type: object
  *       properties:
- *         message:
- *           type: string
- *           example: Employee Dashboard
  *
  *         summary:
  *           type: object
  *           properties:
- *             total_teams:
- *               type: integer
  *             total_projects:
  *               type: integer
+ *
+ *             today_logs:
+ *               type: integer
+ *
  *             task_stats:
  *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 open:
+ *                   type: integer
+ *                 ongoing:
+ *                   type: integer
+ *                 closed:
+ *                   type: integer
+ *
  *             call_stats:
  *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 inquiry:
+ *                   type: integer
+ *                 request:
+ *                   type: integer
+ *                 complaint:
+ *                   type: integer
  *
  *         alerts:
  *           type: object
@@ -247,11 +422,6 @@
  *               type: array
  *               items:
  *                 type: object
- *
- *         my_teams:
- *           type: array
- *           items:
- *             type: object
  *
  *         my_projects:
  *           type: array
@@ -272,170 +442,4 @@
  *           type: array
  *           items:
  *             type: object
- */
-
-/**
- * @swagger
- * /api/dashboard:
- *   get:
- *     summary: Get admin dashboard analytics
- *     description: |
- *       Retrieve system-wide dashboard analytics.
- *
- *       Includes:
- *       - Total employees
- *       - Total calls
- *       - Total tasks
- *       - Total work logs
- *       - Activity counts
- *       - Task status breakdown
- *       - Call type breakdown
- *       - Employee productivity breakdown
- *
- *       Admin only endpoint.
- *
- *     tags: [Dashboard]
- *
- *     security:
- *       - bearerAuth: []
- *
- *     parameters:
- *       - in: query
- *         name: from
- *         schema:
- *           type: string
- *           format: date
- *         example: 2025-08-01
- *
- *       - in: query
- *         name: to
- *         schema:
- *           type: string
- *           format: date
- *         example: 2025-08-31
- *
- *       - in: query
- *         name: actFrom
- *         schema:
- *           type: string
- *           format: date
- *         example: 2025-08-10
- *
- *       - in: query
- *         name: actTo
- *         schema:
- *           type: string
- *           format: date
- *         example: 2025-08-17
- *
- *     responses:
- *       200:
- *         description: Dashboard data fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/DashboardResponse'
- *
- *       401:
- *         description: Unauthorized
- *
- *       403:
- *         description: Admin access required
- *
- *       500:
- *         description: Internal server error
- */
-
-/**
- * @swagger
- * /api/teams/{id}/dashboard:
- *   get:
- *     summary: Get team dashboard
- *     description: |
- *       Retrieve dashboard analytics for a specific team.
- *
- *       Includes:
- *       - Team details
- *       - Team members
- *       - Project stats
- *       - Task stats
- *       - Overdue tasks
- *       - Due soon tasks
- *       - Member productivity
- *       - Recent calls
- *       - Recent activity
- *
- *       Access:
- *       - Admin can access any team
- *       - Team members can access their own team dashboard
- *
- *     tags: [Dashboard]
- *
- *     security:
- *       - bearerAuth: []
- *
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *
- *     responses:
- *       200:
- *         description: Team dashboard fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TeamDashboard'
- *
- *       401:
- *         description: Unauthorized
- *
- *       403:
- *         description: Access denied
- *
- *       404:
- *         description: Team not found
- *
- *       500:
- *         description: Internal server error
- */
-
-/**
- * @swagger
- * /api/me/dashboard:
- *   get:
- *     summary: Get employee dashboard
- *     description: |
- *       Retrieve dashboard data for logged-in employee.
- *
- *       Includes:
- *       - Assigned teams
- *       - Assigned projects
- *       - My tasks
- *       - Task statistics
- *       - Urgent tasks
- *       - Call statistics
- *       - Tasks grouped by project
- *
- *     tags: [Dashboard]
- *
- *     security:
- *       - bearerAuth: []
- *
- *     responses:
- *       200:
- *         description: Employee dashboard fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/EmployeeDashboard'
- *
- *       401:
- *         description: Unauthorized
- *
- *       500:
- *         description: Internal server error
  */

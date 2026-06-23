@@ -186,7 +186,8 @@ const listTasks = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     const search = req.query.search?.trim();
-        const due_filter = req.query.due_filter; // "overdue" | "due_soon" | undefined
+    const due_filter = req.query.due_filter; // "overdue" | "due_soon" | undefined
+   
 
 
 const { from, to } = req.query;
@@ -245,11 +246,19 @@ if (from && to) {
       if (Object.keys(dateWhere).length) conditions.push(dateWhere);
     }
 
+
+
     if (search) {
       conditions.push({
         [Op.or]: [
           { task: { [Op.iLike]: `%${search}%` } },
           { display_id: { [Op.iLike]: `%${search}%` } },
+
+            { "$project.name$": { [Op.iLike]: `%${search}%` } },
+      { "$project.code$": { [Op.iLike]: `%${search}%` } },
+
+      { "$assignee.name$": { [Op.iLike]: `%${search}%` } },
+      { "$assignee.employee_id$": { [Op.iLike]: `%${search}%` } },
         ],
       });
     }
@@ -340,6 +349,11 @@ const updateTask = async (req, res) => {
     ["task", "description", "due_date", "status"].forEach((f) => {
       if (typeof req.body[f] !== "undefined") patch[f] = req.body[f] ?? null;
     });
+
+    if (req.body.status === "closed" && task.status !== "closed") {
+  patch.completedAt = new Date();
+}
+
 const remarkText = req.body.remark || req.body.remarks;
 if (remarkText) {
   patch.remarks = appendRemark({

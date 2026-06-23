@@ -5,7 +5,7 @@ const { Notification } = require("../models");
 const cleanupOldNotifications = async () => {
   try {
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
+    cutoff.setDate(cutoff.getDate() - 90);
 
     const deletedCount = await Notification.destroy({
       where: {
@@ -14,7 +14,7 @@ const cleanupOldNotifications = async () => {
       },
     });
 
-    console.log(`[notification-cleanup] Deleted ${deletedCount} read notifications older than 30 days`);
+    // console.log(`[notification-cleanup] Deleted ${deletedCount} read notifications older than 30 days`);
   } catch (err) {
     console.error("[notification-cleanup] error:", err);
   }

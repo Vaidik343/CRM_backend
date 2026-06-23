@@ -91,7 +91,16 @@ const swaggerSpec = swaggerJsdoc({
   definition: {
     openapi: "3.0.0",
     info: { title: "CRM API", version: "3.0.0", description: "API documentation" },
-    servers: [{ url: `http://localhost:${PORT}` }],
+    servers: [
+  {
+    url: `http://localhost:${PORT}`,
+    description: "Local Development",
+  },
+  {
+    url: process.env.SWAGGER_UI,
+    description: "Production",
+  },
+],
     components: {
       securitySchemes: {
         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },

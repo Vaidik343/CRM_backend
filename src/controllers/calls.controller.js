@@ -410,6 +410,11 @@ const listCalls = async (req, res) => {
           { caller_name: { [Op.iLike]: `%${search}%` } },
           { caller_number: { [Op.iLike]: `%${search}%` } },
           { display_id: { [Op.iLike]: `%${search}%` } },
+
+            { "$project.name$": { [Op.iLike]: `%${search}%` } },
+      { "$project.code$": { [Op.iLike]: `%${search}%` } },
+
+    
         ],
       });
     }

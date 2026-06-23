@@ -5,6 +5,7 @@ const { Op } = require("sequelize");
 const exportData = async (req, res) => {
   try {
     const type = String(req.query.type || "").toLowerCase();
+    console.log("🚀 ~ exportData ~ type:", type)
     if (!["calls", "tasks", "work-logs"].includes(type)) {
       return res.status(400).json({ message: "type must be one of: calls, tasks, work-logs" });
     }
@@ -529,6 +530,7 @@ const exportProjectData = async (req, res) => {
       { field: "Members & Roles", value: membersStr },
       { field: "Created By", value: project.creator?.name || "—" },
       { field: "Created At", value: new Date(project.createdAt).toLocaleDateString() },
+     
     ]);
 
     // --- Calls sheet ---
@@ -550,6 +552,7 @@ const exportProjectData = async (req, res) => {
       { header: "Summary",       key: "call_summary",  width: 30 },
       { header: "Remarks",       key: "remarks",       width: 40 },
       { header: "Created At",    key: "createdAt",     width: 20 },
+      { header: "Updated At",    key: "updatedAt",     width: 20 },
     ];
 
     callsSheet.addRows(calls.map((r) => ({
@@ -581,6 +584,8 @@ const exportProjectData = async (req, res) => {
       { header: "Due Date",     key: "due_date",         width: 15 },
       { header: "Remarks",      key: "remarks",          width: 40 },
       { header: "Created At",   key: "createdAt",        width: 20 },
+      { header: "Updated At",   key: "updatedAt",     width: 20 },
+      
     ];
 
     tasksSheet.addRows(tasks.map((r) => ({
@@ -591,8 +596,33 @@ const exportProjectData = async (req, res) => {
       remarks:          flattenRemarks(r.remarks),
     })));
 
+    // --- Work Logs sheet ---
+const workLogsSheet = workbook.addWorksheet("Work Logs");
+const workLogs = await WorkLog.findAll({
+  where: { ...dateWhere, project_id: projectId },
+  include: [{ model: User, as: "user", attributes: ["name", "employee_id"] }],
+  order: [["date", "DESC"]],
+});
+
+workLogsSheet.columns = [
+  { header: "Employee",    key: "employee_name", width: 22 },
+  { header: "Employee ID", key: "employee_id",   width: 15 },
+  { header: "Date",        key: "date",          width: 15 },
+  { header: "Description", key: "description",   width: 40 },
+  { header: "Remarks",     key: "remarks",       width: 40 },
+  { header: "Created At",  key: "createdAt",     width: 20 },
+  { header: "Updated At",  key: "updatedAt",     width: 20 },
+];
+
+workLogsSheet.addRows(workLogs.map((r) => ({
+  ...r.toJSON(),
+  employee_name: r.user?.name || "",
+  employee_id:   r.user?.employee_id || "",
+  remarks:       flattenRemarks(r.remarks),
+})));
+
     // style header rows on all sheets
-    [infoSheet, callsSheet, tasksSheet].forEach((sheet) => {
+    [infoSheet, callsSheet, tasksSheet, workLogsSheet].forEach((sheet) => {
       sheet.getRow(1).eachCell((cell) => {
         cell.font = { bold: true };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
