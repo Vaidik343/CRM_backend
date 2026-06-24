@@ -16,11 +16,13 @@ const getDashboard = async (req, res) => {
 
     // ── Date filter for cards/breakdowns ─────────────────
     let totalsWhere = {};
+    console.log("🚀 ~ getDashboard ~ totalsWhere:", totalsWhere)
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999);
 
     if (from) {
       const start = new Date(from); start.setHours(0, 0, 0, 0);
+      console.log("🚀 ~ getDashboard ~ start:", start)
       totalsWhere = { createdAt: { [Op.between]: [start, todayEnd] } };
     } else {
       totalsWhere = { createdAt: { [Op.between]: [todayStart, todayEnd] } };
@@ -57,17 +59,17 @@ activityWhere = {
       totalProjects,
       totalCalls,
       totalTasks,
-      totalWorkLogs
+      // totalWorkLogs
     ] = await Promise.all([
       User.count({ where: { is_admin: false } }),          // ✅ no date filter
       Team.count({ where: { is_active: true } }),          // ✅ no date filter
       Project.count({where: {is_active:true}}),
       Call.count({ where: totalsWhere }),                  // date filtered
       Task.count({ where: totalsWhere }),                  // date filtered
-      WorkLog.count({ where: totalsWhere }),               // date filtered
+            
     ]);
+      
 
-    // ── Last 7 days ───────────────────────────────────────
     const [recentCalls, recentTasks, recentWorkLogs] = await Promise.all([
       Call.count({ where: activityWhere }),
       Task.count({ where: activityWhere }),
@@ -85,11 +87,48 @@ activityWhere = {
     taskStatusRows.forEach((r) => { taskStatusBreakdown[r.status] = parseInt(r.count); });
 
     const todayDateStr = new Date().toISOString().split('T')[0];
-    const [dueCount, overdueCount] = await Promise.all([
-      Task.count({ where: { ...totalsWhere, due_date: todayDateStr, status: { [Op.ne]: 'closed' } } }),
+
+    const today = new Date();
+const twoDaysLater = new Date();
+
+twoDaysLater.setDate(twoDaysLater.getDate() + 2);
+
+const todayStr = today.toISOString().split("T")[0];
+const twoDaysLaterStr = twoDaysLater.toISOString().split("T")[0];
+
+
+const dueCount = await Task.count({
+  where: {
+    status: { [Op.ne]: "closed" },
+    due_date: {
+      [Op.between]: [todayStr, twoDaysLaterStr]
+    }
+  }
+});
+
+
+    const workLogWhere = from
+  ? {
+      date: {
+        [Op.between]: [from, todayDateStr]
+      }
+    }
+  : {
+      date: todayDateStr
+    };
+
+const totalWorkLogs = await WorkLog.count({
+  where: workLogWhere
+});
+
+
+
+    const [dueTodayCount, overdueCount] = await Promise.all([
+      
+        Task.count({ where: { due_date: todayDateStr, status: { [Op.ne]: 'closed' } } }),
       Task.count({ where: { ...totalsWhere, due_date: { [Op.lt]: todayDateStr }, status: { [Op.ne]: 'closed' } } }),
     ]);
-    taskStatusBreakdown.due     = dueCount;
+    taskStatusBreakdown.due     = dueTodayCount;
     taskStatusBreakdown.overdue = overdueCount;
 
 
@@ -99,15 +138,25 @@ const taskStatusRowsAllTime = await Task.findAll({
   group: ["status"],
   raw: true,
 });
+console.log("🚀 ~ getDashboard ~ taskStatusRowsAllTime:", taskStatusRowsAllTime)
 const taskStatusBreakdownAllTime = { open: 0, ongoing: 0, closed: 0, due: 0, overdue: 0 };
-console.log("🚀 ~ getDashboard ~ taskStatusBreakdownAllTime:", taskStatusBreakdownAllTime)
-taskStatusRowsAllTime.forEach((r) => { taskStatusBreakdownAllTime[r.status] = parseInt(r.count); });
 
-const [dueCountAllTime, overdueCountAllTime] = await Promise.all([
-  Task.count({ where: { due_date: todayDateStr, status: { [Op.ne]: 'closed' } } }),
-  Task.count({ where: { due_date: { [Op.lt]: todayDateStr }, status: { [Op.ne]: 'closed' } } }),
+taskStatusRowsAllTime.forEach((r) => { taskStatusBreakdownAllTime[r.status] = parseInt(r.count); });
+console.log("🚀 ~ getDashboard ~ taskStatusRowsAllTime12:", taskStatusRowsAllTime)
+
+
+const overdueCountAllTime = await Task.count({
+  where: {
+    due_date: { [Op.lt]: todayDateStr },
+    status: { [Op.ne]: "closed" }
+  }
+});
+
+ await Promise.all([
+  Task.count({ where: { ...totalsWhere, due_date: dueCount, status: { [Op.ne]: 'closed' } } }),
+  Task.count({ where: { ...totalsWhere,due_date: { [Op.lt]: overdueCountAllTime }, status: { [Op.ne]: 'closed' } } }),
 ]);
-taskStatusBreakdownAllTime.due     = dueCountAllTime;
+taskStatusBreakdownAllTime.due     = dueCount;
 taskStatusBreakdownAllTime.overdue = overdueCountAllTime;
 
 
@@ -140,11 +189,24 @@ taskStatusBreakdownAllTime.overdue = overdueCountAllTime;
         where: { assigned_to: { [Op.in]: employeeIds }, ...totalsWhere },
         group: ["assigned_to"], raw: true,
       }),
-      WorkLog.findAll({
-        attributes: ["user_id", [WorkLog.sequelize.fn("COUNT", WorkLog.sequelize.col("user_id")), "count"]],
-        where: { user_id: { [Op.in]: employeeIds }, ...totalsWhere },
-        group: ["user_id"], raw: true,
-      }),
+WorkLog.findAll({
+  attributes: [
+    "user_id",
+    [
+      WorkLog.sequelize.fn(
+        "COUNT",
+        WorkLog.sequelize.col("user_id")
+      ),
+      "count"
+    ]
+  ],
+  where: {
+    user_id: { [Op.in]: employeeIds },
+    ...workLogWhere
+  },
+  group: ["user_id"],
+  raw: true,
+}),
     ]);
     const callMap = Object.fromEntries(empCalls.map((r) => [r.user_id,     parseInt(r.count)]));
     const taskMap = Object.fromEntries(empTasks.map((r) => [r.assigned_to, parseInt(r.count)]));
@@ -245,6 +307,7 @@ taskStatusBreakdownAllTime.overdue = overdueCountAllTime;
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 // ── GET /api/teams/:id/dashboard ─────────────────────────────────────────────
 // Access: Admin (any team) | Team Lead/PM (their team only)
