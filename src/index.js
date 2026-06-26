@@ -44,6 +44,7 @@ const routeFiles = [
   "users.routes.js",
   "roles.routes.js",
   "notifications.routes.js",  // new
+  "report.routes.js"
 ];
 
 // ── Middleware ────────────────────────────────────────────────

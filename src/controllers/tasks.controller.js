@@ -25,7 +25,7 @@ const updateTaskValidators = [
   body("task").optional().isString().trim().notEmpty(),
   body("description").optional({ nullable: true }).isString(),
   body("due_date").optional({ nullable: true }).isISO8601(),
-  body("status").optional().isIn(["open", "ongoing", "closed"]),
+  body("status").optional().isIn(["open", "ongoing","hold" ,"closed"]),
   handleValidation,
 ];
 
@@ -123,7 +123,19 @@ if(assignedId  !== req.user.id)
 
     
 // Auto-set status: self-assign → ongoing, assign to other → open
-    const status = assignedId === req.user.id ? "ongoing" : "open";
+    // const status = assignedId === req.user.id ? "ongoing" : "open";
+
+    const allowedStatuses = ["open", "ongoing", "hold"];
+
+const defaultStatus =
+  assignedId === req.user.id
+    ? "ongoing"
+    : "open";
+
+const status =
+  allowedStatuses.includes(req.body.status)
+    ? req.body.status
+    : defaultStatus;
 
     let remarksLog = [];
 
@@ -137,6 +149,8 @@ if (remarkText) {
     user_name: req.user.name,
   });
 }
+
+
 
     // 6. Create task
     const newTask = await Task.create({
@@ -179,7 +193,7 @@ io.to("user:admins_room").emit("TASK_CREATED", newTask);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-
+ 
 const listTasks = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;

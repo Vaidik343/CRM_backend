@@ -109,12 +109,17 @@ if (from && to) {
 }
 // else admin with no from/to → no date filter, sees everything
 
-
 if (search) {
   where = {
     [Op.and]: [
       where,
-      { '$user.name$': { [Op.iLike]: `%${search}%` } },
+      {
+        [Op.or]: [
+          { "$user.name$": { [Op.iLike]: `%${search}%` } },
+          { "$user.employee_id$": { [Op.iLike]: `%${search}%` } },
+          { "$Project.name$": { [Op.iLike]: `%${search}%` } },
+        ],
+      },
     ],
   };
 }

@@ -64,7 +64,7 @@ task_assigned_to: {
 },
       follow_up: {
         type: DataTypes.UUID,
-        allowNull:true // change it to false
+        allowNull:true 
       },
       parent_call_id: {
   type: DataTypes.UUID,

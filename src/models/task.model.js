@@ -58,7 +58,7 @@ display_id: {
         allowNull: true
       },
        status: {
-        type: DataTypes.ENUM("open", "ongoing", "closed"),
+        type: DataTypes.ENUM("open", "ongoing", "hold", "closed"),
         defaultValue: "open",
         allowNull:false
       },
