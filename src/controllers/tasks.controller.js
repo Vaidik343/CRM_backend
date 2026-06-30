@@ -201,6 +201,8 @@ const listTasks = async (req, res) => {
     const offset = (page - 1) * limit;
     const search = req.query.search?.trim();
     const due_filter = req.query.due_filter; // "overdue" | "due_soon" | undefined
+    console.log("🚀 ~ listTasks ~ due_filter:", due_filter)
+    const status_filter = req.query.status_filter;
    
 
 
@@ -290,8 +292,11 @@ if (from && to) {
         due_date: { [Op.between]: [now, in48hrs] },
         status: { [Op.ne]: "closed" },
       });
-    }
-
+    } 
+    // ← add this
+if (status_filter && ["open", "ongoing", "hold"].includes(status_filter)) {
+  conditions.push({ status: status_filter });
+}
     const where = { [Op.and]: conditions };
 
     const { count, rows } = await Task.findAndCountAll({

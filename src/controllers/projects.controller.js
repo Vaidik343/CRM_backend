@@ -368,9 +368,6 @@ const listProjects = async (req, res) => {
     const offset = (page - 1) * limit;
     const search = req.query.search?.trim();
 
-
-    // Default: only active projects (safe for task-assign dropdowns, etc.)
-    // Only the admin Projects management page passes include_inactive=true
     const includeInactive = req.query.include_inactive === "true" && req.user.is_admin;
 
     let where = {};
@@ -378,12 +375,21 @@ const listProjects = async (req, res) => {
       where.is_active = true;
     }
 
-    if (!req.user.is_admin) {
+    // ── Membership filtering only applies in these cases ──────────────
+    // 1. Employee (non-admin) → always scoped to their own projects
+    // 2. Admin explicitly requesting a specific user's projects (Report page) via user_id param
+    // Admin browsing all projects (no user_id) → sees everything, no membership filter
+    const shouldFilterByMembership = !req.user.is_admin || req.query.user_id;
+
+    if (shouldFilterByMembership) {
+      const userId = req.user.is_admin ? req.query.user_id : req.user.id;
+
       const memberships = await ProjectMember.findAll({
-        where: { user_id: req.user.id, is_active: true },
+        where: { user_id: userId, is_active: true },
         attributes: ["project_id"],
       });
-      const projectIds = memberships.map((m) => m.project_id);
+
+      const projectIds = memberships.map(m => m.project_id);
 
       if (!projectIds.length) {
         return res.status(200).json({
@@ -431,6 +437,8 @@ const listProjects = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+
 const getProject = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id, { include: projectIncludes });

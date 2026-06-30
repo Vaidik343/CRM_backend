@@ -306,6 +306,54 @@ WorkLog.findAll({
     console.error("getDashboard error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
+
+
+  // ── Employee breakdown — always last 7 days, independent of totalsWhere ──
+const sevenDaysAgo = new Date();
+sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+sevenDaysAgo.setHours(0, 0, 0, 0);
+
+const sevenDayWhere = { createdAt: { [Op.between]: [sevenDaysAgo, todayEnd] } };
+const sevenDayDateStr = sevenDaysAgo.toISOString().split("T")[0];
+const sevenDayWorkLogWhere = { date: { [Op.between]: [sevenDayDateStr, todayDateStr] } };
+
+const employees = await User.findAll({
+  where: { is_admin: false },
+  attributes: ["id", "name", "employee_id"],
+  include: [{ model: Role, attributes: ["name"] }],
+  raw: true, nest: true,
+});
+const employeeIds = employees.map((e) => e.id);
+
+const [empCalls, empTasks, empLogs] = await Promise.all([
+  Call.findAll({
+    attributes: ["user_id", [Call.sequelize.fn("COUNT", Call.sequelize.col("user_id")), "count"]],
+    where: { user_id: { [Op.in]: employeeIds }, ...sevenDayWhere },   // ← changed from totalsWhere
+    group: ["user_id"], raw: true,
+  }),
+  Task.findAll({
+    attributes: ["assigned_to", [Task.sequelize.fn("COUNT", Task.sequelize.col("assigned_to")), "count"]],
+    where: { assigned_to: { [Op.in]: employeeIds }, ...sevenDayWhere },  // ← changed from totalsWhere
+    group: ["assigned_to"], raw: true,
+  }),
+  WorkLog.findAll({
+    attributes: ["user_id", [WorkLog.sequelize.fn("COUNT", WorkLog.sequelize.col("user_id")), "count"]],
+    where: { user_id: { [Op.in]: employeeIds }, ...sevenDayWorkLogWhere },  // ← changed from workLogWhere
+    group: ["user_id"], raw: true,
+  }),
+]);
+
+const callMap = Object.fromEntries(empCalls.map((r) => [r.user_id,     parseInt(r.count)]));
+const taskMap = Object.fromEntries(empTasks.map((r) => [r.assigned_to, parseInt(r.count)]));
+const logMap  = Object.fromEntries(empLogs.map((r)  => [r.user_id,     parseInt(r.count)]));
+
+const employeeBreakdown = employees.map((e) => ({
+  id: e.id, name: e.name, employee_id: e.employee_id,
+  role:      e.Role?.name || null,
+  calls:     callMap[e.id] || 0,
+  tasks:     taskMap[e.id] || 0,
+  work_logs: logMap[e.id]  || 0,
+}));
 };
 
 

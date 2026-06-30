@@ -59,7 +59,7 @@ const taskIncludes = [
 
 const workLogIncludes = [
   { model: User, as: "user", attributes: ["id", "name", "employee_id",] },
-  {model: Project,  as: "Project", attributes: ["id", "name"]}
+  {model: Project,   attributes: ["id", "name"]}
 ];
 
 // GET /api/reports/:id/calls
@@ -98,6 +98,7 @@ const getEmployeeCalls = async (req, res) => {
       dateWhere = { createdAt: { [Op.between]: [start, end] } };
     }
 
+    
     // ── Assemble all conditions into one array, wrapped once at the end ──
     const conditions = [];
 
@@ -248,6 +249,15 @@ if (from && to) {
       });
     }
 
+
+    const project_id = req.query.project_id;
+
+if (project_id) {
+    conditions.push({
+        project_id
+    });
+}
+
     const where = { [Op.and]: conditions };
 
 
@@ -302,14 +312,27 @@ if (search) {
   conditions.push({
     [Op.or]: [
       { description: { [Op.iLike]: `%${search}%` } },
-      { "$project.name$": { [Op.iLike]: `%${search}%` } },
+      { "$Project.name$": { [Op.iLike]: `%${search}%` } },
     ],
   });
+}
+
+
+   const project_id = req.query.project_id;
+  console.log("🚀 ~ getEmployeeWorkLogs ~ FULL QUERY:", req.query);
+console.log("🚀 ~ getEmployeeWorkLogs ~ project_id:", project_id);
+
+if (project_id) {
+    conditions.push({
+        project_id
+    });
 }
 
 const where = {
   [Op.and]: conditions,
 };
+const test = await WorkLog.findOne({ include: workLogIncludes });
+console.log("🚀 ~ getEmployeeWorkLogs ~ test:", test)
 
 const { count, rows } = await WorkLog.findAndCountAll({
   where,
