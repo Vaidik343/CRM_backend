@@ -116,9 +116,9 @@
  *       Create a new team linked to a project.
  *
  *       Rules:
- *       - `project_id` is required
+ *       - `project_id` and `name` are required
  *       - Team name must be unique
- *       - Project must exist
+ *       - The referenced project must exist
  *
  *     tags: [Teams]
  *
@@ -344,7 +344,7 @@
  * /api/teams/{id}:
  *   delete:
  *     summary: Delete team
- *     description: Delete a team permanently
+ *     description: Delete a team permanently.
  *
  *     tags: [Teams]
  *

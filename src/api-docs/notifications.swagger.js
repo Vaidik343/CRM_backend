@@ -44,7 +44,7 @@
  * /api/notifications:
  *   get:
  *     summary: Get notifications
- *     description: Admin sees all. Employees see only their own. Includes unread count.
+ *     description: Authenticated users see their own notifications. The response also includes the unread count.
  *     tags: [Notifications]
  *     security:
  *       - bearerAuth: []

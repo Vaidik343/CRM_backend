@@ -197,6 +197,7 @@ const exportMyData = async (req, res) => {
 
       sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
+          createdAt: r.createdAt,
         project: r.project?.name || "",
         remarks: flattenRemarks(r.remarks),
       })));
@@ -234,6 +235,8 @@ const exportMyData = async (req, res) => {
 
       sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
+         createdAt: r.createdAt,
+  due_date: r.due_date,
         project:          r.project?.name  || "",
         assigned_to_name: r.assignee?.name || "",
         assigned_by_name: r.assigner?.name || "",
@@ -265,6 +268,8 @@ const exportMyData = async (req, res) => {
 
       sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
+          createdAt: r.createdAt,
+  date: r.date,
         project: r.Project?.name || "",  //
         remarks: flattenRemarks(r.remarks),
       })));
@@ -351,16 +356,18 @@ const exportEmployeeData = async (req, res) => {
         { header: "Remarks",       key: "remarks",       width: 40 },
         { header: "Created At",    key: "createdAt",     width: 20 },
       ];
+sheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
 
     const cc = sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
+         createdAt: r.createdAt, // Date object
         project: r.project?.name || "",
         remarks: flattenRemarks(r.remarks),
       })));
     console.log("🚀 ~ exportEmployeeData ~ cc:", cc)
     }
 
-    
+
     if (type === "tasks") {
       const where = {
         ...dateWhere,
@@ -386,19 +393,26 @@ const exportEmployeeData = async (req, res) => {
         { header: "Assigned To",  key: "assigned_to_name", width: 20 },
         { header: "Assigned By",  key: "assigned_by_name", width: 20 },
         { header: "Status",       key: "status",           width: 15 },
-        { header: "Due Date",     key: "due_date",         width: 15 },
-        { header: "Remarks",      key: "remarks",          width: 40 },
         { header: "Created At",   key: "createdAt",        width: 20 },
+        { header: "Updated At",   key: "updatedAt",        width: 20 },
+        { header: "Due Date",     key: "due_date",         width: 15 },
+        { header: "Completed Date",     key: "completedAt",         width: 20 },
+        { header: "Remarks",      key: "remarks",          width: 40 },
       ];
+
 
       sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
+          createdAt: r.createdAt,
+  due_date: r.due_date,
         project:          r.project?.name  || "",
         assigned_to_name: r.assignee?.name || "",
         assigned_by_name: r.assigner?.name || "",
         remarks:          flattenRemarks(r.remarks),
       })));
     }
+sheet.getColumn(8).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
+sheet.getColumn(9).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Due Date
 
     if (type === "work-logs") {
       let workLogWhere = { user_id: targetUserId };
@@ -421,17 +435,24 @@ const exportEmployeeData = async (req, res) => {
     { header: "Created At",  key: "createdAt",   width: 20 },
   ];
 
+
  const cw =  sheet.addRows(rows.map((r) => ({
     ...r.toJSON(),
+      createdAt: r.createdAt,
+  date: r.date,
     project: r.Project?.name || "",  // 
     remarks: flattenRemarks(r.remarks),
   })));
+  sheet.getColumn(2).numFmt = "dd/mm/yyyy";
+sheet.getColumn(5).numFmt = "dd/mm/yyyy hh:mm AM/PM";
+
  console.log("🚀 ~ exportEmployeeData ~ cw:", cw)
 }
     sheet.getRow(1).eachCell((cell) => {
       cell.font = { bold: true };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
     });
+
 
     const fileLabel = from && to ? `${from}_to_${to}` : new Date().toISOString().split("T")[0];
     const empLabel = targetUser.employee_id || targetUser.name.replace(/\s+/g, "_");

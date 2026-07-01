@@ -52,7 +52,7 @@
  * /api/work-logs:
  *   post:
  *     summary: Create a work log
- *     description: Log work completed on a specific date. Any authenticated employee can create their own log.
+ *     description: Log work completed on a specific date. Any authenticated employee can create their own log, optionally linking it to a project and appending an initial remark.
  *     tags: [Work Logs]
  *     security:
  *       - bearerAuth: []
@@ -69,6 +69,14 @@
  *               description:
  *                 type: string
  *                 example: "Fixed bug in authentication module and tested login functionality"
+ *               project_id:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *               remark:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Optional initial remark appended to the remarks log.
  *               date:
  *                 type: string
  *                 format: date
@@ -96,7 +104,7 @@
  * /api/work-logs:
  *   get:
  *     summary: Get all work logs
- *     description: Paginated list of work logs. Admin sees all, employees see only their own.
+ *     description: Paginated list of work logs. Admins see all work logs; employees only see their own, with a default date filter of today unless a range is supplied.
  *     tags: [Work Logs]
  *     security:
  *       - bearerAuth: []
@@ -113,6 +121,23 @@
  *           type: integer
  *           default: 20
  *         example: 20
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by user name, employee ID, or project name.
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Optional start date for filtering.
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Optional end date for filtering.
  *     responses:
  *       200:
  *         description: List of work logs

@@ -9,8 +9,8 @@
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: User login
- *     description: Authenticate user with employee ID and password to get access token
+ *     summary: Login user
+ *     description: Authenticates an employee using employee_id and password and returns a JWT plus the user profile.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -24,15 +24,13 @@
  *             properties:
  *               employee_id:
  *                 type: string
- *                 description: Employee ID of the user
- *                 example: "EMP001"
+ *                 example: EMP001
  *               password:
  *                 type: string
- *                 description: Password of the user
- *                 example: "Admin@123"
+ *                 example: Admin@123
  *     responses:
  *       200:
- *         description: Login successful, returns access token and user details
+ *         description: Login successful
  *         content:
  *           application/json:
  *             schema:
@@ -40,7 +38,6 @@
  *               properties:
  *                 accessToken:
  *                   type: string
- *                   description: JWT access token for authentication
  *                 user:
  *                   type: object
  *                   properties:
@@ -68,10 +65,30 @@
  *                           type: boolean
  *                         can_delete:
  *                           type: boolean
+ *       400:
+ *         description: Validation error
  *       401:
  *         description: Invalid credentials
- *       400:
- *         description: Validation error - missing required fields
  *       500:
  *         description: Server error
+ */
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout current user
+ *     description: Returns a simple logout acknowledgement. The client should clear the JWT token on success.
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Logged out successfully
  */

@@ -41,7 +41,7 @@
  * /api/password/change:
  *   patch:
  *     summary: Change own password
- *     description: Logged-in users can change their own password by providing the current and new password.
+ *     description: Logged-in users can change their own password by providing the current password and a new password.
  *     tags: [Password]
  *     security:
  *       - bearerAuth: []
@@ -76,7 +76,7 @@
  * /api/password/reset/{id}:
  *   patch:
  *     summary: Reset user password
- *     description: Admins can reset any employee password and receive a temporary password in the response.
+ *     description: Admins can reset any employee password and receive a temporary password in the response payload.
  *     tags: [Password]
  *     security:
  *       - bearerAuth: []

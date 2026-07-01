@@ -20,16 +20,12 @@
  *           format: uuid
  *         can_read:
  *           type: boolean
- *           description: Permission to read records
  *         can_write:
  *           type: boolean
- *           description: Permission to create records
  *         can_update:
  *           type: boolean
- *           description: Permission to update records
  *         can_delete:
  *           type: boolean
- *           description: Permission to delete records
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -42,50 +38,14 @@
  * @swagger
  * /api/permissions:
  *   get:
- *     summary: Get all user permissions
- *     description: Retrieve list of all users with their permissions (Admin only)
+ *     summary: List all permissions
+ *     description: Lists every permission record and the linked user details. This route is admin-only.
  *     tags: [Permissions]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of user permissions
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 permissions:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                         format: uuid
- *                       user_id:
- *                         type: string
- *                         format: uuid
- *                       can_read:
- *                         type: boolean
- *                       can_write:
- *                         type: boolean
- *                       can_update:
- *                         type: boolean
- *                       can_delete:
- *                         type: boolean
- *                       User:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: string
- *                             format: uuid
- *                           name:
- *                             type: string
- *                           employee_id:
- *                             type: string
- *                           email:
- *                             type: string
+ *         description: Permissions returned
  *       401:
  *         description: Unauthorized
  *       403:
@@ -98,8 +58,8 @@
  * @swagger
  * /api/permissions/{user_id}:
  *   get:
- *     summary: Get user permission by user ID
- *     description: Retrieve permission record for a specific user (Admin only)
+ *     summary: Get a single user permission record
+ *     description: Returns the permission flags for one user.
  *     tags: [Permissions]
  *     security:
  *       - bearerAuth: []
@@ -112,14 +72,7 @@
  *           format: uuid
  *     responses:
  *       200:
- *         description: Permission record found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 permission:
- *                   $ref: '#/components/schemas/Permission'
+ *         description: Permission record returned
  *       404:
  *         description: Permission record not found
  *       401:
@@ -134,8 +87,8 @@
  * @swagger
  * /api/permissions/{user_id}:
  *   patch:
- *     summary: Update user permissions
- *     description: Update permission flags for a user (Admin only). Creates default permission record if not exists.
+ *     summary: Update permissions for a user
+ *     description: Updates the provided permission flags for a target user. If no permission row exists, the controller creates one with defaults.
  *     tags: [Permissions]
  *     security:
  *       - bearerAuth: []
@@ -162,17 +115,7 @@
  *                 type: boolean
  *     responses:
  *       200:
- *         description: Permission updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 permission:
- *                   $ref: '#/components/schemas/Permission'
- *                 created:
- *                   type: boolean
- *                   description: Whether a new permission record was created
+ *         description: Permission updated
  *       400:
  *         description: Invalid input
  *       404:
@@ -189,8 +132,8 @@
  * @swagger
  * /api/permissions/{user_id}/reset:
  *   patch:
- *     summary: Reset user permissions to default
- *     description: Reset permissions to default values (can_read=true, can_write=true, can_update=false, can_delete=false). Admin only.
+ *     summary: Reset permissions to defaults
+ *     description: Resets the permissions for the target user to can_read=true, can_write=true, can_update=false, and can_delete=false.
  *     tags: [Permissions]
  *     security:
  *       - bearerAuth: []
@@ -203,16 +146,7 @@
  *           format: uuid
  *     responses:
  *       200:
- *         description: Permissions reset to default
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 permission:
- *                   $ref: '#/components/schemas/Permission'
+ *         description: Permissions reset
  *       404:
  *         description: Permission record not found
  *       401:

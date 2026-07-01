@@ -251,6 +251,23 @@
  *           type: integer
  *           default: 10
  *         description: Number of results per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by project name or code.
+ *       - in: query
+ *         name: include_inactive
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Only admins can use this flag to include inactive projects.
+ *       - in: query
+ *         name: user_id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Admin-only filter to list projects for a specific user.
  *     responses:
  *       200:
  *         description: Paginated list of projects
@@ -286,7 +303,7 @@
  * /api/projects/{id}:
  *   get:
  *     summary: Get a single project by ID
- *     description: Employees can only access projects they are active members of.
+ *     description: Employees can only access projects they are active members of. Admins can access all active projects unless `include_inactive=true` is supplied.
  *     tags: [Projects]
  *     security:
  *       - bearerAuth: []

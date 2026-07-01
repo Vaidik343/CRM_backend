@@ -288,7 +288,7 @@
  *     description: |
  *       Update team member status.
  *
- *       Allowed fields:
+ *       Allowed field:
  *       - is_active
  *
  *     tags: [Team Members]
@@ -348,8 +348,7 @@
  *   delete:
  *     summary: Soft delete team member
  *     description: |
- *       Soft delete a team member by setting:
- *       - `is_active = false`
+ *       Soft delete a team member by setting `is_active` to false.
  *
  *     tags: [Team Members]
  *

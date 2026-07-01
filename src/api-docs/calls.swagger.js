@@ -242,7 +242,7 @@
  * /api/calls:
  *   get:
  *     summary: Get all call records
- *     description: Paginated list of calls. Non-admin users only see their own calls.
+ *     description: Paginated list of calls. Non-admin users only see calls they created, were transferred to, or were added as meeting attendees to; admins can see all records.
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []
@@ -257,6 +257,35 @@
  *         schema:
  *           type: integer
  *           default: 20
+ *       - in: query
+ *         name: project_id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter calls by project.
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by caller name, caller number, display ID, or project name/code.
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Optional start date for filtering.
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Optional end date for filtering.
+ *       - in: query
+ *         name: all_dates
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: For employees, set to true to disable the default 7-day window.
  *     responses:
  *       200:
  *         description: Paginated list of calls
@@ -360,6 +389,12 @@
  *               receive_type:
  *                 type: string
  *                 enum: [call, msg, email, meeting]
+ *               attendees:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 description: Optional attendee user IDs for meetings.
  *               remark:
  *                 type: string
  *                 description: Appends a new entry to remarks log

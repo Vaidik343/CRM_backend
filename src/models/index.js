@@ -16,6 +16,7 @@ const Team = require('./team.model')(sequelize, DataTypes);
 const TeamMember = require('./teamMembers.model')(sequelize, DataTypes);
 const ProjectMember = require("./projectMembers.model")(sequelize, DataTypes);
 const Notification = require("./notification.model")(sequelize, DataTypes);
+const TaskStatusLog = require("../models/taskStatusLog.model")(sequelize, DataTypes);
 
  
 // ── Role ↔ User ───────────────────────────────────────────────
@@ -101,6 +102,11 @@ User.hasMany(Notification, { foreignKey: "user_id", as: "notifications", onDelet
 Notification.belongsTo(User, { foreignKey: "user_id", as: "user" });
  
 
+// Task status log to task
+Task.hasMany(TaskStatusLog, { foreignKey: 'task_id', as: 'statusLogs' });
+TaskStatusLog.belongsTo(Task, { foreignKey: 'task_id' });
+TaskStatusLog.belongsTo(User, { foreignKey: 'changed_by', as: 'changedBy' });
+
 // Team creator
 Team.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 User.hasMany(Team, { foreignKey: 'created_by', as: 'created_teams' });
@@ -143,6 +149,7 @@ module.exports = {
   TeamMember,
   User,
   Role,
+  TaskStatusLog,
   Permission,
   Project,
   Call,

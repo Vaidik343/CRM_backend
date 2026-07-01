@@ -2,7 +2,7 @@
  * @swagger
  * tags:
  *   name: Users
- *   description: User management APIs (Admin only)
+ *   description: User management APIs
  */
 
 /**
@@ -72,7 +72,7 @@
  * /api/users:
  *   post:
  *     summary: Create a new user
- *     description: Create a new user with auto-generated employee ID and temporary password (Admin only)
+ *     description: Create a new user with an auto-generated employee ID and temporary password.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -133,7 +133,7 @@
  * /api/users:
  *   get:
  *     summary: Get all users
- *     description: Retrieve list of all users (Admin only)
+ *     description: Retrieve the list of users currently available in the system.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -166,7 +166,7 @@
  * /api/users/{id}:
  *   get:
  *     summary: Get user by ID
- *     description: Retrieve a single user by ID (Admin only)
+ *     description: Retrieve a single user by ID.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -208,7 +208,7 @@
  * /api/users/{id}:
  *   patch:
  *     summary: Update user
- *     description: Update user details (Admin only)
+ *     description: Update user details.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -275,7 +275,7 @@
  * /api/users/{id}:
  *   delete:
  *     summary: Delete user
- *     description: Delete a user (Admin only)
+ *     description: Delete a user.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []

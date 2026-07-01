@@ -2,61 +2,7 @@
  * @swagger
  * tags:
  *   name: Exports
- *   description: Export data to Excel files
- */
-
-/**
- * @swagger
- * /api/export:
- *   get:
- *     summary: Export system data
- *     description: |
- *       Export Calls, Tasks, or Work Logs as an Excel file.
- *       Supports filtering by a single date or date range.
- *       If no date filters are provided, today's data is exported.
- *     tags: [Exports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: type
- *         required: true
- *         schema:
- *           type: string
- *           enum: [calls, tasks, work-logs]
- *         description: Type of data to export
- *       - in: query
- *         name: date
- *         schema:
- *           type: string
- *           format: date
- *         description: Export records from a specific date
- *       - in: query
- *         name: from
- *         schema:
- *           type: string
- *           format: date
- *         description: Start date for range export
- *       - in: query
- *         name: to
- *         schema:
- *           type: string
- *           format: date
- *         description: End date for range export
- *     responses:
- *       200:
- *         description: Excel file generated successfully
- *         content:
- *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
- *             schema:
- *               type: string
- *               format: binary
- *       400:
- *         description: Invalid export type
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
+ *   description: Additional export endpoints for current-user, employee, and project-level Excel exports
  */
 
 /**

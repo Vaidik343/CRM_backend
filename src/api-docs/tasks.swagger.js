@@ -46,6 +46,22 @@
  *           type: string
  *           format: date
  *           nullable: true
+ *         task_id:
+ *           type: string
+ *           format: uuid
+ *         old_status:
+ *           type: string
+ *           nullable: true
+ *           enum: [open, ongoing, hold, closed]
+ *         new_status:
+ *           type: string
+ *           enum: [open, ongoing, hold, closed]
+ *         changed_at:
+ *           type: string
+ *           format: date-time
+ *         changedBy:
+ *           type: object
+ *           nullable: true
  *         status:
  *           type: string
  *           enum: [open, ongoing, closed]
@@ -165,8 +181,9 @@
  *   get:
  *     summary: Get all tasks
  *     description: |
- *       Admin sees all tasks. Employees see tasks they created or are assigned to.
- *       Defaults to today's tasks if `from`/`to` not provided.
+ *       Admins see all tasks. Employees only see tasks they created or were assigned to.
+ *       For regular users, the default window is the last 7 days unless `all_dates=true`
+ *       or an explicit `from`/`to` range is provided.
  *     tags: [Tasks]
  *     security:
  *       - bearerAuth: []
@@ -182,17 +199,40 @@
  *           type: integer
  *           default: 10
  *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by task name, display ID, project name, project code, or assignee name/employee ID.
+ *       - in: query
  *         name: from
  *         schema:
  *           type: string
  *           format: date
- *         description: Start date (YYYY-MM-DD). If omitted along with `to`, defaults to today.
+ *         description: Start date (YYYY-MM-DD). Used for date filtering.
  *       - in: query
  *         name: to
  *         schema:
  *           type: string
  *           format: date
- *         description: End date (YYYY-MM-DD). If omitted along with `from`, defaults to today.
+ *         description: End date (YYYY-MM-DD). Used for date filtering.
+ *       - in: query
+ *         name: due_filter
+ *         schema:
+ *           type: string
+ *           enum: [overdue, due_soon]
+ *         description: Filter tasks by due-date urgency.
+ *       - in: query
+ *         name: status_filter
+ *         schema:
+ *           type: string
+ *           enum: [open, ongoing, hold]
+ *         description: Filter tasks by status.
+ *       - in: query
+ *         name: all_dates
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: For employees, set to true to disable the default 7-day window.
  *     responses:
  *       200:
  *         description: List of tasks
@@ -335,4 +375,56 @@
  *         description: Unauthorized
  *       500:
  *         description: Internal server error
+ */
+/**
+ * @swagger
+ * /api/tasks/{id}/status-logs:
+ *   get:
+ *     summary: Get task status history
+ *     description: Returns the chronological history of all status changes for a task.
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Task ID
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Status history retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 logs:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/TaskStatusLog'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Task not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Task not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
  */

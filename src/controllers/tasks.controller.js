@@ -1,5 +1,5 @@
 const { body, param } = require("express-validator");
-const { Task, User, Call, Project, Role, ProjectMember } = require("../models");
+const { Task, User, Call, Project, Role, ProjectMember, TaskStatusLog } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const { Op } = require("sequelize");
 const generateDisplayId = require("../utils/generateDisplayId");
@@ -167,6 +167,15 @@ if (remarkText) {
       remarks : remarksLog
     });
     // console.log("🚀 ~ createTask ~ newTask:", newTask)
+
+    await TaskStatusLog.create({
+  task_id: newTask.id,
+  changed_by: req.user.id,
+  from_status: null,
+  to_status: newTask.status,
+  reason: null,
+  changed_at: new Date(),
+});
 
     // notify assignee only if someone else was assigned
 if (assignedId !== req.user.id) {
@@ -364,10 +373,13 @@ const updateTask = async (req, res) => {
   });
 }
 
-    const patch = {};
-    ["task", "description", "due_date", "status"].forEach((f) => {
-      if (typeof req.body[f] !== "undefined") patch[f] = req.body[f] ?? null;
-    });
+const patch = {};
+["task", "description", "due_date", "status"].forEach((f) => {
+  if (typeof req.body[f] !== "undefined") patch[f] = req.body[f] ?? null;
+});
+
+const oldStatus = task.status; 
+const statusChanged = patch.status && patch.status !== task.status;
 
     if (req.body.status === "closed" && task.status !== "closed") {
   patch.completedAt = new Date();
@@ -385,6 +397,18 @@ if (remarkText) {
 
     await task.update(patch);
 
+    if (statusChanged) {
+  await TaskStatusLog.create({
+    task_id: task.id,
+    changed_by: req.user.id,
+     from_status: oldStatus,   
+    to_status: patch.status,
+    reason: req.body.reason || null,
+    changed_at: new Date(),
+  });
+}
+
+
     await task.reload({ include: taskIncludes });
     const io = req.app.get("io");
 io.to(`user:${task.assigned_to}`).emit("TASK_UPDATED", task);
@@ -400,6 +424,27 @@ io.to("user:admins_room").emit("TASK_UPDATED", task);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+
+const getTaskStatusLogs = async (req, res) => {
+  try {
+    const task = await Task.findByPk(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    const logs = await TaskStatusLog.findAll({
+      where: { task_id: req.params.id },
+      include: [{ model: User, as: 'changedBy', attributes: ['id', 'name', 'employee_id'] }],
+      order: [['changed_at', 'ASC']],
+    });
+
+    return res.json({ logs });
+  } catch (err) {
+    console.error("getTaskStatusLogs error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
 
 const deleteTask = async (req, res) => {
   try {
@@ -435,6 +480,7 @@ module.exports = {
   getTask,
   updateTask,
   deleteTask,
+    getTaskStatusLogs,
   createTaskValidators,
   updateTaskValidators,
 };
