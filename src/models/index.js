@@ -97,6 +97,10 @@ Client.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 Project.hasMany(WorkLog,{foreignKey: "project_id"});
 WorkLog.belongsTo(Project,{foreignKey: "project_id"})
  
+
+// worklog and task
+
+  WorkLog.belongsTo(Task, { foreignKey: 'task_id', as: 'task' }); // ← add this
 // ── Notification ↔ User ───────────────────────────────────────
 User.hasMany(Notification, { foreignKey: "user_id", as: "notifications", onDelete: "CASCADE" });
 Notification.belongsTo(User, { foreignKey: "user_id", as: "user" });

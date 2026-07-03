@@ -23,7 +23,7 @@ const updateClientValidators = [
 ];
 
 // ── Internal helper — called from calls.controller.js ──────────────────────
-const findOrCreateClientForCall = async ({ phone, name, company, created_by }) => {
+const findOrCreateClientForCall = async ({ phone, name, email, company, created_by }) => {
   if (!phone) return null;
 
   let client = await Client.findOne({ where: { phone } });
@@ -32,6 +32,7 @@ const findOrCreateClientForCall = async ({ phone, name, company, created_by }) =
     return await Client.create({
       phone,
       names: name ? [name] : [],
+      email: email || null,
       company: company || null,
       created_by,
       is_active: true,
@@ -41,15 +42,19 @@ const findOrCreateClientForCall = async ({ phone, name, company, created_by }) =
   let changed = false;
   const names = [...(client.names || [])];
 
-  // merge new name if not already present (case-insensitive)
   if (name && !names.some((n) => n.toLowerCase() === name.toLowerCase())) {
     names.push(name);
     changed = true;
   }
 
-  // update company if a new/different one is provided
   if (company && company !== client.company) {
     client.company = company;
+    changed = true;
+  }
+
+  // only update email if client has none yet — don't overwrite existing
+  if (email && !client.email) {
+    client.email = email;
     changed = true;
   }
 

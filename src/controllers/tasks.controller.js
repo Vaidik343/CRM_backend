@@ -212,6 +212,7 @@ const listTasks = async (req, res) => {
     const due_filter = req.query.due_filter; // "overdue" | "due_soon" | undefined
     console.log("🚀 ~ listTasks ~ due_filter:", due_filter)
     const status_filter = req.query.status_filter;
+    console.log("🚀 ~ listTasks ~ status_filter:", status_filter)
    
 
 

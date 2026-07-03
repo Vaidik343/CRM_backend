@@ -103,6 +103,7 @@ const createCall = async (req, res) => {
     const {
       caller_name,
       caller_number,
+      caller_email,
       project_id,
       client_id ,
       call_type,
@@ -219,11 +220,13 @@ if(req.body.remark)
 
 
 let resolvedClientId = client_id || null;
+console.log("🚀 ~ createCall ~ resolvedClientId:", resolvedClientId)
 
 if (!resolvedClientId && caller_number) {
   const client = await findOrCreateClientForCall({
     phone: caller_number,
     name: caller_name,
+    email : caller_email,
     created_by: req.user.id,
   });
 
@@ -236,6 +239,11 @@ let resolvedAttendees = [];
 if (receive_type === "meeting" && Array.isArray(attendees)) {
   resolvedAttendees = attendees.filter((id) => id !== req.user.id);
 }
+
+// Email communications always create a task
+if (receive_type === "email") {
+  is_task = true;
+}
     
     // 4. Create the call
     const call = await Call.create({
@@ -244,6 +252,7 @@ if (receive_type === "meeting" && Array.isArray(attendees)) {
       client_id: resolvedClientId,
       caller_name,
       caller_number: caller_number || null,
+      caller_email,
       project_id:   project_id || null,
       call_type,
       call_subtype,
@@ -463,7 +472,7 @@ const updateCall = async (req, res) => {
     const call = await Call.findByPk(req.params.id);
     if (!call) return res.status(404).json({ message: "Call not found" });
 
-    if (!req.user.is_admin && call.user_id !== req.user.id) {
+    if (!req.user.is_admin && call.user_id !== req.user.id &&   call.transfer_to !== req.user.id) {
       return res.status(403).json({ message: "Forbidden" });
     }
 

@@ -16,6 +16,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+      task_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
     
       description: { type: DataTypes.TEXT, allowNull: false },
       date: { type: DataTypes.DATEONLY, allowNull: false },

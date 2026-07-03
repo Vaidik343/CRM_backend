@@ -23,6 +23,11 @@ client_id: {
   type: DataTypes.UUID,
   allowNull: true,  
 },
+
+caller_email: {
+    type: DataTypes.STRING,
+    allowNull: true,
+},
       caller_name: {
         type: DataTypes.STRING,
         allowNull: false

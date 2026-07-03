@@ -61,7 +61,7 @@ const exportData = async (req, res) => {
   { header: "Receive Type", key: "receive_type", width: 15 },
   { header: "Summary",      key: "call_summary", width: 30 },
   { header: "Remarks",      key: "remarks", width: 30 },
-  { header: "Created At",   key: "createdAt", width: 20 }, // increase this
+  { header: "Created At",   key: "createdAt", width: 30 }, // increase this
 ];
       sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
@@ -70,6 +70,7 @@ const exportData = async (req, res) => {
         project:     r.Project?.name     || "",
       })));
     }
+sheet.getColumn(11).numFmt = "dd/mm/yyyy hh:mm AM/PM";
 
     if (type === "tasks") {
       const rows = await Task.findAll({
@@ -89,7 +90,10 @@ const exportData = async (req, res) => {
         { header: "Status",       key: "status" , width: 25},
         { header: "Start Date",   key: "start_date" , width: 25},
         { header: "Due Date",     key: "due_date", width: 25 },
-        { header: "Created At",   key: "createdAt", width: 25 },
+    { header: "Completed At",   key: "completedAt",      width: 30 },
+  { header: "Created At",     key: "createdAt",        width: 30 },
+  { header: "Updated At",     key: "updatedAt",        width: 30 },
+
       ];
       sheet.addRows(rows.map((r) => ({
         ...r.toJSON(),
@@ -97,6 +101,11 @@ const exportData = async (req, res) => {
         assigned_by_name: r.assigner?.name || "",
       })));
     }
+
+    sheet.getColumn(8).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Completed At
+sheet.getColumn(9).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Created At
+sheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Updated At
+
 
     if (type === "work-logs") {
       // work logs use date field not createdAt
@@ -111,7 +120,7 @@ const exportData = async (req, res) => {
 
       const rows = await WorkLog.findAll({
         where: workLogWhere,
-        include: [{ model: User, attributes: ["name", "employee_id"] }],
+        include: [{ model: User, as: 'user' ,attributes: ["name", "employee_id"] }],
         order: [["date", "DESC"]],
       });
       sheet.columns = [
@@ -128,6 +137,8 @@ const exportData = async (req, res) => {
         employee_id: r.User?.employee_id || "",
       })));
     }
+    sheet.getColumn(2).numFmt = "dd/mm/yyyy";              // Date
+sheet.getColumn(5).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
 
     // filename reflects filter
     const fileLabel = date ? date : from && to ? `${from}_to_${to}` : "today";
@@ -203,6 +214,8 @@ const exportMyData = async (req, res) => {
       })));
     }
 
+    sheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM"; 
+
     if (type === "tasks") {
       const rows = await Task.findAll({
         where: {
@@ -231,6 +244,7 @@ const exportMyData = async (req, res) => {
         { header: "Due Date",     key: "due_date",         width: 15 },
         { header: "Remarks",      key: "remarks",          width: 40 },
         { header: "Created At",   key: "createdAt",        width: 20 },
+         { header: "Updated At",    key: "updatedAt",        width: 20 },
       ];
 
       sheet.addRows(rows.map((r) => ({
@@ -243,6 +257,9 @@ const exportMyData = async (req, res) => {
         remarks:          flattenRemarks(r.remarks),
       })));
     }
+
+    sheet.getColumn(11).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
+sheet.getColumn(12).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Updated At
 
     if (type === "work-logs") {
       let workLogWhere = { user_id: userId };
@@ -274,7 +291,8 @@ const exportMyData = async (req, res) => {
         remarks: flattenRemarks(r.remarks),
       })));
     }
-
+sheet.getColumn(2).numFmt = "dd/mm/yyyy";              // Date
+sheet.getColumn(5).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
     // style header row
     sheet.getRow(1).eachCell((cell) => {
       cell.font = { bold: true };
@@ -522,6 +540,8 @@ const exportAllEmployeeData = async (req, res) => {
       project: r.project?.name || "",
       remarks: flattenRemarks(r.remarks),
     })));
+
+    callSheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
     callSheet.getRow(1).eachCell((cell) => {
       cell.font = { bold: true };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
@@ -566,6 +586,9 @@ const exportAllEmployeeData = async (req, res) => {
       assigned_by_name: r.assigner?.name || "",
       remarks:          flattenRemarks(r.remarks),
     })));
+  taskSheet.getColumn(9).numFmt = "dd/mm/yyyy hh:mm AM/PM";              // Date
+taskSheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM"; 
+
     taskSheet.getRow(1).eachCell((cell) => {
       cell.font = { bold: true };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
@@ -600,6 +623,9 @@ const exportAllEmployeeData = async (req, res) => {
       project: r.Project?.name || "",
       remarks: flattenRemarks(r.remarks),
     })));
+
+    wlSheet.getColumn(2).numFmt = "dd/mm/yyyy";              // Date
+wlSheet.getColumn(5).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
     wlSheet.getRow(1).eachCell((cell) => {
       cell.font = { bold: true };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
@@ -732,6 +758,9 @@ const exportProjectData = async (req, res) => {
       remarks: flattenRemarks(r.remarks),
     })));
 
+    callsSheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
+callsSheet.getColumn(11).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Updated At
+
     // --- Tasks sheet ---
     const tasksSheet = workbook.addWorksheet("Tasks");
     const tasks = await Task.findAll({
@@ -753,6 +782,7 @@ const exportProjectData = async (req, res) => {
       { header: "Assigned By",  key: "assigned_by_name", width: 20 },
       { header: "Status",       key: "status",           width: 15 },
       { header: "Due Date",     key: "due_date",         width: 15 },
+       { header: "Completed At",  key: "completedAt",      width: 20 },
       { header: "Remarks",      key: "remarks",          width: 40 },
       { header: "Created At",   key: "createdAt",        width: 20 },
       { header: "Updated At",   key: "updatedAt",     width: 20 },
@@ -766,7 +796,11 @@ const exportProjectData = async (req, res) => {
       assigned_by_name: r.assigner?.name || "",
       remarks:          flattenRemarks(r.remarks),
     })));
-
+tasksSheet.getColumn(8).numFmt = "dd/mm/yyyy";              // Due Date
+tasksSheet.getColumn(9).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Completed At
+tasksSheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Completed At
+tasksSheet.getColumn(11).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
+tasksSheet.getColumn(12).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Updated At
     // --- Work Logs sheet ---
 const workLogsSheet = workbook.addWorksheet("Work Logs");
 const workLogs = await WorkLog.findAll({
@@ -791,6 +825,10 @@ workLogsSheet.addRows(workLogs.map((r) => ({
   employee_id:   r.user?.employee_id || "",
   remarks:       flattenRemarks(r.remarks),
 })));
+
+workLogsSheet.getColumn(3).numFmt = "dd/mm/yyyy";              // Date
+workLogsSheet.getColumn(6).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Created At
+workLogsSheet.getColumn(7).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Updated At
 
     // style header rows on all sheets
     [infoSheet, callsSheet, tasksSheet, workLogsSheet].forEach((sheet) => {
