@@ -233,6 +233,13 @@ if (!resolvedClientId && caller_number) {
   resolvedClientId = client?.id || null;
 }
 
+if (resolvedClientId && caller_email) {
+    const existingClient = await Client.findByPk(resolvedClientId);
+    if (existingClient && !existingClient.email) {
+        await existingClient.update({ email: caller_email });
+    }
+}
+
 // Attendees only make sense for meetings; ignore if sent for other receive_types.
 // Exclude the acting employee — they're implicitly present, no need to self-select.
 let resolvedAttendees = [];
@@ -241,9 +248,7 @@ if (receive_type === "meeting" && Array.isArray(attendees)) {
 }
 
 // Email communications always create a task
-if (receive_type === "email") {
-  is_task = true;
-}
+const resolvedIsTask = receive_type === "email" ? true : (is_task || false);
     
     // 4. Create the call
     const call = await Call.create({
@@ -258,7 +263,7 @@ if (receive_type === "email") {
       call_subtype,
       call_summary:  call_summary || null,
       receive_type,
-      is_task:       is_task || false,   // NEW
+      is_task:       resolvedIsTask,  // NEW
       transfer_to : transfer_to || null,
       task_assigned_to: task_assigned_to || null,
       // follow_up : follow_up || null,
@@ -287,13 +292,14 @@ if (resolvedAttendees.length > 0) {
 }
 
     // 5. If is_task → auto-create task from call data
-    if (is_task) {
+    if (resolvedIsTask) {
   // console.log("🚀 ~ createCall ~ is_task:", is_task)
 
    // ✅ CREATE TASK
 
   //  if this logic dont work then get back old logic
 const taskAssignee = task_assigned_to || req.user.id;
+console.log("🚀 ~ updateCall ~ taskAssignee:", taskAssignee)
 
 const task = await Task.create({
   call_id: call.id,
@@ -353,7 +359,7 @@ if (transfer_to) {
 }
 
 // task auto-created and assigned to someone else
-if (is_task && task_assigned_to) {
+if (resolvedIsTask  && task_assigned_to) {
   await createNotification(io, {
     user_id: task_assigned_to,
     type:    "TASK_ASSIGNED",
@@ -423,6 +429,10 @@ const listCalls = async (req, res) => {
             { "$project.name$": { [Op.iLike]: `%${search}%` } },
       { "$project.code$": { [Op.iLike]: `%${search}%` } },
 
+        // Employee who logged the call
+      { "$caller.name$": { [Op.iLike]: `%${search}%` } },
+      { "$caller.employee_id$": { [Op.iLike]: `%${search}%` } },
+
     
         ],
       });
@@ -483,8 +493,9 @@ const updateCall = async (req, res) => {
         message: `Invalid call_subtype "${newSubtype}" for call_type "${newType}". Valid options: ${CALL_TYPES[newType]?.join(", ")}`,
       });
     }
-const fields = ["caller_name", "caller_number", "project_id", "call_type", "call_subtype", "call_summary", "remarks", "receive_type", "client_id", "attendees"];
-const uuidFields = ["project_id", "client_id"];
+const fields = ["caller_name", "caller_number", "project_id", "call_type", "call_subtype", "call_summary", "remarks", "receive_type", "client_id", "attendees",  "is_task",
+  "task_assigned_to"];
+const uuidFields = ["project_id", "client_id", "task_assigned_to"];
 
 const patch = {};
 fields.forEach((f) => {
@@ -506,10 +517,121 @@ fields.forEach((f) => {
         user_name: req.user.name,
       });
     }
+
+    
+    const becomingTask =
+  call.is_task === false &&
+  req.body.is_task === true;
+
+const taskAssignee = req.body.task_assigned_to || req.user.id;
+
+const prefix =
+  taskAssignee === req.user.id ? "CT" : "CTA";
+console.log("🚀 ~ updateCall ~ prefix:", prefix)
+
+if (becomingTask && !patch.project_id && !call.project_id) {
+  return res.status(400).json({
+    message: "project_id is required when creating a task.",
+  });
+}
+
+if (req.body.task_assigned_to) {
+  const assigneeExists = await User.findByPk(req.body.task_assigned_to);
+
+  if (!assigneeExists) {
+    return res.status(404).json({
+      message: "task_assigned_to user not found",
+    });
+  }
+}
+
+  if (becomingTask) {
+  const existingTask = await Task.findOne({
+    where: { call_id: call.id },
+  });
+
+  if (existingTask) {
+    return res.status(400).json({
+      message: "Task already exists for this call.",
+    });
+  }
+}
+
+if (becomingTask) {
+ patch.display_id = await generateDisplayId({
+  prefix,
+  employeeId: req.user.employee_id,
+});
+
+  patch.is_task = true;
+}
+
+
+
     await call.update(patch);
     await call.reload({ include: callIncludes });
+     const io = req.app.get("io");
+let task = null;
 
-    const io = req.app.get("io");
+    if (becomingTask) {
+ const task = await Task.create({
+    call_id: call.id,
+    project_id: patch.project_id || call.project_id,
+    display_id: call.display_id,
+    task: call.call_summary
+      ? call.call_summary.slice(0, 255)
+      : `${call.call_subtype} from ${call.caller_name}`,
+    description: call.call_summary || null,
+    assigned_to: taskAssignee,
+    assigned_by: req.user.id,
+    status:
+      taskAssignee === req.user.id
+        ? "ongoing"
+        : "open",
+    start_date: new Date(),
+    remarks: call.remarks,
+  });
+ console.log("🚀 ~ updateCall ~ task:", task)
+
+  await task.reload({
+    include: [
+      {
+        model: User,
+        as: "assignee",
+        attributes: ["id", "name", "employee_id"],
+      },
+      {
+        model: User,
+        as: "assigner",
+        attributes: ["id", "name", "employee_id"],
+      },
+      {
+        model: Project,
+        as: "project",
+        attributes: ["id", "name"],
+      },
+    ],
+  });
+
+  if (taskAssignee !== req.user.id) {
+    io.to(`user:${taskAssignee}`).emit("TASK_CREATED", task);
+    io.to("user:admins_room").emit("TASK_CREATED", task);
+
+    await createNotification(io, {
+      user_id: taskAssignee,
+      type: "TASK_ASSIGNED",
+      title: "New Task Assigned",
+      message: `You have been assigned a task from call: ${call.display_id}`,
+      data: {
+        task_id: task.id,
+        display_id: task.display_id,
+        call_id: call.id,
+      },
+    });
+  }
+}
+
+   
     io.to(`user:${call.user_id}`).emit("CALL_UPDATED", call);
     if (call.transfer_to) {
       io.to(`user:${call.transfer_to}`).emit("CALL_UPDATED", call);
@@ -528,7 +650,7 @@ fields.forEach((f) => {
       io.to(`user:${attendeeId}`).emit("CALL_ATTENDEE_ADDED", call);
     }
 
-    return res.json({ call });
+    return res.json({ call, task });
   } catch (err) {
     console.error("updateCall error:", err);
     return res.status(500).json({ message: "Internal server error" });

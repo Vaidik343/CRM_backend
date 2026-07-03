@@ -541,6 +541,19 @@ const exportAllEmployeeData = async (req, res) => {
       remarks: flattenRemarks(r.remarks),
     })));
 
+    // Total row
+const callTotalRow = callSheet.addRow({
+  display_id: "TOTAL CALLS",
+  project: calls.length,
+});
+
+callTotalRow.font = { bold: true };
+callTotalRow.fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { argb: "FFFDE9D9" },
+};
+
     callSheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
     callSheet.getRow(1).eachCell((cell) => {
       cell.font = { bold: true };
@@ -586,6 +599,18 @@ const exportAllEmployeeData = async (req, res) => {
       assigned_by_name: r.assigner?.name || "",
       remarks:          flattenRemarks(r.remarks),
     })));
+
+    const taskTotalRow = taskSheet.addRow({
+  display_id: "TOTAL TASKS",
+  task: tasks.length,
+});
+
+taskTotalRow.font = { bold: true };
+taskTotalRow.fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { argb: "FFFDE9D9" },
+};
   taskSheet.getColumn(9).numFmt = "dd/mm/yyyy hh:mm AM/PM";              // Date
 taskSheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM"; 
 
@@ -624,6 +649,18 @@ taskSheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
       remarks: flattenRemarks(r.remarks),
     })));
 
+const workLogTotalRow = wlSheet.addRow({
+  description: "TOTAL WORK LOGS",
+  project: workLogs.length,   // column C instead of Date column
+});
+
+workLogTotalRow.font = { bold: true };
+workLogTotalRow.fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { argb: "FFFDE9D9" },
+};
+    
     wlSheet.getColumn(2).numFmt = "dd/mm/yyyy";              // Date
 wlSheet.getColumn(5).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
     wlSheet.getRow(1).eachCell((cell) => {
