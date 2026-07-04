@@ -1,6 +1,28 @@
 const ExcelJS = require("exceljs");
-const { Call, Task, WorkLog, User, Project, ProjectMember, Role } = require("../models");
+const { Call, Task, WorkLog, User, Project, ProjectMember, Role , TaskStatusLog } = require("../models");
 const { Op } = require("sequelize");
+
+
+
+  const flattenStatusLogs = (logs) => {
+  if (!Array.isArray(logs) || logs.length === 0) return "";
+  return logs
+    .map((l) => {
+      const transition = l.from_status
+        ? `${l.from_status} → ${l.to_status}`
+        : `Created as ${l.to_status}`;
+      const by = l.changedBy?.name || "—";
+      const at = new Date(l.changed_at).toLocaleString("en-GB", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+      const reason = l.reason ? ` | Reason: ${l.reason}` : "";
+      return `[${at}] ${transition} — By ${by}${reason}`;
+    })
+    .join("\n");
+};
+
+
 
 const exportData = async (req, res) => {
   try {
@@ -175,6 +197,9 @@ const exportMyData = async (req, res) => {
         .map((r) => `[${new Date(r.created_at).toLocaleDateString()} - ${r.added_by_name}]: ${r.text}`)
         .join("\n");
     };
+
+
+
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet(type);
@@ -373,6 +398,7 @@ const exportEmployeeData = async (req, res) => {
         { header: "Summary",       key: "call_summary",  width: 30 },
         { header: "Remarks",       key: "remarks",       width: 40 },
         { header: "Created At",    key: "createdAt",     width: 20 },
+        { header: "Activity Timeline", key: "activity", width: 70 },
       ];
 sheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
 
@@ -380,6 +406,7 @@ sheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
         ...r.toJSON(),
          createdAt: r.createdAt, // Date object
         project: r.project?.name || "",
+         activity: flattenStatusLogs(r.statusLogs),
         remarks: flattenRemarks(r.remarks),
       })));
     console.log("🚀 ~ exportEmployeeData ~ cc:", cc)
@@ -399,6 +426,12 @@ sheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
           { model: User, as: "assignee", attributes: ["name"] },
           { model: User, as: "assigner", attributes: ["name"] },
           { model: Project, as: "project", attributes: ["name"] },
+           {                                          
+      model: TaskStatusLog,
+      as: "statusLogs",
+      include: [{ model: User, as: "changedBy", attributes: ["name"] }],
+      order: [["changed_at", "ASC"]],
+    },
         ],
         order: [["createdAt", "DESC"]],
       });
@@ -416,6 +449,7 @@ sheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
         { header: "Due Date",     key: "due_date",         width: 15 },
         { header: "Completed Date",     key: "completedAt",         width: 20 },
         { header: "Remarks",      key: "remarks",          width: 40 },
+        { header: "Status History",  key: "status_history",   width: 50 }, 
       ];
 
 
@@ -427,10 +461,12 @@ sheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM";
         assigned_to_name: r.assignee?.name || "",
         assigned_by_name: r.assigner?.name || "",
         remarks:          flattenRemarks(r.remarks),
+         status_history:   flattenStatusLogs(r.statusLogs || []),
       })));
     }
 sheet.getColumn(8).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Created At
 sheet.getColumn(9).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Due Date
+sheet.getColumn(13).alignment = { wrapText: true, vertical: "top" };
 
     if (type === "work-logs") {
       let workLogWhere = { user_id: targetUserId };
@@ -573,6 +609,7 @@ callTotalRow.fill = {
       { header: "Due Date",     key: "due_date",         width: 15 },
       { header: "Remarks",      key: "remarks",          width: 40 },
       { header: "Created At",   key: "createdAt",        width: 20 },
+        { header: "Status History",  key: "status_history",   width: 50 },
     ];
 
 
@@ -589,6 +626,12 @@ callTotalRow.fill = {
         { model: User,    as: "assignee", attributes: ["name"] },
         { model: User,    as: "assigner", attributes: ["name"] },
         { model: Project, as: "project",  attributes: ["name"] },
+         {                                          
+      model: TaskStatusLog,
+      as: "statusLogs",
+      include: [{ model: User, as: "changedBy", attributes: ["name"] }],
+      order: [["changed_at", "ASC"]],
+    },
       ],
       order: [["createdAt", "DESC"]],
     });
@@ -598,6 +641,7 @@ callTotalRow.fill = {
       assigned_to_name: r.assignee?.name || "",
       assigned_by_name: r.assigner?.name || "",
       remarks:          flattenRemarks(r.remarks),
+       status_history:   flattenStatusLogs(r.statusLogs || []),
     })));
 
     const taskTotalRow = taskSheet.addRow({
@@ -613,6 +657,7 @@ taskTotalRow.fill = {
 };
   taskSheet.getColumn(9).numFmt = "dd/mm/yyyy hh:mm AM/PM";              // Date
 taskSheet.getColumn(10).numFmt = "dd/mm/yyyy hh:mm AM/PM"; 
+taskSheet.getColumn(11).alignment = { wrapText: true, vertical: "top" };
 
     taskSheet.getRow(1).eachCell((cell) => {
       cell.font = { bold: true };

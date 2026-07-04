@@ -1,5 +1,5 @@
 const { body, param } = require("express-validator");
-const { Call, User, Project, Task, Team, TeamMember, Client  } = require("../models");
+const { Call, User, Project, Task, Team, TeamMember, Client , WorkLog  } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const CALL_TYPES = require("../constants/callTypes");
 const { appendRemark } = require("../utils/remarksLog");
@@ -89,6 +89,13 @@ const callIncludes = [
   required: false,
 },
 ];
+
+const workLogIncludes = [
+  { model: User, as: "user", attributes: ["id", "name", "employee_id"] },
+  { model: Project, attributes: ["id", "name"] },
+  { model: Task, as: "task", attributes: ["id", "display_id", "task", "project_id"] },
+];
+
 // ── Subtype validator helper ───────────────────────────────────
 function validateSubtype(call_type, call_subtype) {
   const validSubtypes = CALL_TYPES[call_type];
@@ -110,7 +117,8 @@ const createCall = async (req, res) => {
       call_subtype,
       call_summary,
       receive_type,
-      is_task,        // NEW
+      is_task,       
+      is_worklog,
       transfer_to,
       task_assigned_to,
       follow_up,
@@ -132,6 +140,19 @@ const createCall = async (req, res) => {
         message: "project_id is required when is_task is true",
       });
     }
+
+    if (is_worklog && !project_id) {
+  return res.status(400).json({
+    message: "project_id is required when is_worklog is true",
+  });
+}
+
+if (is_task && is_worklog) {
+  return res.status(400).json({
+    message: "is_task and is_worklog cannot both be true",
+  });
+}
+
 
 
     //follow up required parent call id
@@ -188,7 +209,10 @@ const createCall = async (req, res) => {
     else if(is_task)
     {
       prefix = "CT"
-    }
+    } 
+    else if (is_worklog) {     
+  prefix = "CW";
+}
     else if(parent_call_id)
     {
       prefix = "CFB"
@@ -249,6 +273,13 @@ if (receive_type === "meeting" && Array.isArray(attendees)) {
 
 // Email communications always create a task
 const resolvedIsTask = receive_type === "email" ? true : (is_task || false);
+
+// Move this check AFTER resolvedIsTask is computed
+if (resolvedIsTask && is_worklog) {
+  return res.status(400).json({
+    message: "is_task and is_worklog cannot both be true",
+  });
+}
     
     // 4. Create the call
     const call = await Call.create({
@@ -263,7 +294,8 @@ const resolvedIsTask = receive_type === "email" ? true : (is_task || false);
       call_subtype,
       call_summary:  call_summary || null,
       receive_type,
-      is_task:       resolvedIsTask,  // NEW
+      is_task:       resolvedIsTask,  
+       is_worklog:       is_worklog || false,
       transfer_to : transfer_to || null,
       task_assigned_to: task_assigned_to || null,
       // follow_up : follow_up || null,
@@ -343,6 +375,28 @@ const task = await Task.create({
       return res.status(201).json({ call, task});
     }
 
+
+    // Auto-create WorkLog if is_worklog is true
+if (is_worklog) {
+  const workLog = await WorkLog.create({
+    user_id:     req.user.id,
+    display_id:  call.display_id,
+    project_id:  project_id || null,
+    task_id:     null,
+    description: call_summary
+      ? `${call_summary}`
+      : `${call_subtype} from ${caller_name}`,
+    date:        new Date(),
+    remarks:     remarksLog,
+  });
+
+  await workLog.reload({ include: workLogIncludes });
+
+  return res.status(201).json({ call, workLog });
+}
+
+
+
     const io = req.app.get("io");
 
 // call transferred
@@ -368,8 +422,11 @@ if (resolvedIsTask  && task_assigned_to) {
     data:    { task_id: task.id, display_id: task.display_id, call_id: call.id },
   });
 }
-    // 6. Normal call (no task)
-    return res.status(201).json({ call, task: null });
+
+
+
+    // 6. Normal call (no task, no worklog)
+    return res.status(201).json({ call, task: null , workLog:null});
 
   } catch (err) {
     console.error("createCall error:", err);
@@ -518,6 +575,22 @@ fields.forEach((f) => {
       });
     }
 
+
+// multiple remarks array
+// if (Array.isArray(req.body.remarks_list) && req.body.remarks_list.length > 0) {
+//     let currentRemarks = patch.remarks || call.remarks || [];
+//     for (const text of req.body.remarks_list) {
+//         if (text.trim()) {
+//             currentRemarks = appendRemark({
+//                 existingRemarks: currentRemarks,
+//                 text: text.trim(),
+//                 user_id: req.user.id,
+//                 user_name: req.user.name,
+//             });
+//         }
+//     }
+//     patch.remarks = currentRemarks;
+// }
     
     const becomingTask =
   call.is_task === false &&

@@ -83,6 +83,12 @@ task_assigned_to: {
         defaultValue: false,
         allowNull: true,
       },
+  is_worklog: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
+  allowNull: true,
+},
+
       attendees: {
   type: DataTypes.JSONB,
   allowNull: true,
