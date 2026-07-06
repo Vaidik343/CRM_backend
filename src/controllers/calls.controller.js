@@ -63,6 +63,7 @@ const callIncludes = [
     model: User,
     as: "caller",
     attributes: ["id", "name", "employee_id"],
+    required: false,
   },
 
   {
@@ -486,9 +487,9 @@ const listCalls = async (req, res) => {
             { "$project.name$": { [Op.iLike]: `%${search}%` } },
       { "$project.code$": { [Op.iLike]: `%${search}%` } },
 
-        // Employee who logged the call
-      { "$caller.name$": { [Op.iLike]: `%${search}%` } },
+   { "$caller.name$":        { [Op.iLike]: `%${search}%` } },       
       { "$caller.employee_id$": { [Op.iLike]: `%${search}%` } },
+  
 
     
         ],
@@ -497,13 +498,20 @@ const listCalls = async (req, res) => {
 
     const where = { [Op.and]: conditions };
 
+//     console.log("🔍 search:", search);
+// console.log("🔍 where:", JSON.stringify(where, null, 2));
+// console.log("🔍 callIncludes:", JSON.stringify(callIncludes, null, 2));
+
     const { count, rows } = await Call.findAndCountAll({
-      limit,
-      offset,
-      where,
-      include: callIncludes,
-      order: [["createdAt", "DESC"]],
-    });
+  where,
+  include: callIncludes,
+  subQuery: false,          // ADD THIS
+  order: [["createdAt", "DESC"]],
+  limit,
+  offset,
+  distinct: true,           //  needed when subQuery: false to get correct count
+
+});
 
     return res.status(200).json({ message: "List of All calls", data: rows, total: count, page, limit });
   } catch (err) {
