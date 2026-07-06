@@ -98,7 +98,7 @@ const swaggerSpec = swaggerJsdoc({
     description: "Local Development",
   },
   {
-    url: process.env.SWAGGER_UI,
+    url: 'http://ewmapi.bbcspldev.in/',
     description: "Production",
   },
 ],
