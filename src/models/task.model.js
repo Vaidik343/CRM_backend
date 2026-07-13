@@ -71,7 +71,7 @@ completedAt: {
 
       remarks: {
         type: DataTypes.JSONB,
-        allowNull:true, // change it to false
+        allowNull:true, 
           defaultValue: [],
         
       }

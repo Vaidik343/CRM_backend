@@ -43,8 +43,11 @@ const routeFiles = [
   "permissions.routes.js",
   "users.routes.js",
   "roles.routes.js",
+  "leave.routes.js",
   "notifications.routes.js",  // new
-  "report.routes.js"
+  "report.routes.js",
+  
+  
 ];
 
 // ── Middleware ────────────────────────────────────────────────

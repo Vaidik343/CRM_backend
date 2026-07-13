@@ -59,7 +59,7 @@ const taskIncludes = [
 
 const getProjectMembership = async (user_id, project_id) => {
   return await ProjectMember.findOne({ where: { user_id, project_id } });
-};
+}; 
 
 // const getUserRole = async (user_id) => {
 //   const user = await User.findByPk(user_id, {

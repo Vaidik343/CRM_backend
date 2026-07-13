@@ -17,6 +17,10 @@ const TeamMember = require('./teamMembers.model')(sequelize, DataTypes);
 const ProjectMember = require("./projectMembers.model")(sequelize, DataTypes);
 const Notification = require("./notification.model")(sequelize, DataTypes);
 const TaskStatusLog = require("../models/taskStatusLog.model")(sequelize, DataTypes);
+const LeaveRequest = require("../models/leaveRequests.model")(sequelize, DataTypes);
+const LeaveLog = require("../models/leaveLog.modal")(sequelize, DataTypes);
+const WorkedSaturday = require("../models/workedSaturdays.modal")(sequelize, DataTypes);
+const CompanySettings = require("./companySettings.model")(sequelize, DataTypes);
 
  
 // ── Role ↔ User ───────────────────────────────────────────────
@@ -111,6 +115,82 @@ Task.hasMany(TaskStatusLog, { foreignKey: 'task_id', as: 'statusLogs' });
 TaskStatusLog.belongsTo(Task, { foreignKey: 'task_id' });
 TaskStatusLog.belongsTo(User, { foreignKey: 'changed_by', as: 'changedBy' });
 
+
+// Leave
+
+
+User.hasMany(LeaveRequest, {
+    foreignKey: "user_id",
+    as: "leaveRequests",
+});
+
+LeaveRequest.belongsTo(User, {
+    foreignKey: "user_id",
+    as: "employee",
+});
+
+User.hasMany(LeaveRequest, {
+    foreignKey: "approved_by",
+    as: "approvedLeaves",
+});
+
+LeaveRequest.belongsTo(User, {
+    foreignKey: "approved_by",
+    as: "approver",
+});
+
+// Leave logs
+
+LeaveRequest.hasMany(LeaveLog, {
+    foreignKey: "leave_request_id",
+    as: "logs",
+});
+
+LeaveLog.belongsTo(LeaveRequest, {
+    foreignKey: "leave_request_id",
+    as: "leaveRequest",
+});
+
+User.hasMany(LeaveLog, {
+    foreignKey: "user_id",
+    as: "leaveLogs",
+});
+
+LeaveLog.belongsTo(User, {
+    foreignKey: "user_id",
+    as: "user",
+});
+
+// work on saturday
+// Worked Saturdays
+User.hasMany(WorkedSaturday, {
+  foreignKey: 'user_id',
+  as: 'workedSaturdays',
+});
+WorkedSaturday.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'employee',
+});
+
+User.hasMany(WorkedSaturday, {
+  foreignKey: 'marked_by',
+  as: 'markedSaturdays',
+});
+WorkedSaturday.belongsTo(User, {
+  foreignKey: 'marked_by',
+  as: 'markedByAdmin',
+});
+
+// Link exchange leave to the specific worked Saturday it consumed
+LeaveRequest.belongsTo(WorkedSaturday, {
+  foreignKey: 'worked_saturday_id',
+  as: 'exchangedSaturday',
+});
+WorkedSaturday.hasMany(LeaveRequest, {
+  foreignKey: 'worked_saturday_id',
+  as: 'exchangeLeaves',
+});
+
 // Team creator
 Team.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 User.hasMany(Team, { foreignKey: 'created_by', as: 'created_teams' });
@@ -146,6 +226,7 @@ TeamMember.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 Team.hasMany(Task, { foreignKey: 'team_id', as: 'tasks' });
 Task.belongsTo(Team, { foreignKey: 'team_id', as: 'team' });
 
+
 // ── Export ────────────────────────────────────────────────────
 module.exports = {
   sequelize,
@@ -161,5 +242,8 @@ module.exports = {
   Task,
   WorkLog,
   ProjectMember,
+  LeaveRequest,
+LeaveLog,
+CompanySettings,
   Notification
 };

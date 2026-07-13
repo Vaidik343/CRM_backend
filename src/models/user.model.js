@@ -33,7 +33,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING, 
         allowNull: false,
        },
-
+saturday_group: {
+  type: DataTypes.ENUM('A', 'B'),
+  allowNull: true,  // null = not applicable (e.g. admin/management)
+},
       is_admin: {
         type: DataTypes.BOOLEAN,
         allowNull:false
