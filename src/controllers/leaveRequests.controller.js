@@ -314,6 +314,7 @@ const cancelLeave = async (req, res) => {
   }
 }
 
+  
 const getAllLeaves = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -361,10 +362,11 @@ const getAllLeaves = async (req, res) => {
       total: count,
       page,
       totalPages: Math.ceil(count / limit),
-      leaves: rows,
+      data: rows,
     });
   } catch (error) {
-     return res.status(500).json({ message: err.message });
+    
+     return res.status(500).json({ message: error.message });
   }
 }
 
@@ -379,6 +381,7 @@ const approveLeave = async (req, res) => {
     const { id } = req.params;
 
     const leave = await LeaveRequest.findByPk(id);
+    console.log("🚀 ~ approveLeave ~ leave:", leave)
 
     if (!leave) {
       await t.rollback();
