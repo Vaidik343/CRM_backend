@@ -44,6 +44,7 @@ const routeFiles = [
   "users.routes.js",
   "roles.routes.js",
   "leave.routes.js",
+  "leaveBalance.routes.js",
   "notifications.routes.js",  // new
   "report.routes.js",
   

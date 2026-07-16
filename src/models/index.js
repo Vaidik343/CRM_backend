@@ -21,7 +21,8 @@ const LeaveRequest = require("../models/leaveRequests.model")(sequelize, DataTyp
 const LeaveLog = require("../models/leaveLog.modal")(sequelize, DataTypes);
 const WorkedSaturday = require("../models/workedSaturdays.modal")(sequelize, DataTypes);
 const CompanySettings = require("./companySettings.model")(sequelize, DataTypes);
-
+const PublicHoliday = require("../models/publicHoliday")(sequelize, DataTypes);
+const LeaveBalance = require("./leaveBalance.modal")(sequelize, DataTypes);
  
 // ── Role ↔ User ───────────────────────────────────────────────
 Role.hasMany(User, { foreignKey: "role_id", onDelete: "RESTRICT" });
@@ -191,6 +192,27 @@ WorkedSaturday.hasMany(LeaveRequest, {
   as: 'exchangeLeaves',
 });
 
+
+// Public Holidays
+User.hasMany(PublicHoliday, {
+  foreignKey: 'created_by',
+  as: 'createdHolidays',
+});
+PublicHoliday.belongsTo(User, {
+  foreignKey: 'created_by',
+  as: 'creator',
+});
+
+// Leave Balance
+User.hasMany(LeaveBalance, {
+  foreignKey: 'user_id',
+  as: 'leaveBalances',
+});
+LeaveBalance.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'employee',
+});
+
 // Team creator
 Team.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 User.hasMany(Team, { foreignKey: 'created_by', as: 'created_teams' });
@@ -244,6 +266,9 @@ module.exports = {
   ProjectMember,
   LeaveRequest,
 LeaveLog,
+WorkedSaturday,
+LeaveBalance,
+PublicHoliday,
 CompanySettings,
   Notification
 };

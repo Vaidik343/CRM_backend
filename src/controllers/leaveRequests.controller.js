@@ -4,11 +4,16 @@ const {
   LeaveLog,
   CompanySettings,
   WorkedSaturday,
+   LeaveBalance,       
+  PublicHoliday,   
   sequelize,
 } = require("../models");
 const generateDisplayId = require("../utils/generateDisplayId");
 const generateProjectCode = require("../utils/generateProjectCode");
 const { appendRemark } = require("../utils/remarksLog");
+
+const { countLeaveDays } = require('../utils/leaveValidation'); 
+const { createNotification } = require("./notifications.controller");
 
 const { Op } = require("sequelize");
 
@@ -84,6 +89,18 @@ const logsInclude = {
 const createLeave = async (req, res) => {
   const t = await sequelize.transaction();
   const io = req.app.get("io");
+
+
+  for (const admin of admins) {
+  await createNotification(io, {
+    user_id: admin.id,
+    type:    "LEAVE_REQUESTED",
+    title:   "New Leave Request",
+    message: `${employee.name} has submitted a leave request (${display_id}).`,
+    data:    { leave_id: leave.id, display_id },
+  });
+}
+
 
   try {
     const {
@@ -202,6 +219,8 @@ const user_id = req.user.id;
       leave,
     });
 
+    // also emit real-time event to admins room so admin list updates live
+io.to("user:admins_room").emit("LEAVE_REQUESTED", leave);
 
   } catch (error) {
      await t.rollback();
@@ -250,7 +269,7 @@ const getMyLeaves = async (req, res) => {
       total: count,
       page,
       totalPages: Math.ceil(count / limit),
-      leaves: rows,
+      data: rows,
     });
 
   } catch (err) {
@@ -376,12 +395,36 @@ const getAllLeaves = async (req, res) => {
 
 const approveLeave = async (req, res) => {
   const t = await sequelize.transaction();
+
+  const io = req.app.get("io");
+
+await createNotification(io, {
+  user_id: leave.user_id,
+  type:    "LEAVE_APPROVED",
+  title:   "Leave Request Approved",
+  message: `Your leave request (${leave.display_id}) has been approved.`,
+  data:    { leave_id: leave.id, display_id: leave.display_id },
+});
+
+io.to(`user:${leave.user_id}`).emit("LEAVE_UPDATED", {
+  id:     leave.id,
+  status: "approved",
+});
+
   try {
     const admin_id = req.user.id;
-    const { id } = req.params;
+    const { id }   = req.params;
 
-    const leave = await LeaveRequest.findByPk(id);
-    console.log("🚀 ~ approveLeave ~ leave:", leave)
+    // ── 1. Find leave with employee info ──
+    const leave = await LeaveRequest.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: 'employee',
+          attributes: ['id', 'name', 'employee_id', 'saturday_group'],
+        },
+      ],
+    });
 
     if (!leave) {
       await t.rollback();
@@ -393,22 +436,102 @@ const approveLeave = async (req, res) => {
       return res.status(400).json({ message: `Leave is already ${leave.status}.` });
     }
 
+    // ── 2. Calculate leave days ──
+    const leaveDays = await countLeaveDays(
+      leave.start_date,
+      leave.end_date,
+      leave.duration,
+      leave.employee.saturday_group,
+    );
+
+    // ── 3. Approve the leave ──
     await leave.update({
-      status: LEAVE_STATUS.APPROVED,
+      status:      LEAVE_STATUS.APPROVED,
       approved_by: admin_id,
       approved_at: new Date(),
     }, { transaction: t });
 
+    // ── 4. Update leave balance ──
+    const month = new Date(leave.start_date).getMonth() + 1; // 1–12
+    const year  = new Date(leave.start_date).getFullYear();
+
+    // get or create balance record for this employee this month
+    const [balance] = await LeaveBalance.findOrCreate({
+      where: { user_id: leave.user_id, month, year },
+      defaults: {
+        entitled_paid:  2,
+        used_paid:      0,
+        used_unpaid:    0,
+        used_exchange:  0,
+      },
+      transaction: t,
+    });
+
+    if (leave.leave_type === LEAVE_TYPES.EXCHANGE) {
+      // exchange leave — doesn't touch paid/unpaid balance
+      await balance.update({
+        used_exchange: parseFloat(balance.used_exchange) + leaveDays,
+      }, { transaction: t });
+
+    } else {
+      // paid or unpaid — consume paid first, rest goes to unpaid
+      const remainingPaid = parseFloat(balance.entitled_paid) - parseFloat(balance.used_paid);
+
+      let addToPaid   = 0;
+      let addToUnpaid = 0;
+
+      if (remainingPaid <= 0) {
+        // no paid leaves left — fully unpaid
+        addToUnpaid = leaveDays;
+
+      } else if (remainingPaid >= leaveDays) {
+        // enough paid leaves to cover all days
+        addToPaid = leaveDays;
+
+      } else {
+        // partial — use remaining paid, rest unpaid
+        addToPaid   = remainingPaid;
+        addToUnpaid = leaveDays - remainingPaid;
+      }
+
+      await balance.update({
+        used_paid:   parseFloat(balance.used_paid)   + addToPaid,
+        used_unpaid: parseFloat(balance.used_unpaid) + addToUnpaid,
+      }, { transaction: t });
+    }
+
+    // ── 5. Leave log ──
     await LeaveLog.create({
       leave_request_id: leave.id,
-      user_id: admin_id,
-      action: 'approved',
-      remarks: {},
+      user_id:          admin_id,
+      action:           'approved',
+      remarks: {
+        leave_days: leaveDays,
+      },
     }, { transaction: t });
+
+    // ── 6. Notify employee ──
+    const io = req.app.get('io');
+
+    await createNotification(io, {
+      user_id: leave.user_id,
+      type:    'LEAVE_APPROVED',
+      title:   'Leave Request Approved',
+      message: `Your leave request (${leave.display_id}) has been approved.`,
+      data:    { leave_id: leave.id, display_id: leave.display_id },
+    });
+
+    io.to(`user:${leave.user_id}`).emit('LEAVE_UPDATED', {
+      id:     leave.id,
+      status: 'approved',
+    });
 
     await t.commit();
 
-    return res.status(200).json({ message: 'Leave request approved.' });
+    return res.status(200).json({
+      message: 'Leave request approved.',
+      leave_days: leaveDays,
+    });
 
   } catch (err) {
     await t.rollback();
@@ -480,31 +603,42 @@ const rejectLeave = async (req, res) => {
 // ADMIN — Mark Worked Saturday
 // ─────────────────────────────────────────────
 
+  
 const markWorkedSaturday = async (req, res) => {
+  const t = await sequelize.transaction();
+
   try {
     const admin_id = req.user.id;
     const { user_id, saturday_date } = req.body;
 
     if (!user_id || !saturday_date) {
+      await t.rollback();
       return res.status(400).json({ message: 'user_id and saturday_date are required.' });
     }
 
-    const date = new Date(saturday_date);
+// ✅ replace with this — parse date parts directly, no timezone conversion
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+if (!dateRegex.test(saturday_date)) {
+  await t.rollback();
+  return res.status(400).json({ message: 'Invalid saturday_date format. Use YYYY-MM-DD.' });
+}
 
-    if (isNaN(date)) {
-      return res.status(400).json({ message: 'Invalid saturday_date.' });
-    }
-
-    if (date.getDay() !== 6) {
-      return res.status(400).json({ message: 'Provided date is not a Saturday.' });
-    }
-
+const [year, month, day] = saturday_date.split('-').map(Number);
+console.log("🚀 ~ markWorkedSaturday ~ [year, month, day]:", [year, month, day])
+const date = new Date(year, month - 1, day); // local date, no UTC shift
+console.log("🚀 ~ markWorkedSaturday ~ date:", date)
+if (date.getDay() !== 6) {
+  await t.rollback();
+  return res.status(400).json({ message: 'Provided date is not a Saturday.' });
+}
     // Prevent duplicate entry for same employee + same date
     const existing = await WorkedSaturday.findOne({
       where: { user_id, saturday_date },
     });
+    console.log("🚀 ~ markWorkedSaturday ~ existing:", existing)
 
     if (existing) {
+      await t.rollback();
       return res.status(409).json({ message: 'This Saturday is already marked as worked for this employee.' });
     }
 
@@ -513,14 +647,18 @@ const markWorkedSaturday = async (req, res) => {
       saturday_date,
       is_exchanged: false,
       marked_by: admin_id,
-    });
+    }, { transaction: t });
+    console.log("🚀 ~ markWorkedSaturday ~ record:", record)
 
+     await t.commit();
+     
     return res.status(201).json({
       message: 'Saturday marked as worked.',
       record,
     });
 
   } catch (err) {
+    console.log("🚀 ~ markWorkedSaturday ~ err:", err)
     return res.status(500).json({ message: err.message });
   }
 };
@@ -591,6 +729,8 @@ const getLeaveLogs = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
+
+
 
 
 // ─────────────────────────────────────────────

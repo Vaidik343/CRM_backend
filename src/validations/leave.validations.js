@@ -107,9 +107,12 @@ const validateMarkSaturday = (req, res, next) => {
   }
 
   if (saturday_date && !isNaN(new Date(saturday_date))) {
-    if (new Date(saturday_date).getDay() !== 6) {
-      errors.push('saturday_date must be a Saturday.');
-    }
+   // ✅ fix
+const [y, m, d] = saturday_date.split('-').map(Number);
+console.log("🚀 ~ validateMarkSaturday ~ [y, m, d]:", [y, m, d])
+if (new Date(y, m - 1, d).getDay() !== 6) {
+  errors.push('saturday_date must be a Saturday.');
+}
   }
 
   if (errors.length > 0) {
