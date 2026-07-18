@@ -88,18 +88,7 @@ const logsInclude = {
 
 const createLeave = async (req, res) => {
   const t = await sequelize.transaction();
-  const io = req.app.get("io");
-
-
-  for (const admin of admins) {
-  await createNotification(io, {
-    user_id: admin.id,
-    type:    "LEAVE_REQUESTED",
-    title:   "New Leave Request",
-    message: `${employee.name} has submitted a leave request (${display_id}).`,
-    data:    { leave_id: leave.id, display_id },
-  });
-}
+ 
 
 
   try {
@@ -212,15 +201,40 @@ const user_id = req.user.id;
       },
     }, { transaction: t });
 
+
+    
+    // ── Notify all admins ──
+const admins = await User.findAll({
+  where: { is_admin: true },
+  attributes: ["id"],
+});
+
+     const io = req.app.get("io");
+
+
+  for (const admin of admins) {
+  await createNotification(io, {
+    user_id: admin.id,
+    type:    "LEAVE_REQUESTED",
+    title:   "New Leave Request",
+    message: `${employee.name} has submitted a leave request (${display_id}).`,
+    data:    { leave_id: leave.id, display_id },
+  });
+}
+
+    // also emit real-time event to admins room so admin list updates live
+io.to("user:admins_room").emit("LEAVE_REQUESTED", leave);
+
+
+
     await t.commit();
+
 
     return res.status(201).json({
       message: 'Leave request submitted successfully.',
       leave,
     });
 
-    // also emit real-time event to admins room so admin list updates live
-io.to("user:admins_room").emit("LEAVE_REQUESTED", leave);
 
   } catch (error) {
      await t.rollback();
@@ -322,6 +336,29 @@ const cancelLeave = async (req, res) => {
       action: 'cancelled',
       remarks: { cancelled_by: 'employee' },
     }, { transaction: t });
+
+    const io = req.app.get("io");
+
+const admins = await User.findAll({
+  where: { is_admin: true },
+  attributes: ["id"],
+});
+
+for (const admin of admins) {
+  await createNotification(io, {
+    user_id: admin.id,
+    type:    "LEAVE_CANCELLED",
+    title:   "Leave Request Cancelled",
+    message: `A leave request (${leave.display_id}) has been cancelled by the employee.`,
+    data:    { leave_id: leave.id, display_id: leave.display_id },
+  });
+}
+
+io.to("user:admins_room").emit("LEAVE_UPDATED", {
+  id:     leave.id,
+  status: "cancelled",
+});
+
 
     await t.commit();
 

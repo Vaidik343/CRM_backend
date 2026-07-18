@@ -23,6 +23,11 @@ const WorkedSaturday = require("../models/workedSaturdays.modal")(sequelize, Dat
 const CompanySettings = require("./companySettings.model")(sequelize, DataTypes);
 const PublicHoliday = require("../models/publicHoliday")(sequelize, DataTypes);
 const LeaveBalance = require("./leaveBalance.modal")(sequelize, DataTypes);
+const Intern = require("./interns.model")(sequelize, DataTypes);
+const InternDocument = require("./internDocuments.model")(sequelize, DataTypes);
+const InternProject = require("./internProjects.model")(sequelize, DataTypes);
+const InternTask = require("./internTasks.model")(sequelize, DataTypes);
+const InternWorkLog = require("./internWorkLog.model")(sequelize, DataTypes);
  
 // ── Role ↔ User ───────────────────────────────────────────────
 Role.hasMany(User, { foreignKey: "role_id", onDelete: "RESTRICT" });
@@ -213,6 +218,122 @@ LeaveBalance.belongsTo(User, {
   as: 'employee',
 });
 
+
+
+// Intern
+
+// ── Intern → User (mentor) ──
+Intern.belongsTo(User, {
+  foreignKey: 'mentor_id',
+  as: 'mentor',
+});
+User.hasMany(Intern, {
+  foreignKey: 'mentor_id',
+  as: 'mentoredInterns',
+});
+
+
+// ── Intern → User (approved_by) ──
+Intern.belongsTo(User, {
+  foreignKey: 'approved_by',
+  as: 'approvedBy',
+});
+User.hasMany(Intern, {
+  foreignKey: 'approved_by',
+  as: 'approvedInterns',
+});
+
+// ── Intern → InternDocument ──
+Intern.hasOne(InternDocument, {
+  foreignKey: 'intern_id',
+  as: 'documents',
+});
+InternDocument.belongsTo(Intern, {
+  foreignKey: 'intern_id',
+  as: 'intern',
+});
+
+// ── Intern → InternProject ──
+Intern.hasMany(InternProject, {
+  foreignKey: 'intern_id',
+  as: 'projects',
+});
+InternProject.belongsTo(Intern, {
+  foreignKey: 'intern_id',
+  as: 'intern',
+});
+
+// ── InternProject → User (mentor) ──
+InternProject.belongsTo(User, {
+  foreignKey: 'mentor_id',
+  as: 'mentor',
+});
+User.hasMany(InternProject, {
+  foreignKey: 'mentor_id',
+  as: 'mentoredProjects',
+});
+
+// ── Intern → InternTask ──
+Intern.hasMany(InternTask, {
+  foreignKey: 'intern_id',
+  as: 'tasks',
+});
+InternTask.belongsTo(Intern, {
+  foreignKey: 'intern_id',
+  as: 'intern',
+});
+
+// ── InternTask → InternProject ──
+InternProject.hasMany(InternTask, {
+  foreignKey: 'intern_project_id',
+  as: 'tasks',
+});
+InternTask.belongsTo(InternProject, {
+  foreignKey: 'intern_project_id',
+  as: 'project',
+});
+
+// ── InternTask → User (assigned_by) ──
+InternTask.belongsTo(User, {
+  foreignKey: 'assigned_by',
+  as: 'assigner',
+});
+User.hasMany(InternTask, {
+  foreignKey: 'assigned_by',
+  as: 'assignedInternTasks',
+});
+
+// ── Intern → InternWorkLog ──
+Intern.hasMany(InternWorkLog, {
+  foreignKey: 'intern_id',
+  as: 'worklogs',
+});
+InternWorkLog.belongsTo(Intern, {
+  foreignKey: 'intern_id',
+  as: 'intern',
+});
+
+// ── InternWorkLog → InternProject ──
+InternProject.hasMany(InternWorkLog, {
+  foreignKey: 'intern_project_id',
+  as: 'worklogs',
+});
+InternWorkLog.belongsTo(InternProject, {
+  foreignKey: 'intern_project_id',
+  as: 'project',
+});
+
+// ── InternWorkLog → InternTask ──
+InternTask.hasMany(InternWorkLog, {
+  foreignKey: 'intern_task_id',
+  as: 'worklogs',
+});
+InternWorkLog.belongsTo(InternTask, {
+  foreignKey: 'intern_task_id',
+  as: 'task',
+});
+
+
 // Team creator
 Team.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 User.hasMany(Team, { foreignKey: 'created_by', as: 'created_teams' });
@@ -270,5 +391,10 @@ WorkedSaturday,
 LeaveBalance,
 PublicHoliday,
 CompanySettings,
+Intern,
+InternDocument,
+InternProject,
+InternTask,
+InternWorkLog,
   Notification
 };

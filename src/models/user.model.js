@@ -37,6 +37,27 @@ saturday_group: {
   type: DataTypes.ENUM('A', 'B'),
   allowNull: true,  // null = not applicable (e.g. admin/management)
 },
+
+is_probation: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
+  allowNull: true
+},
+
+  probation_start: {
+      type: DataTypes.DATEONLY,
+      allowNull: true, // ❌ should be nullable — admin sets this on approval, not at registration
+    },
+    probation_end: {
+      type: DataTypes.DATEONLY,
+      allowNull: true, // ❌ same reason
+    },
+
+       probation_status: {
+      type: DataTypes.ENUM('active', 'passed', 'terminated'),
+      defaultValue: 'active',
+      allowNull: true,
+    },
       is_admin: {
         type: DataTypes.BOOLEAN,
         allowNull:false

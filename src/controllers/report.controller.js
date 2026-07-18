@@ -319,8 +319,8 @@ if (search) {
 
 
    const project_id = req.query.project_id;
-  console.log("🚀 ~ getEmployeeWorkLogs ~ FULL QUERY:", req.query);
-console.log("🚀 ~ getEmployeeWorkLogs ~ project_id:", project_id);
+//   console.log("🚀 ~ getEmployeeWorkLogs ~ FULL QUERY:", req.query);
+// console.log("🚀 ~ getEmployeeWorkLogs ~ project_id:", project_id);
 
 if (project_id) {
     conditions.push({
@@ -332,7 +332,7 @@ const where = {
   [Op.and]: conditions,
 };
 const test = await WorkLog.findOne({ include: workLogIncludes });
-console.log("🚀 ~ getEmployeeWorkLogs ~ test:", test)
+// console.log("🚀 ~ getEmployeeWorkLogs ~ test:", test)
 
 const { count, rows } = await WorkLog.findAndCountAll({
   where,
@@ -345,7 +345,7 @@ const { count, rows } = await WorkLog.findAndCountAll({
 
     return res.json({ data: rows, total: count, page, limit });
   } catch (err) {
-    console.error("getEmployeeWorkLogs error:", err);
+    // console.error("getEmployeeWorkLogs error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
