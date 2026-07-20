@@ -17,6 +17,32 @@ const {
   regenerateSetupToken,
 } = require('../controllers/intern.controller');
 
+const {
+  createProject,
+  getMyProject,
+  updateProject,
+  getInternProject,
+  adminUpdateProject,
+} = require('../controllers/internProject.controller');
+
+
+const {
+  createTask,
+  getMyTasks,
+  updateTask,
+  adminAssignTask,
+  getInternTasks,
+  adminUpdateTask,
+} = require('../controllers/internTask.controller');
+
+const {
+  createWorkLog,
+  getMyWorkLogs,
+  updateWorkLog,
+  getInternWorkLogs,
+} = require('../controllers/internWorkLog.controller');
+
+
 const { authenticate } = require('../middlewares/auth.middleware');
 const { requireAdmin }  = require('../middlewares/role.middleware');
 const { authenticateIntern } = require('../middlewares/internAuth.middleware');
@@ -269,5 +295,66 @@ router.post(
 );
 
 // ─────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────
+// INTERN — Project Routes
+// ─────────────────────────────────────────────
+
+// POST   /api/intern/project        → create own project
+// GET    /api/intern/project        → get own project
+// PATCH  /api/intern/project        → update own project
+router.post('/intern/project',   authenticateIntern, createProject);
+router.get('/intern/project',    authenticateIntern, getMyProject);
+router.patch('/intern/project',  authenticateIntern, updateProject);
+
+// ─────────────────────────────────────────────
+// INTERN — Task Routes
+// ─────────────────────────────────────────────
+
+// POST   /api/intern/tasks          → self create task
+// GET    /api/intern/tasks          → get all own tasks
+// PATCH  /api/intern/tasks/:id      → update own task
+router.post('/intern/tasks',        authenticateIntern, createTask);
+router.get('/intern/tasks',         authenticateIntern, getMyTasks);
+router.patch('/intern/tasks/:id',   authenticateIntern, updateTask);
+
+// ─────────────────────────────────────────────
+// INTERN — WorkLog Routes
+// ─────────────────────────────────────────────
+
+// POST   /api/intern/worklogs       → create worklog
+// GET    /api/intern/worklogs       → get own worklogs
+// PATCH  /api/intern/worklogs/:id   → update worklog
+router.post('/intern/worklogs',       authenticateIntern, createWorkLog);
+router.get('/intern/worklogs',        authenticateIntern, getMyWorkLogs);
+router.patch('/intern/worklogs/:id',  authenticateIntern, updateWorkLog);
+
+// ─────────────────────────────────────────────
+// ADMIN — Project Routes
+// ─────────────────────────────────────────────
+
+// GET    /api/admin/interns/:intern_id/project       → get intern's project
+// PATCH  /api/admin/interns/:intern_id/project       → update mentor
+router.get('/admin/interns/:intern_id/project',   authenticate, requireAdmin, getInternProject);
+router.patch('/admin/interns/:intern_id/project', authenticate, requireAdmin, adminUpdateProject);
+
+// ─────────────────────────────────────────────
+// ADMIN — Task Routes
+// ─────────────────────────────────────────────
+
+// POST   /api/admin/intern/tasks              → assign task to intern
+// GET    /api/admin/interns/:intern_id/tasks  → get intern's tasks
+// PATCH  /api/admin/intern/tasks/:id          → update any intern task
+router.post('/admin/intern/tasks',                authenticate, requireAdmin, adminAssignTask);
+router.get('/admin/interns/:intern_id/tasks',     authenticate, requireAdmin, getInternTasks);
+router.patch('/admin/intern/tasks/:id',           authenticate, requireAdmin, adminUpdateTask);
+
+// ─────────────────────────────────────────────
+// ADMIN — WorkLog Routes
+// ─────────────────────────────────────────────
+
+// GET  /api/admin/interns/:intern_id/worklogs → get intern's worklogs
+router.get('/admin/interns/:intern_id/worklogs', authenticate, requireAdmin, getInternWorkLogs);
 
 module.exports = router;
