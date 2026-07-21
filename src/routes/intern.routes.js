@@ -15,6 +15,7 @@ const {
   extendInternship,
   deactivateIntern,
   regenerateSetupToken,
+  updateMyProfile
 } = require('../controllers/intern.controller');
 
 const {
@@ -229,10 +230,19 @@ router.post('/intern/login', login);
 
 // GET /api/intern/me
 // Returns own profile
-router.get('/intern/me', authenticateIntern, (req, res) => {
-  return res.status(200).json({ intern: req.intern });
+// in intern.routes.js — update the /intern/me route
+router.get('/intern/me', authenticateIntern, async (req, res) => {
+  const intern = await Intern.findByPk(req.intern.id, {
+    include: [
+      { model: User, as: 'mentor', attributes: ['id', 'name', 'employee_id'] },
+      { model: InternDocument, as: 'documents' },
+    ],
+  });
+  return res.status(200).json({ intern });
 });
 
+// PATCH /api/intern/me
+router.patch('/intern/me', authenticateIntern, updateMyProfile);
 // ─────────────────────────────────────────────
 // ADMIN ROUTES
 // ─────────────────────────────────────────────

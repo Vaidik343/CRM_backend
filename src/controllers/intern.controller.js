@@ -702,9 +702,43 @@ const regenerateSetupToken = async (req, res) => {
   }
 };
 
+
+// INTERN — Update Own Profile
+const updateMyProfile = async (req, res) => {
+  try {
+    const intern_id = req.intern.id;
+    const { name, mobile, college_name } = req.body;
+
+    const intern = await Intern.findByPk(intern_id);
+    if (!intern) {
+      return res.status(404).json({ message: 'Intern not found.' });
+    }
+
+    // validate mobile if provided
+    if (mobile && !/^\d{10}$/.test(mobile)) {
+      return res.status(400).json({ message: 'Mobile must be a 10-digit number.' });
+    }
+
+    await intern.update({
+      name:        name?.trim()        || intern.name,
+      mobile:      mobile              || intern.mobile,
+      college_name: college_name?.trim() || intern.college_name,
+    });
+
+    return res.status(200).json({
+      message: 'Profile updated successfully.',
+      intern,
+    });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+
 // ─────────────────────────────────────────────
 
-module.exports.internController = {
+module.exports = {
   register,
   checkStatus,
   setupPassword,
@@ -716,4 +750,5 @@ module.exports.internController = {
   extendInternship,
   deactivateIntern,
   regenerateSetupToken,
+  updateMyProfile
 };

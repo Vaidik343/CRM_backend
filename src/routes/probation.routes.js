@@ -119,7 +119,7 @@ router.patch(
   '/probation/:id/dates',
   authenticate,
   requireAdmin,
-  updateProbationDates
+  updateProbationDates   
 );
 
 module.exports = router;
