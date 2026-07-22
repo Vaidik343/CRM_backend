@@ -1,4 +1,3 @@
-'use strict';
 
 const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
@@ -53,20 +52,39 @@ const register = async (req, res) => {
       email,
       mobile,
       enrollment_no,
-      college_name,
       degree_type,
       intern_type,
       document_type,
-      college_detail, // optional stringified JSON
+      college_detail,
     } = req.body;
 
-    // ── 1. Required field checks ──
-    if (!name || !email || !mobile || !enrollment_no || !college_name || !degree_type || !intern_type || !document_type) {
+    // ── 1. Parse college_detail first so we can extract college_name ──
+    let parsedCollegeDetail = null;
+    if (college_detail) {
+      try {
+        parsedCollegeDetail = typeof college_detail === 'string'
+          ? JSON.parse(college_detail)
+          : college_detail;
+      } catch {
+        parsedCollegeDetail = null;
+      }
+    }
+
+    // extract college_name from parsed college_detail
+    const college_name = parsedCollegeDetail?.college_name || null;
+
+    // ── 2. Required field checks — removed college_name, added college_detail check ──
+    if (!name || !email || !mobile || !enrollment_no || !degree_type || !intern_type || !document_type) {
       await t.rollback();
       return res.status(400).json({ message: 'All required fields must be provided.' });
     }
 
-    // ── 2. Required file checks ──
+    if (!college_name) {
+      await t.rollback();
+      return res.status(400).json({ message: 'College name is required inside college_detail.' });
+    }
+
+    // ── 3. Required file checks ──
     if (!req.files?.id_proof?.[0]) {
       await t.rollback();
       return res.status(400).json({ message: 'ID proof is required.' });
@@ -77,10 +95,10 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Passport photo is required.' });
     }
 
-    // ── 3. Validate enums ──
-    const validInternTypes    = ['intern', 'trainee'];
-    const validDegreeTypes    = ['bachelor', 'master'];
-    const validDocumentTypes  = ['aadhaar', 'voter_card', 'passport', 'driving_licence'];
+    // ── 4. Validate enums ──
+    const validInternTypes   = ['intern', 'trainee'];
+    const validDegreeTypes   = ['bachelor', 'master'];
+    const validDocumentTypes = ['aadhaar', 'voter_card', 'passport', 'driving_licence'];
 
     if (!validInternTypes.includes(intern_type)) {
       await t.rollback();
@@ -97,7 +115,7 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Invalid document type.' });
     }
 
-    // ── 4. Check duplicate email / enrollment ──
+    // ── 5. Check duplicate email / enrollment ──
     const existing = await Intern.findOne({
       where: {
         [Op.or]: [{ email }, { enrollment_no }],
@@ -110,19 +128,19 @@ const register = async (req, res) => {
       return res.status(409).json({ message: `An intern with this ${field} already exists.` });
     }
 
-    // ── 5. Create intern record ──
+    // ── 6. Create intern record ──
     const intern = await Intern.create({
       name:          name.trim(),
       email:         email.trim().toLowerCase(),
       mobile,
       enrollment_no,
-      college_name:  college_name.trim(),
+      college_name,  // ✅ extracted from college_detail
       degree_type,
       intern_type,
       status:        'pending',
     }, { transaction: t });
 
-    // ── 6. Move uploaded files to intern's folder ──
+    // ── 7. Move uploaded files ──
     const idProofResult = moveUploadedFile(
       req.files.id_proof[0].path,
       `interns/${intern.id}`,
@@ -140,9 +158,8 @@ const register = async (req, res) => {
       return res.status(500).json({ message: 'File upload failed.' });
     }
 
-    // optional files
-    let resumeResult      = null;
-    let marksheetResult   = null;
+    let resumeResult    = null;
+    let marksheetResult = null;
 
     if (req.files?.resume?.[0]) {
       resumeResult = moveUploadedFile(
@@ -160,40 +177,28 @@ const register = async (req, res) => {
       );
     }
 
-    // ── 7. Parse college_detail ──
-    let parsedCollegeDetail = null;
-    if (college_detail) {
-      try {
-        parsedCollegeDetail = typeof college_detail === 'string'
-          ? JSON.parse(college_detail)
-          : college_detail;
-      } catch {
-        parsedCollegeDetail = null;
-      }
-    }
-
     // ── 8. Create document record ──
     await InternDocument.create({
       intern_id:          intern.id,
       document_type,
       id_proof:           idProofResult.url,
       photo:              photoResult.url,
-      college_detail:     parsedCollegeDetail,
-      resume:             resumeResult?.url     || null,
-      last_sem_marksheet: marksheetResult?.url  || null,
+      college_detail:     parsedCollegeDetail, // ✅ already parsed above
+      resume:             resumeResult?.url    || null,
+      last_sem_marksheet: marksheetResult?.url || null,
     }, { transaction: t });
 
     await t.commit();
 
     return res.status(201).json({
-      message: 'Registration submitted successfully. Please wait for admin approval.',
+      message:   'Registration submitted successfully. Please wait for admin approval.',
       intern_id: intern.id,
     });
 
   } catch (err) {
     await t.rollback();
+    console.log("🚀 ~ register ~ err:", err);
 
-    // clean up any uploaded temp files on error
     ['id_proof', 'photo', 'resume', 'last_sem_marksheet'].forEach((field) => {
       if (req.files?.[field]?.[0]?.path) {
         if (fs.existsSync(req.files[field][0].path)) {
@@ -205,7 +210,6 @@ const register = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
-
 // ─────────────────────────────────────────────
 // PUBLIC — Check Status (waiting screen polling)
 // ─────────────────────────────────────────────
@@ -383,6 +387,7 @@ const login = async (req, res) => {
         sub:         intern.id,
         type:        'intern',
         intern_type: intern.intern_type,
+         name:        intern.name, 
       },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }

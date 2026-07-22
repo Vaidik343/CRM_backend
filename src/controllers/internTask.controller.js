@@ -10,7 +10,7 @@ const {
 } = require('../models');
 
 const generateDisplayId = require('../utils/generateDisplayId');
-const { appendRemark }  = require('../utils/remarkUtils');
+const { appendRemark }  = require('../utils/remarksLog');
 
 // ─────────────────────────────────────────────
 // HELPERS

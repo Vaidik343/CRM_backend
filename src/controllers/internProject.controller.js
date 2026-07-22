@@ -1,5 +1,5 @@
 const { Op, where } = require('sequelize');
-import { projects } from './../api-docs/exportData.swagger';
+
 const {
   InternProject,
   InternTask,
@@ -31,7 +31,7 @@ const createProject = async (req, res) => {
     const t = await sequelize.transaction();
 
     try {
-        const inter_id = req.intern.id;
+        const intern_id = req.intern.id;
 
          const { name, description, tech_details, mentor_id } = req.body;
 
@@ -41,7 +41,7 @@ const createProject = async (req, res) => {
             return res.status(400).json({message: 'Project  name is required.'}); 
          }
 
-         const existing = await InternProject.findOne({ where: {inter_id}});
+         const existing = await InternProject.findOne({ where: {intern_id}});
          if(existing)
          {
             await t.rollback();
@@ -90,7 +90,7 @@ const createProject = async (req, res) => {
 
     } catch (error) {
         await t.rollback();
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: error.message });
     }
 }
 
@@ -98,10 +98,10 @@ const createProject = async (req, res) => {
 
 const getMyProject = async () => {
     try {
-        const inter_id = req.intern.id;
+        const intern_id = req.intern.id;
 
         const project = await InternProject.findOne({
-            where: {inter_id},
+            where: {intern_id},
             include: projectIncludes,
         });
 
@@ -114,7 +114,7 @@ const getMyProject = async () => {
 
 
     } catch (error) {
-        return res.status(500).json({message: err.message});
+        return res.status(500).json({message: error.message});
     }
 };
 
@@ -147,29 +147,37 @@ const updateProject = async (req, res) => {
         project,
     });
     } catch (error) {
-         return res.status(500).json({ message: err.message });
+         return res.status(500).json({ message: error.message });
     }
 
 }
 
 // admin - get intern's project
 
-const getInternProject = async (req, res) => {
-    try {
-        const project = await InternProject.findOne({
-            where: {inter_id},
-            include: projectIncludes,
-        });
 
-        if (!project) {
-      return res.status(404).json({ message: 'No project found for this intern.' });
+const getInternProject = async (req, res) => {
+  try {
+    const { intern_id } = req.params;
+
+    const project = await InternProject.findOne({
+      where: { intern_id },
+      include: projectIncludes,
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        message: "No project found for this intern.",
+      });
     }
 
     return res.status(200).json({ project });
 
-    } catch (error) {
-         return res.status(500).json({ message: err.message });
-    }
+  } catch (error) {
+    console.log("🚀 ~ getInternProject ~ error:", error);
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
 };
 
 // admin update intern's project (mentor only)

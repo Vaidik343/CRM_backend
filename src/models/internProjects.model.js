@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
-    intern_id: { // ❌ you had 'inter_id' — typo
+    intern_id: { 
       type: DataTypes.UUID,
       allowNull: false,
     },

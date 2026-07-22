@@ -20,6 +20,7 @@ async function authenticateIntern(req, res, next) {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("🚀 ~ authenticateIntern ~ payload:", payload)
 
     // make sure this token belongs to an intern not an employee
     if (payload.type !== 'intern') {

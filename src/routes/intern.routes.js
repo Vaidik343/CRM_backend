@@ -65,11 +65,11 @@ const validateRegister = (req, res, next) => {
   if (!email || !email.trim())           errors.push('email is required.');
   if (!mobile)                           errors.push('mobile is required.');
   if (!enrollment_no)                    errors.push('enrollment_no is required.');
-  if (!college_name || !college_name.trim()) errors.push('college_name is required.');
+  // if (!college_name || !college_name.trim()) errors.push('college_name is required.');
   if (!degree_type)                      errors.push('degree_type is required.');
   if (!intern_type)                      errors.push('intern_type is required.');
   if (!document_type)                    errors.push('document_type is required.');
-
+ console.log("bd", req.body)
   // email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (email && !emailRegex.test(email.trim())) {
@@ -205,7 +205,7 @@ const validateExtend = (req, res, next) => {
 router.post(
   '/intern/register',
   internUpload,           // multer handles files first
-  validateRegister,       // then validate text fields
+  validateRegister,  // then validate text fields
   register
 );
 
