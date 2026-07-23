@@ -71,7 +71,22 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    reference_type: {
+      type: DataTypes.ENUM(  'employee','intern','college', 'friend','social_media','website','other'),
+  allowNull: true,
 
+    },
+
+    reference_name: {
+      type: DataTypes.STRING(100),
+      allowNull: true
+    },
+
+    reference_contact: {
+     type: DataTypes.STRING(100),
+     allowNull: true
+    },
+    
     setup_token: {
   type: DataTypes.STRING,
   allowNull: true,

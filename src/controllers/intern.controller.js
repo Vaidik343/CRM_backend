@@ -56,6 +56,10 @@ const register = async (req, res) => {
       intern_type,
       document_type,
       college_detail,
+
+        reference_type,
+  reference_name,
+  reference_contact,
     } = req.body;
 
     // ── 1. Parse college_detail first so we can extract college_name ──
@@ -115,6 +119,25 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Invalid document type.' });
     }
 
+const validReferenceTypes = [
+  "employee",
+  "intern",
+  "college",
+  "friend",
+  "social_media",
+  "website",
+  "other",
+];
+
+if (
+  reference_type &&
+  !validReferenceTypes.includes(reference_type)
+) {
+  await t.rollback();
+  return res.status(400).json({
+    message: "Invalid reference type.",
+  });
+}
     // ── 5. Check duplicate email / enrollment ──
     const existing = await Intern.findOne({
       where: {
@@ -138,6 +161,10 @@ const register = async (req, res) => {
       degree_type,
       intern_type,
       status:        'pending',
+
+        reference_type,
+  reference_name,
+  reference_contact,
     }, { transaction: t });
 
     // ── 7. Move uploaded files ──
@@ -226,6 +253,7 @@ const checkStatus = async (req, res) => {
         'setup_token_expires_at',
       ],
     });
+    console.log("🚀 ~ checkStatus ~ intern:", intern)
 
     if (!intern) {
       return res.status(404).json({ message: 'Intern not found.' });
@@ -483,7 +511,14 @@ const getInternById = async (req, res) => {
       return res.status(404).json({ message: 'Intern not found.' });
     }
 
-    return res.status(200).json({ intern });
+    // ✅ Don't expose password_hash — just tell frontend if it's set
+    const internData = intern.toJSON();
+    internData.has_password = !!intern.password_hash;
+    delete internData.password_hash;
+    delete internData.setup_token;
+    delete internData.setup_token_expires_at;
+
+    return res.status(200).json({ intern: internData });
 
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -532,7 +567,7 @@ const approveIntern = async (req, res) => {
     const setup_token            = crypto.randomBytes(32).toString('hex');
     const setup_token_expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    await intern.update({
+  const ia = await intern.update({
       status:                 'approved',
       start_date,
       end_date,
@@ -542,6 +577,7 @@ const approveIntern = async (req, res) => {
       setup_token,
       setup_token_expires_at,
     }, { transaction: t });
+  console.log("🚀 ~ approveIntern ~ ia:", ia)
 
     await t.commit();
 
@@ -712,7 +748,9 @@ const regenerateSetupToken = async (req, res) => {
 const updateMyProfile = async (req, res) => {
   try {
     const intern_id = req.intern.id;
-    const { name, mobile, college_name } = req.body;
+    const { name, mobile, college_name ,   reference_type,
+  reference_name,
+  reference_contact,} = req.body;
 
     const intern = await Intern.findByPk(intern_id);
     if (!intern) {
@@ -723,13 +761,44 @@ const updateMyProfile = async (req, res) => {
     if (mobile && !/^\d{10}$/.test(mobile)) {
       return res.status(400).json({ message: 'Mobile must be a 10-digit number.' });
     }
+const validReferenceTypes = [
+  "employee",
+  "intern",
+  "college",
+  "friend",
+  "social_media",
+  "website",
+  "other",
+];
 
-    await intern.update({
-      name:        name?.trim()        || intern.name,
-      mobile:      mobile              || intern.mobile,
-      college_name: college_name?.trim() || intern.college_name,
-    });
+if (
+  reference_type &&
+  !validReferenceTypes.includes(reference_type)
+) {
+  return res.status(400).json({
+    message: "Invalid reference type.",
+  });
+}
+  await intern.update({
+  name: name?.trim() || intern.name,
+  mobile: mobile || intern.mobile,
+  college_name: college_name?.trim() || intern.college_name,
 
+  reference_type:
+    reference_type !== undefined
+      ? reference_type
+      : intern.reference_type,
+
+  reference_name:
+    reference_name !== undefined
+      ? reference_name?.trim()
+      : intern.reference_name,
+
+  reference_contact:
+    reference_contact !== undefined
+      ? reference_contact?.trim()
+      : intern.reference_contact,
+});
     return res.status(200).json({
       message: 'Profile updated successfully.',
       intern,

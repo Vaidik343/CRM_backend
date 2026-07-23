@@ -96,7 +96,7 @@ const createProject = async (req, res) => {
 
 // inter get own project
 
-const getMyProject = async () => {
+const getMyProject = async (req, res) => {
     try {
         const intern_id = req.intern.id;
 

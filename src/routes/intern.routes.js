@@ -1,5 +1,4 @@
-'use strict';
-
+const { Intern, User, InternDocument } = require('../models');
 const express = require('express');
 const router  = express.Router();
 
@@ -48,6 +47,7 @@ const { authenticate } = require('../middlewares/auth.middleware');
 const { requireAdmin }  = require('../middlewares/role.middleware');
 const { authenticateIntern } = require('../middlewares/internAuth.middleware');
 const { internUpload }  = require('../middlewares/multer');
+const { requirePermission } = require('../middlewares/permission.middleware');
 
 // ─────────────────────────────────────────────
 // VALIDATION MIDDLEWARE
