@@ -54,9 +54,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATEONLY,
       allowNull: true, // ❌ same reason
     },
-    mentor_id: {
-      type: DataTypes.UUID,
-      allowNull: true, // admin sets on approval
+    mentor_ids: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: [],
     },
     approved_by: {
       type: DataTypes.UUID,

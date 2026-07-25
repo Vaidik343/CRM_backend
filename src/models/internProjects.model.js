@@ -27,13 +27,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    mentor_id: {
-      type: DataTypes.UUID,
+   mentor_ids: {
+      type: DataTypes.JSONB,
       allowNull: true,
+      defaultValue: [],
     },
   }, {
     tableName: 'intern_projects',
-    timestamps: true, // ❌ you had false
+    timestamps: true, 
   });
 
   return InternProject;

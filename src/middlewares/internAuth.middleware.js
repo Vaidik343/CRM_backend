@@ -32,7 +32,7 @@ async function authenticateIntern(req, res, next) {
         'id', 'display_id', 'name', 'email',
         'intern_type', 'degree_type', 'college_name',
         'status', 'start_date', 'end_date',
-        'mentor_id', 'enrollment_no',
+        'mentor_ids', 'enrollment_no',
       ],
     });
 

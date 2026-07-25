@@ -23,12 +23,30 @@ const generateDisplayId = require('../utils/generateDisplayId');
 // HELPERS
 // ─────────────────────────────────────────────
 
-const internIncludes = [
-  {
-    model: User,
-    as: 'mentor',
+
+// ── HELPER — fetch mentors from JSONB array ────────────────────────────────
+const getMentors = async (mentor_ids) => {
+  if (!mentor_ids || mentor_ids.length === 0) return [];
+  return await User.findAll({
+    where: { id: mentor_ids },
     attributes: ['id', 'name', 'employee_id'],
-  },
+  });
+};
+
+// ── attach mentors to intern object manually ──
+const attachMentors = async (intern) => {
+  const plain = intern.toJSON ? intern.toJSON() : { ...intern };
+  plain.mentors = await getMentors(plain.mentor_ids || []);
+  return plain;
+};
+
+
+const internIncludes = [
+  // {
+  //   model: User,
+  //   as: 'mentor',
+  //   attributes: ['id', 'name', 'employee_id'],
+  // },
   {
     model: User,
     as: 'approvedBy',
@@ -373,13 +391,7 @@ const login = async (req, res) => {
 
     const intern = await Intern.findOne({
       where: { email: email.trim().toLowerCase() },
-      include: [
-        {
-          model: User,
-          as: 'mentor',
-          attributes: ['id', 'name', 'employee_id'],
-        },
-      ],
+
     });
 
     if (!intern) {
@@ -434,7 +446,7 @@ const login = async (req, res) => {
         college_name: intern.college_name,
         start_date:   intern.start_date,
         end_date:     intern.end_date,
-        mentor:       intern.mentor,
+        mentor_ids:   intern.mentor_ids || [], 
       },
     });
 
@@ -473,7 +485,7 @@ const getAllInterns = async (req, res) => {
       include: [
         {
           model: User,
-          as: 'mentor',
+          as: 'approvedBy',
           attributes: ['id', 'name', 'employee_id'],
         },
       ],
@@ -483,11 +495,14 @@ const getAllInterns = async (req, res) => {
       distinct: true,
     });
 
+    // attach mentors to each intern
+    const internsWithMentors = await Promise.all(rows.map(attachMentors));
+
     return res.status(200).json({
       total:      count,
       page,
       totalPages: Math.ceil(count / limit),
-      interns:    rows,
+      interns:    internsWithMentors,
     });
 
   } catch (err) {
@@ -511,14 +526,9 @@ const getInternById = async (req, res) => {
       return res.status(404).json({ message: 'Intern not found.' });
     }
 
-    // ✅ Don't expose password_hash — just tell frontend if it's set
-    const internData = intern.toJSON();
-    internData.has_password = !!intern.password_hash;
-    delete internData.password_hash;
-    delete internData.setup_token;
-    delete internData.setup_token_expires_at;
+    const internWithMentors = await attachMentors(intern);
 
-    return res.status(200).json({ intern: internData });
+    return res.status(200).json({ intern: internWithMentors });
 
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -535,11 +545,7 @@ const approveIntern = async (req, res) => {
     const admin_id = req.user.id;
     const { id }   = req.params;
 
-    const {
-      start_date,
-      end_date,
-      mentor_id,
-    } = req.body;
+    const { start_date, end_date, mentor_ids } = req.body;
 
     if (!start_date || !end_date) {
       await t.rollback();
@@ -552,7 +558,6 @@ const approveIntern = async (req, res) => {
     }
 
     const intern = await Intern.findByPk(id);
-
     if (!intern) {
       await t.rollback();
       return res.status(404).json({ message: 'Intern not found.' });
@@ -563,29 +568,36 @@ const approveIntern = async (req, res) => {
       return res.status(400).json({ message: `Intern is already ${intern.status}.` });
     }
 
-    // generate one-time setup token
-    const setup_token            = crypto.randomBytes(32).toString('hex');
-    const setup_token_expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // validate mentor_ids if provided
+    if (mentor_ids && Array.isArray(mentor_ids) && mentor_ids.length > 0) {
+      const mentors = await User.findAll({ where: { id: mentor_ids } });
+      if (mentors.length !== mentor_ids.length) {
+        await t.rollback();
+        return res.status(404).json({ message: 'One or more mentors not found.' });
+      }
+    }
 
-  const ia = await intern.update({
+    const setup_token            = crypto.randomBytes(32).toString('hex');
+    const setup_token_expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await intern.update({
       status:                 'approved',
       start_date,
       end_date,
-      mentor_id:              mentor_id || null,
+      mentor_ids:             mentor_ids || [],
       approved_by:            admin_id,
       approved_at:            new Date(),
       setup_token,
       setup_token_expires_at,
     }, { transaction: t });
-  console.log("🚀 ~ approveIntern ~ ia:", ia)
 
     await t.commit();
 
-// ✅ just return the token — frontend builds the URL itself
-return res.status(200).json({
-  message:     'Intern approved successfully.',
-  setup_token, // admin copies this or shares the link manually
-});
+    return res.status(200).json({
+      message:     'Intern approved successfully.',
+      setup_token,
+    });
+
   } catch (err) {
     await t.rollback();
     return res.status(500).json({ message: err.message });
@@ -748,57 +760,50 @@ const regenerateSetupToken = async (req, res) => {
 const updateMyProfile = async (req, res) => {
   try {
     const intern_id = req.intern.id;
-    const { name, mobile, college_name ,   reference_type,
-  reference_name,
-  reference_contact,} = req.body;
+
+    const {
+      name,
+      mobile,
+      college_name,
+      enrollment_no,
+      degree_type,
+      intern_type,
+      reference_type,
+      reference_name,
+      reference_contact,
+    } = req.body;
 
     const intern = await Intern.findByPk(intern_id);
     if (!intern) {
       return res.status(404).json({ message: 'Intern not found.' });
     }
 
-    // validate mobile if provided
     if (mobile && !/^\d{10}$/.test(mobile)) {
       return res.status(400).json({ message: 'Mobile must be a 10-digit number.' });
     }
-const validReferenceTypes = [
-  "employee",
-  "intern",
-  "college",
-  "friend",
-  "social_media",
-  "website",
-  "other",
-];
 
-if (
-  reference_type &&
-  !validReferenceTypes.includes(reference_type)
-) {
-  return res.status(400).json({
-    message: "Invalid reference type.",
-  });
-}
-  await intern.update({
-  name: name?.trim() || intern.name,
-  mobile: mobile || intern.mobile,
-  college_name: college_name?.trim() || intern.college_name,
+    const validDegreeTypes = ['bachelor', 'master'];
+    if (degree_type && !validDegreeTypes.includes(degree_type)) {
+      return res.status(400).json({ message: 'Invalid degree_type.' });
+    }
 
-  reference_type:
-    reference_type !== undefined
-      ? reference_type
-      : intern.reference_type,
+    const validInternTypes = ['intern', 'trainee'];
+    if (intern_type && !validInternTypes.includes(intern_type)) {
+      return res.status(400).json({ message: 'Invalid intern_type.' });
+    }
 
-  reference_name:
-    reference_name !== undefined
-      ? reference_name?.trim()
-      : intern.reference_name,
+    await intern.update({
+      name:              name?.trim()              || intern.name,
+      mobile:            mobile                    || intern.mobile,
+      college_name:      college_name?.trim()      || intern.college_name,
+      enrollment_no:     enrollment_no?.trim()     || intern.enrollment_no,
+      degree_type:       degree_type               || intern.degree_type,
+      intern_type:       intern_type               || intern.intern_type,
+      reference_type:    reference_type            ?? intern.reference_type,
+      reference_name:    reference_name?.trim()    ?? intern.reference_name,
+      reference_contact: reference_contact?.trim() ?? intern.reference_contact,
+    });
 
-  reference_contact:
-    reference_contact !== undefined
-      ? reference_contact?.trim()
-      : intern.reference_contact,
-});
     return res.status(200).json({
       message: 'Profile updated successfully.',
       intern,
@@ -810,6 +815,230 @@ if (
 };
 
 
+const updateMyDocuments = async (req, res) => {
+  try {
+    const intern_id = req.intern.id;
+
+    const doc = await InternDocument.findOne({ where: { intern_id } });
+    if (!doc) {
+      return res.status(404).json({ message: 'Document record not found.' });
+    }
+
+    const { document_type, college_detail } = req.body;
+
+    // ── Validate document_type if provided ──
+    const validDocumentTypes = ['aadhaar', 'voter_card', 'passport', 'driving_licence'];
+    if (document_type && !validDocumentTypes.includes(document_type)) {
+      return res.status(400).json({ message: 'Invalid document_type.' });
+    }
+
+    const updates = {};
+
+    // ── Update document_type if provided ──
+    if (document_type) updates.document_type = document_type;
+
+    // ── Update college_detail if provided ──
+    if (college_detail) {
+      try {
+        updates.college_detail = typeof college_detail === 'string'
+          ? JSON.parse(college_detail)
+          : college_detail;
+      } catch {
+        return res.status(400).json({ message: 'Invalid college_detail format.' });
+      }
+    }
+
+    // ── Handle individual file replacements ──
+    const fileFields = ['id_proof', 'photo', 'resume', 'last_sem_marksheet'];
+
+    for (const field of fileFields) {
+      if (req.files?.[field]?.[0]) {
+        // delete old file if exists
+        if (doc[field]) {
+          deleteUploadedFile(doc[field]);
+        }
+
+        // move new file
+        const result = moveUploadedFile(
+          req.files[field][0].path,
+          `interns/${intern_id}`,
+          field
+        );
+
+        if (!result) {
+          // clean up temp files uploaded so far
+          ['id_proof', 'photo', 'resume', 'last_sem_marksheet'].forEach((f) => {
+            if (req.files?.[f]?.[0]?.path && fs.existsSync(req.files[f][0].path)) {
+              fs.unlinkSync(req.files[f][0].path);
+            }
+          });
+          return res.status(500).json({ message: `Failed to upload ${field}.` });
+        }
+
+        updates[field] = result.url;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No fields provided to update.' });
+    }
+
+    await doc.update(updates);
+
+    return res.status(200).json({
+      message: 'Documents updated successfully.',
+      documents: doc,
+    });
+
+  } catch (err) {
+    // clean up any temp files on error
+    ['id_proof', 'photo', 'resume', 'last_sem_marksheet'].forEach((field) => {
+      if (req.files?.[field]?.[0]?.path && fs.existsSync(req.files[field][0].path)) {
+        fs.unlinkSync(req.files[field][0].path);
+      }
+    });
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+
+const adminUpdateIntern = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      name,
+      email,
+      mobile,
+      college_name,
+      enrollment_no,
+      degree_type,
+      intern_type,
+      start_date,
+      end_date,
+      mentor_ids,
+      reference_type,
+      reference_name,
+      reference_contact,
+      status,
+    } = req.body;
+
+    const intern = await Intern.findByPk(id);
+    if (!intern) {
+      return res.status(404).json({ message: "Intern not found." });
+    }
+
+    // validate mobile
+    if (mobile && !/^\d{10}$/.test(mobile)) {
+      return res.status(400).json({
+        message: "Mobile must be a 10-digit number.",
+      });
+    }
+
+    // validate mentor_ids
+    if (mentor_ids && Array.isArray(mentor_ids) && mentor_ids.length > 0) {
+      const mentors = await User.findAll({
+        where: { id: mentor_ids },
+      });
+
+      if (mentors.length !== mentor_ids.length) {
+        return res.status(404).json({
+          message: "One or more mentors not found.",
+        });
+      }
+    }
+
+    // validate dates
+    const newStart = start_date || intern.start_date;
+    const newEnd = end_date || intern.end_date;
+
+    if (newStart && newEnd && new Date(newStart) >= new Date(newEnd)) {
+      return res.status(400).json({
+        message: "end_date must be after start_date.",
+      });
+    }
+
+    // check email uniqueness
+    if (email && email !== intern.email) {
+      const existing = await Intern.findOne({
+        where: { email: email.trim().toLowerCase() },
+      });
+
+      if (existing) {
+        return res.status(409).json({
+          message: "Email already in use.",
+        });
+      }
+    }
+
+    // check enrollment uniqueness
+    if (enrollment_no && enrollment_no !== intern.enrollment_no) {
+      const existing = await Intern.findOne({
+        where: { enrollment_no: enrollment_no.trim() },
+      });
+
+      if (existing) {
+        return res.status(409).json({
+          message: "Enrollment number already in use.",
+        });
+      }
+    }
+
+    // ===== Reference Validation =====
+    const validReferenceTypes = [
+      "employee",
+      "intern",
+      "college",
+      "friend",
+      "social_media",
+      "website",
+      "other",
+    ];
+
+    let normalizedReferenceType = null;
+
+    if (reference_type && reference_type.trim() !== "") {
+      if (!validReferenceTypes.includes(reference_type)) {
+        return res.status(400).json({
+          message: "Invalid reference type.",
+        });
+      }
+
+      normalizedReferenceType = reference_type;
+    }
+
+    await intern.update({
+      name: name?.trim() ?? intern.name,
+      email: email?.trim().toLowerCase() ?? intern.email,
+      mobile: mobile ?? intern.mobile,
+      college_name: college_name?.trim() ?? intern.college_name,
+      enrollment_no: enrollment_no?.trim() ?? intern.enrollment_no,
+      degree_type: degree_type ?? intern.degree_type,
+      intern_type: intern_type ?? intern.intern_type,
+      start_date: start_date ?? intern.start_date,
+      end_date: end_date ?? intern.end_date,
+      mentor_ids: mentor_ids !== undefined ? mentor_ids : intern.mentor_ids,
+
+      reference_type: normalizedReferenceType,
+      reference_name: reference_name?.trim() || null,
+      reference_contact: reference_contact?.trim() || null,
+    });
+
+    const updated = await attachMentors(intern);
+
+    return res.status(200).json({
+      message: "Intern updated successfully.",
+      intern: updated,
+    });
+
+  } catch (err) {
+    console.log("🚀 ~ adminUpdateIntern ~ err:", err);
+
+    return res.status(500).json({
+      message: err.message,
+    });
+  }
+};
 // ─────────────────────────────────────────────
 
 module.exports = {
@@ -824,5 +1053,7 @@ module.exports = {
   extendInternship,
   deactivateIntern,
   regenerateSetupToken,
-  updateMyProfile
+  updateMyProfile,
+  updateMyDocuments ,
+  adminUpdateIntern
 };

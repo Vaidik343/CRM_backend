@@ -223,14 +223,14 @@ LeaveBalance.belongsTo(User, {
 // Intern
 
 // ── Intern → User (mentor) ──
-Intern.belongsTo(User, {
-  foreignKey: 'mentor_id',
-  as: 'mentor',
-});
-User.hasMany(Intern, {
-  foreignKey: 'mentor_id',
-  as: 'mentoredInterns',
-});
+// Intern.belongsTo(User, {
+//   foreignKey: 'mentor_id',
+//   as: 'mentor',
+// });
+// User.hasMany(Intern, {
+//   foreignKey: 'mentor_id',
+//   as: 'mentoredInterns',
+// });
 
 
 // ── Intern → User (approved_by) ──
@@ -264,14 +264,14 @@ InternProject.belongsTo(Intern, {
 });
 
 // ── InternProject → User (mentor) ──
-InternProject.belongsTo(User, {
-  foreignKey: 'mentor_id',
-  as: 'mentor',
-});
-User.hasMany(InternProject, {
-  foreignKey: 'mentor_id',
-  as: 'mentoredProjects',
-});
+// InternProject.belongsTo(User, {
+//   foreignKey: 'mentor_id',
+//   as: 'mentor',
+// });
+// User.hasMany(InternProject, {
+//   foreignKey: 'mentor_id',
+//   as: 'mentoredProjects',
+// });
 
 // ── Intern → InternTask ──
 Intern.hasMany(InternTask, {

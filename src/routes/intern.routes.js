@@ -14,7 +14,9 @@ const {
   extendInternship,
   deactivateIntern,
   regenerateSetupToken,
-  updateMyProfile
+  updateMyProfile,
+  updateMyDocuments ,
+  adminUpdateIntern
 } = require('../controllers/intern.controller');
 
 const {
@@ -232,13 +234,35 @@ router.post('/intern/login', login);
 // Returns own profile
 // in intern.routes.js — update the /intern/me route
 router.get('/intern/me', authenticateIntern, async (req, res) => {
-  const intern = await Intern.findByPk(req.intern.id, {
-    include: [
-      { model: User, as: 'mentor', attributes: ['id', 'name', 'employee_id'] },
-      { model: InternDocument, as: 'documents' },
-    ],
-  });
-  return res.status(200).json({ intern });
+  try {
+    const { User, InternDocument } = require('../models');
+
+    const intern = await Intern.findByPk(req.intern.id, {
+      include: [
+        { model: InternDocument, as: 'documents' },
+      ],
+    });
+
+    if (!intern) return res.status(404).json({ message: 'Intern not found.' });
+
+    const plain = intern.toJSON();
+
+    // manually fetch mentors from mentor_ids JSONB array
+    if (plain.mentor_ids && plain.mentor_ids.length > 0) {
+      const mentors = await User.findAll({
+        where: { id: plain.mentor_ids },
+        attributes: ['id', 'name', 'employee_id'],
+      });
+      plain.mentors = mentors;
+    } else {
+      plain.mentors = [];
+    }
+
+    return res.status(200).json({ intern: plain });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 });
 
 // PATCH /api/intern/me
@@ -254,6 +278,14 @@ router.get('/admin/interns', authenticate, requireAdmin, getAllInterns);
 // GET /api/admin/interns/:id
 // Returns full intern detail with documents
 router.get('/admin/interns/:id', authenticate, requireAdmin, getInternById);
+
+// PATCH /api/intern/documents — intern updates own documents
+router.patch('/intern/documents', authenticateIntern, internUpload, updateMyDocuments);
+
+
+// PATCH /api/admin/interns/:id — admin updates intern
+router.patch('/admin/interns/:id', authenticate, requireAdmin, adminUpdateIntern);
+
 
 // PATCH /api/admin/interns/:id/approve
 // Required body: start_date, end_date
