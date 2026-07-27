@@ -3,6 +3,7 @@ const {User, sequelize} = require('../models');
 
 //admin put employee on probation
 
+   
 const startProbation = async (req, res) => {
 
     const t = await sequelize.transaction();
@@ -28,6 +29,7 @@ const startProbation = async (req, res) => {
 
 
      const user = await User.findByPk(id);
+     console.log("🚀 ~ startProbation ~ user:", user)
 
     if (!user) {
       await t.rollback();
@@ -44,10 +46,10 @@ const startProbation = async (req, res) => {
       return res.status(400).json({ message: 'Employee is already on probation.' });
     }
 
-    if (!user.is_active) {
-      await t.rollback();
-      return res.status(400).json({ message: 'Cannot put an inactive employee on probation.' });
-    }
+    // if (!user.is_active) {
+    //   await t.rollback();
+    //   return res.status(400).json({ message: 'Cannot put an inactive employee on probation.' });
+    // }
 
      await user.update({
       is_probation:     true,
@@ -74,6 +76,7 @@ const startProbation = async (req, res) => {
 
     } catch (error) {
        await t.rollback();
+        console.log("🚀 ~ startProbation ~ error:", error)
        return res.status(500).json({ message: err.message });
     }
 
@@ -110,7 +113,7 @@ const passProbation = async(req, res) => {
 
         await user.update({
             is_probation: false,
-            probation_start: 'passed',
+             probation_status: 'passed', 
         }, {transaction: t});
 
         await t.commit();

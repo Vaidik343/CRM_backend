@@ -336,7 +336,7 @@ const cancelLeave = async (req, res) => {
       action: 'cancelled',
       remarks: { cancelled_by: 'employee' },
     }, { transaction: t });
-
+const employee = await User.findByPk(user_id, { attributes: ['name'] });
     const io = req.app.get("io");
 
 const admins = await User.findAll({
@@ -433,24 +433,14 @@ const getAllLeaves = async (req, res) => {
 const approveLeave = async (req, res) => {
   const t = await sequelize.transaction();
 
-  const io = req.app.get("io");
-
-await createNotification(io, {
-  user_id: leave.user_id,
-  type:    "LEAVE_APPROVED",
-  title:   "Leave Request Approved",
-  message: `Your leave request (${leave.display_id}) has been approved.`,
-  data:    { leave_id: leave.id, display_id: leave.display_id },
-});
-
-io.to(`user:${leave.user_id}`).emit("LEAVE_UPDATED", {
-  id:     leave.id,
-  status: "approved",
-});
+ 
 
   try {
     const admin_id = req.user.id;
     const { id }   = req.params;
+
+
+
 
     // ── 1. Find leave with employee info ──
     const leave = await LeaveRequest.findByPk(id, {
@@ -627,6 +617,21 @@ const rejectLeave = async (req, res) => {
     }, { transaction: t });
 
     await t.commit();
+
+    const io = req.app.get('io');
+
+await createNotification(io, {
+  user_id: leave.user_id,
+  type:    'LEAVE_REJECTED',
+  title:   'Leave Request Rejected',
+  message: `Your leave request (${leave.display_id}) has been rejected.`,
+  data:    { leave_id: leave.id, display_id: leave.display_id },
+});
+
+io.to(`user:${leave.user_id}`).emit('LEAVE_UPDATED', {
+  id:     leave.id,
+  status: 'rejected',
+});
 
     return res.status(200).json({ message: 'Leave request rejected.' });
 

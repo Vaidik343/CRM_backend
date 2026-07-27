@@ -147,10 +147,17 @@ const validReferenceTypes = [
   "other",
 ];
 
-if (
-  reference_type &&
-  !validReferenceTypes.includes(reference_type)
-) {
+// normalise empty strings to null
+const normalizedReferenceType =
+  reference_type && reference_type.trim() !== "" ? reference_type.trim() : null;
+
+const normalizedReferenceName =
+  reference_name && reference_name.trim() !== "" ? reference_name.trim() : null;
+
+const normalizedReferenceContact =
+  reference_contact && reference_contact.trim() !== "" ? reference_contact.trim() : null;
+
+if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReferenceType)) {
   await t.rollback();
   return res.status(400).json({
     message: "Invalid reference type.",
@@ -180,9 +187,9 @@ if (
       intern_type,
       status:        'pending',
 
-        reference_type,
-  reference_name,
-  reference_contact,
+ reference_type: normalizedReferenceType,
+  reference_name: normalizedReferenceName,
+  reference_contact: normalizedReferenceContact,
     }, { transaction: t });
 
     // ── 7. Move uploaded files ──
@@ -191,12 +198,14 @@ if (
       `interns/${intern.id}`,
       'id_proof'
     );
+    console.log("🚀 ~ register ~ idProofResult:", idProofResult)
 
     const photoResult = moveUploadedFile(
       req.files.photo[0].path,
       `interns/${intern.id}`,
       'photo'
     );
+    console.log("🚀 ~ register ~ photoResult:", photoResult)
 
     if (!idProofResult || !photoResult) {
       await t.rollback();
@@ -223,7 +232,7 @@ if (
     }
 
     // ── 8. Create document record ──
-    await InternDocument.create({
+  const id =   await InternDocument.create({
       intern_id:          intern.id,
       document_type,
       id_proof:           idProofResult.url,
@@ -232,6 +241,7 @@ if (
       resume:             resumeResult?.url    || null,
       last_sem_marksheet: marksheetResult?.url || null,
     }, { transaction: t });
+  console.log("🚀 ~ register ~ id:", id)
 
     await t.commit();
 
@@ -521,6 +531,7 @@ const getInternById = async (req, res) => {
     const intern = await Intern.findByPk(id, {
       include: internIncludes,
     });
+    console.log("🚀 ~ getInternById ~ intern:", intern)
 
     if (!intern) {
       return res.status(404).json({ message: 'Intern not found.' });
@@ -792,6 +803,33 @@ const updateMyProfile = async (req, res) => {
       return res.status(400).json({ message: 'Invalid intern_type.' });
     }
 
+    const validReferenceTypes = [
+  "employee",
+  "intern",
+  "college",
+  "friend",
+  "social_media",
+  "website",
+  "other",
+];
+
+// normalise empty strings to null
+const normalizedReferenceType =
+  reference_type && reference_type.trim() !== "" ? reference_type.trim() : null;
+
+const normalizedReferenceName =
+  reference_name && reference_name.trim() !== "" ? reference_name.trim() : null;
+
+const normalizedReferenceContact =
+  reference_contact && reference_contact.trim() !== "" ? reference_contact.trim() : null;
+
+if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReferenceType)) {
+  await t.rollback();
+  return res.status(400).json({
+    message: "Invalid reference type.",
+  });
+}
+
     await intern.update({
       name:              name?.trim()              || intern.name,
       mobile:            mobile                    || intern.mobile,
@@ -799,9 +837,9 @@ const updateMyProfile = async (req, res) => {
       enrollment_no:     enrollment_no?.trim()     || intern.enrollment_no,
       degree_type:       degree_type               || intern.degree_type,
       intern_type:       intern_type               || intern.intern_type,
-      reference_type:    reference_type            ?? intern.reference_type,
-      reference_name:    reference_name?.trim()    ?? intern.reference_name,
-      reference_contact: reference_contact?.trim() ?? intern.reference_contact,
+      reference_type:    normalizedReferenceType            ?? intern.reference_type,
+      reference_name:   normalizedReferenceName  ?? intern.reference_name,
+      reference_contact: normalizedReferenceContact?? intern.reference_contact,
     });
 
     return res.status(200).json({
@@ -815,11 +853,13 @@ const updateMyProfile = async (req, res) => {
 };
 
 
+
 const updateMyDocuments = async (req, res) => {
   try {
     const intern_id = req.intern.id;
 
     const doc = await InternDocument.findOne({ where: { intern_id } });
+    console.log("🚀 ~ updateMyDocuments ~ doc:", doc)
     if (!doc) {
       return res.status(404).json({ message: 'Document record not found.' });
     }
@@ -864,6 +904,7 @@ const updateMyDocuments = async (req, res) => {
           `interns/${intern_id}`,
           field
         );
+        console.log("🚀 ~ updateMyDocuments ~ result:", result)
 
         if (!result) {
           // clean up temp files uploaded so far
@@ -891,6 +932,7 @@ const updateMyDocuments = async (req, res) => {
     });
 
   } catch (err) {
+      console.log("🚀 ~ updateMyDocuments ~ err:", err)
     // clean up any temp files on error
     ['id_proof', 'photo', 'resume', 'last_sem_marksheet'].forEach((field) => {
       if (req.files?.[field]?.[0]?.path && fs.existsSync(req.files[field][0].path)) {

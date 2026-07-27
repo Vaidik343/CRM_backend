@@ -34,6 +34,7 @@ const moveUploadedFile = (tempFilePath, subFolder, fieldName) => {
     // build public URL
     // e.g. /uploads/interns/abc-uuid/id_proof_123456789.jpg
     const publicUrl = `/uploads/${subFolder.replace(/\\/g, '/')}/${fileName}`;
+    console.log("🚀 ~ moveUploadedFile ~ publicUrl:", publicUrl)
 
     console.log(`File moved to: ${finalPath}`);
 

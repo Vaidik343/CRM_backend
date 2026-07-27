@@ -45,6 +45,7 @@ const routeFiles = [
   "roles.routes.js",
   "leave.routes.js",
   "leaveBalance.routes.js",
+  "probation.routes.js",
   "intern.routes.js",
   "notifications.routes.js",  // new
   "report.routes.js",
@@ -59,6 +60,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use("/public", express.static(path.join(__dirname, "public")));
 
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // ── Make io accessible in all controllers via req.app.get("io") ──
 app.set("io", io);
 
@@ -130,6 +132,10 @@ io.on("connection", (socket) => {
     if (!userId) return;
     socket.join(`user:${userId}`);
   });
+
+  socket.on('join_intern', ({ intern_id }) => {
+  socket.join(`intern:${intern_id}`);
+});
 
   socket.on("disconnect", () => {
     console.log(`❌ Socket disconnected: ${socket.id}`);
