@@ -10,12 +10,18 @@ async function authenticate(req, res, next) {
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findByPk(payload.sub, {
-      attributes: ["id", "employee_id", "name", "email", "role_id", "is_admin"],
-      include: [{ model: Role, attributes: ["id", "name"] }],
-    });
+const user = await User.findByPk(payload.sub, {
+  attributes: ["id", "employee_id", "name", "email", "role_id", "is_admin", "is_active"],  // 
+  include: [{ model: Role, attributes: ["id", "name"] }],
+});
     // console.log("🚀 ~ authenticate ~ user:", user)
     if (!user) return res.status(401).json({ message: "Invalid token" });
+
+    if (!user.is_active) {
+  return res.status(401).json({ message: "Your account has been deactivated." });
+}
+
+
 // console.log("AUTH USER:", req.user);
     // Flatten to a plain object and attach the role name for convenience
     req.user = user.toJSON();

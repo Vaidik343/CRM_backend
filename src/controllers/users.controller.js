@@ -26,8 +26,12 @@ const updateUserValidators = [
   handleValidation,
 ];
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const safeAttributes = ["id", "employee_id", "name", "email", "role_id", "is_admin", "mobile", "createdAt"];
+const safeAttributes = [
+  "id", "employee_id", "name", "email", "role_id", "is_admin", "mobile",
+  "is_active", "saturday_group",
+  "is_probation", "probation_start", "probation_end", "probation_status",
+  "createdAt",
+];
 
 const userIncludes = [{ model: Role, attributes: ["id", "name"] }];
 

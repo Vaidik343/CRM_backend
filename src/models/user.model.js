@@ -61,7 +61,12 @@ is_probation: {
       is_admin: {
         type: DataTypes.BOOLEAN,
         allowNull:false
-      }
+      } ,
+      is_active: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: true,
+  allowNull: false,
+},
     },
     
     {

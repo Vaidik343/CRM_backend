@@ -716,8 +716,13 @@ const deactivateIntern = async (req, res) => {
       return res.status(400).json({ message: 'Intern is already deactivated.' });
     }
 
-    await intern.update({ status: 'completed' });
 
+await intern.update({ 
+  is_active: false,
+  status: 'completed',  // natural completion
+  // OR if fired/removed:
+  // status: 'terminated' — but we'd need to add this to enum
+});
     return res.status(200).json({ message: 'Intern deactivated successfully.' });
 
   } catch (err) {
@@ -963,6 +968,7 @@ const adminUpdateIntern = async (req, res) => {
       reference_name,
       reference_contact,
       status,
+      verify_document_fields,
     } = req.body;
 
     const intern = await Intern.findByPk(id);
@@ -1065,6 +1071,22 @@ const adminUpdateIntern = async (req, res) => {
       reference_name: reference_name?.trim() || null,
       reference_contact: reference_contact?.trim() || null,
     });
+
+     if (verify_document_fields && Array.isArray(verify_document_fields) && verify_document_fields.length > 0) {
+      const validFields = ['id_proof', 'photo', 'resume', 'last_sem_marksheet', 'document_type'];
+      const invalid = verify_document_fields.filter((f) => !validFields.includes(f));
+
+      if (invalid.length > 0) {
+        return res.status(400).json({ message: `Invalid document fields: ${invalid.join(', ')}` });
+      }
+
+      const doc = await InternDocument.findOne({ where: { intern_id: id } });
+      if (doc) {
+        const existing = doc.verified_fields || [];
+        const merged   = [...new Set([...existing, ...verify_document_fields])];
+        await doc.update({ verified_fields: merged });
+      }
+    }
 
     const updated = await attachMentors(intern);
 

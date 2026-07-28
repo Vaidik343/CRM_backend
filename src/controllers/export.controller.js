@@ -1,5 +1,5 @@
 const ExcelJS = require("exceljs");
-const { Call, Task, WorkLog, User, Project, ProjectMember, Role , TaskStatusLog } = require("../models");
+const { Call, Task, WorkLog, User, Project, ProjectMember, Role, TaskStatusLog, LeaveRequest, LeaveBalance } = require("../models");
 const { Op } = require("sequelize");
 
 
@@ -931,7 +931,183 @@ workLogsSheet.getColumn(7).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Updated At
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-module.exports = { exportData, exportMyData, exportEmployeeData, exportProjectData , exportAllEmployeeData };
+
+
+
+const exportLeaveData = async (req, res) => {
+  try {
+    const { from, to, user_id } = req.query;
+
+    // ── Date range ──
+    const start = new Date(from || new Date(new Date().getFullYear(), 0, 1)); // default: start of year
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(to || new Date());
+    end.setHours(23, 59, 59, 999);
+
+    // ── Target user (admin can pass user_id, otherwise all employees) ──
+    const userWhere = user_id ? { id: user_id } : { is_admin: false };
+    const targetUser = user_id ? await User.findByPk(user_id) : null;
+    if (user_id && !targetUser) {
+      return res.status(404).json({ message: "Employee not found." });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+
+    // ════════════════════════════════════════════════════
+    // SHEET 1 — All Leave Requests
+    // ════════════════════════════════════════════════════
+    const leaveSheet = workbook.addWorksheet("Leave Requests");
+
+    leaveSheet.columns = [
+      { header: "Display ID",     key: "display_id",    width: 18 },
+      { header: "Employee",       key: "employee_name", width: 22 },
+      { header: "Employee ID",    key: "employee_id",   width: 15 },
+      { header: "Leave Type",     key: "leave_type",    width: 18 },
+      { header: "Reason Type",    key: "reason_type",   width: 18 },
+      { header: "Duration",       key: "duration",      width: 18 },
+      { header: "Start Date",     key: "start_date",    width: 15 },
+      { header: "End Date",       key: "end_date",      width: 15 },
+      { header: "Status",         key: "status",        width: 15 },
+      { header: "Reason",         key: "reason",        width: 30 },
+      { header: "Rejection Reason", key: "rejection_reason", width: 30 },
+      { header: "Approved By",    key: "approved_by_name",   width: 20 },
+      { header: "Approved At",    key: "approved_at",   width: 20 },
+      { header: "Applied On",     key: "createdAt",     width: 20 },
+    ];
+
+    const leaveWhere = {
+      start_date: { [Op.between]: [start.toISOString().split("T")[0], end.toISOString().split("T")[0]] },
+    };
+    if (user_id) leaveWhere.user_id = user_id;
+
+    const leaves = await LeaveRequest.findAll({
+      where: leaveWhere,
+      include: [
+        { model: User, as: "employee", where: userWhere, attributes: ["id", "name", "employee_id"] },
+        { model: User, as: "approver", attributes: ["name"], required: false },
+      ],
+      order: [["start_date", "DESC"]],
+    });
+
+    leaveSheet.addRows(leaves.map((r) => ({
+      ...r.toJSON(),
+      employee_name:    r.employee?.name       || "—",
+      employee_id:      r.employee?.employee_id || "—",
+      approved_by_name: r.approver?.name        || "—",
+      approved_at:      r.approved_at           || null,
+    })));
+
+    // Total row
+    const leaveTotalRow = leaveSheet.addRow({
+      display_id:    "TOTAL LEAVES",
+      employee_name: leaves.length,
+    });
+    leaveTotalRow.font = { bold: true };
+    leaveTotalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE9D9" } };
+
+    leaveSheet.getColumn(7).numFmt  = "dd/mm/yyyy"; // Start Date
+    leaveSheet.getColumn(8).numFmt  = "dd/mm/yyyy"; // End Date
+    leaveSheet.getColumn(13).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Approved At
+    leaveSheet.getColumn(14).numFmt = "dd/mm/yyyy hh:mm AM/PM"; // Applied On
+
+    leaveSheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
+    });
+
+    // ════════════════════════════════════════════════════
+    // SHEET 2 — Month-wise Leave Summary
+    // ════════════════════════════════════════════════════
+    const summarySheet = workbook.addWorksheet("Monthly Summary");
+
+    // Get all unique employees in the result
+    const employeeIds = [...new Set(leaves.map((l) => l.user_id))];
+
+    // Get leave balance records for these employees in date range
+    const startYear = start.getFullYear();
+    const endYear   = end.getFullYear();
+    const startMonth = start.getMonth() + 1;
+    const endMonth   = end.getMonth() + 1;
+
+    const balances = await LeaveBalance.findAll({
+      where: {
+        user_id: employeeIds.length > 0 ? employeeIds : ['00000000-0000-0000-0000-000000000000'], // avoid empty IN
+        [Op.or]: [
+          // include all months between start and end year/month
+          {
+            year:  startYear,
+            month: { [Op.gte]: startMonth },
+          },
+          {
+            year:  endYear,
+            month: { [Op.lte]: endMonth },
+          },
+          // years in between
+          {
+            year: { [Op.between]: [startYear + 1, endYear - 1] },
+          },
+        ],
+      },
+      include: [
+        { model: User, as: "employee", attributes: ["name", "employee_id"] },
+      ],
+      order: [["year", "ASC"], ["month", "ASC"]],
+    });
+
+    const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    summarySheet.columns = [
+      { header: "Employee",       key: "employee_name",  width: 22 },
+      { header: "Employee ID",    key: "employee_id",    width: 15 },
+      { header: "Month",          key: "month_label",    width: 12 },
+      { header: "Year",           key: "year",           width: 10 },
+      { header: "Entitled Paid",  key: "entitled_paid",  width: 16 },
+      { header: "Used Paid",      key: "used_paid",      width: 14 },
+      { header: "Used Unpaid",    key: "used_unpaid",    width: 14 },
+      { header: "Used Exchange",  key: "used_exchange",  width: 16 },
+      { header: "Remaining Paid", key: "remaining_paid", width: 16 },
+    ];
+
+    summarySheet.addRows(balances.map((b) => ({
+      employee_name:  b.employee?.name        || "—",
+      employee_id:    b.employee?.employee_id || "—",
+      month_label:    MONTH_NAMES[(b.month || 1) - 1],
+      year:           b.year,
+      entitled_paid:  parseFloat(b.entitled_paid  || 0),
+      used_paid:      parseFloat(b.used_paid       || 0),
+      used_unpaid:    parseFloat(b.used_unpaid     || 0),
+      used_exchange:  parseFloat(b.used_exchange   || 0),
+      remaining_paid: parseFloat(b.entitled_paid || 0) - parseFloat(b.used_paid || 0),
+    })));
+
+    summarySheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
+    });
+
+    // ── Send ──
+    const fileLabel = from && to
+      ? `${from}_to_${to}`
+      : `${start.getFullYear()}`;
+
+    const empLabel = targetUser
+      ? (targetUser.employee_id || targetUser.name.replace(/\s+/g, "_"))
+      : "all_employees";
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${empLabel}_leaves_${fileLabel}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("exportLeaveData error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+
+module.exports = { exportData, exportMyData, exportEmployeeData, exportProjectData , exportAllEmployeeData, exportLeaveData  };
 // module.exports = { exportData };
 
 

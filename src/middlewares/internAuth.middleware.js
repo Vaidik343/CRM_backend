@@ -27,18 +27,25 @@ async function authenticateIntern(req, res, next) {
       return res.status(403).json({ message: 'Access denied. Not an intern token.' });
     }
 
-    const intern = await Intern.findByPk(payload.sub, {
-      attributes: [
-        'id', 'display_id', 'name', 'email',
-        'intern_type', 'degree_type', 'college_name',
-        'status', 'start_date', 'end_date',
-        'mentor_ids', 'enrollment_no',
-      ],
-    });
+ const intern = await Intern.findByPk(payload.sub, {
+  attributes: [
+    'id', 'display_id', 'name', 'email',
+    'intern_type', 'degree_type', 'college_name',
+    'status', 'is_active', 'start_date', 'end_date',  // ← add is_active
+    'mentor_ids', 'enrollment_no',
+  ],
+});
+
+
 
     if (!intern) {
       return res.status(401).json({ message: 'Invalid token.' });
     }
+
+    if (!intern.is_active) {
+  return res.status(403).json({ message: 'Your account has been deactivated.' });
+}
+
 
     if (intern.status === 'completed') {
       return res.status(403).json({ message: 'Your internship period has ended.' });

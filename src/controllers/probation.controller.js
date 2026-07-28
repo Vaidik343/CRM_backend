@@ -130,7 +130,7 @@ const passProbation = async(req, res) => {
         })
     } catch (error) {
         await t.rollback();
-        return res.status(500).json({message: err.message});
+        return res.status(500).json({message: error.message});
     }
 };
 
@@ -227,7 +227,7 @@ const getProbationEmployees = async (req, res) => {
       attributes: [
         'id', 'name', 'employee_id', 'email',
         'is_active', 'is_probation',
-        'probation_start', 'probation_end', 'probation_status',
+        'probation_start', 'probation_end', 'probation_status', 'saturday_group',
         'createdAt',
       ],
       order:    [['probation_start', 'DESC']],

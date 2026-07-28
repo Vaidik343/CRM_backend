@@ -14,12 +14,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM('intern', 'trainee'),
       allowNull: false,
     },
-    status: {
-      // ❌ you forgot this entirely
-      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'active', 'completed'),
-      defaultValue: 'pending',
-      allowNull: false,
-    },
+status: {
+  type: DataTypes.ENUM('pending', 'approved', 'rejected', 'active', 'completed', 'terminated'),
+  defaultValue: 'pending',
+  allowNull: false,
+},
     name: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -105,6 +104,13 @@ setup_token_expires_at: {
       type: DataTypes.DATE,
       allowNull: true, // ❌ not false — they haven't logged in yet at registration
     },
+
+    is_active: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: true,
+  allowNull: false,
+},
+
   }, {
     tableName: 'interns',
     timestamps: true, // ❌ you had false — we need createdAt/updatedAt
