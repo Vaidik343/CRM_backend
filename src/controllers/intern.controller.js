@@ -1,4 +1,4 @@
-
+﻿
 const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
 const crypto    = require('crypto');
@@ -896,9 +896,43 @@ const updateMyDocuments = async (req, res) => {
     // ── Handle individual file replacements ──
     const fileFields = ['id_proof', 'photo', 'resume', 'last_sem_marksheet'];
 
+    // Fields already verified by admin are locked -- intern cannot overwrite them
+    const verifiedFields = doc.verified_fields || [];
+
+    // Collect any locked fields the intern is trying to upload
+    const lockedAttempts = fileFields.filter(
+      (f) => req.files?.[f]?.[0] && verifiedFields.includes(f)
+    );
+
+    if (lockedAttempts.length > 0) {
+      // clean up temp files before returning
+      fileFields.forEach((f) => {
+        if (req.files?.[f]?.[0]?.path && fs.existsSync(req.files[f][0].path)) {
+          fs.unlinkSync(req.files[f][0].path);
+        }
+      });
+      return res.status(400).json({
+        message: `Cannot replace verified document(s): ${lockedAttempts.join(', ')}. These have been verified by admin and are locked.`,
+        locked_fields: lockedAttempts,
+      });
+    }
+
+    // Also block document_type change if it is verified
+    if (document_type && verifiedFields.includes('document_type')) {
+      fileFields.forEach((f) => {
+        if (req.files?.[f]?.[0]?.path && fs.existsSync(req.files[f][0].path)) {
+          fs.unlinkSync(req.files[f][0].path);
+        }
+      });
+      return res.status(400).json({
+        message: 'Cannot change document_type: it has been verified by admin and is locked.',
+        locked_fields: ['document_type'],
+      });
+    }
+
     for (const field of fileFields) {
       if (req.files?.[field]?.[0]) {
-        // delete old file if exists
+        // delete old file if exists (field is confirmed NOT verified)
         if (doc[field]) {
           deleteUploadedFile(doc[field]);
         }
@@ -1121,3 +1155,4 @@ module.exports = {
   updateMyDocuments ,
   adminUpdateIntern
 };
+

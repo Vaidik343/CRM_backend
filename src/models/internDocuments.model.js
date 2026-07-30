@@ -41,6 +41,13 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    // JSONB array of fields that admin has verified
+    // e.g. ['id_proof', 'photo', 'resume', 'last_sem_marksheet', 'document_type']
+    verified_fields: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: [],
+    },
   }, {
     tableName: 'intern_documents',
     timestamps: true,

@@ -17,6 +17,9 @@ const { createNotification } = require("./notifications.controller");
 
 const { Op } = require("sequelize");
 
+const { sendLeaveRequestEmail } = require("../utils/email");
+
+
 const {
   validateLeaveDates,
   validateDuplicateLeave,
@@ -172,7 +175,7 @@ const user_id = req.user.id;
       reason,
       status: LEAVE_STATUS.PENDING,
     }, { transaction: t });
-    console.log("🚀 ~ createLeave ~ leave:", leave)
+    // console.log("🚀 ~ createLeave ~ leave:", leave)
 
 
       // ── 9. Mark Saturday as exchanged ──
@@ -228,6 +231,17 @@ io.to("user:admins_room").emit("LEAVE_REQUESTED", leave);
 
 
     await t.commit();
+
+
+    try {
+  await sendLeaveRequestEmail({
+    employee,
+    leave,
+  });
+} catch (err) {
+  console.error("Leave email failed:", err);
+}
+
 
 
     return res.status(201).json({

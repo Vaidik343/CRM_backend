@@ -109,6 +109,13 @@
  *         last_sem_marksheet:
  *           type: string
  *           nullable: true
+ *         verified_fields:
+ *           type: array
+ *           items:
+ *             type: string
+ *             enum: [id_proof, photo, resume, last_sem_marksheet, document_type]
+ *           example: ["id_proof", "photo"]
+ *           description: List of document fields verified by admin. Populated via adminUpdateIntern.
  *     InternProject:
  *       type: object
  *       properties:
@@ -1139,6 +1146,121 @@
  *                     $ref: '#/components/schemas/InternWorkLog'
  */
 
+/**
+ * @swagger
+ * /api/admin/interns/{id}:
+ *   patch:
+ *     summary: Admin update intern profile and/or verify documents
+ *     description: |
+ *       Admin can update any editable field on an intern (name, email, mobile, mentor_ids, dates, etc.).
+ *       Optionally pass `verify_document_fields` to mark document fields as verified.
+ *       Valid verifiable fields: `id_proof`, `photo`, `resume`, `last_sem_marksheet`, `document_type`.
+ *       These fields are merged (union) into `InternDocument.verified_fields`.
+ *       You can verify a single field at a time or pass all 5 to verify everything.
+ *     tags: [Interns]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Intern ID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               mobile:
+ *                 type: string
+ *                 example: "9876543210"
+ *               college_name:
+ *                 type: string
+ *               enrollment_no:
+ *                 type: string
+ *               degree_type:
+ *                 type: string
+ *                 enum: [bachelor, master]
+ *               intern_type:
+ *                 type: string
+ *                 enum: [intern, trainee]
+ *               start_date:
+ *                 type: string
+ *                 format: date
+ *               end_date:
+ *                 type: string
+ *                 format: date
+ *               mentor_ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 description: Array of user IDs to assign as mentors (replaces existing list)
+ *               reference_type:
+ *                 type: string
+ *                 enum: [employee, intern, college, friend, social_media, website, other]
+ *               reference_name:
+ *                 type: string
+ *               reference_contact:
+ *                 type: string
+ *               verify_document_fields:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [id_proof, photo, resume, last_sem_marksheet, document_type]
+ *                 example: ["id_proof", "photo"]
+ *                 description: |
+ *                   Fields to mark as admin-verified in `InternDocument.verified_fields`.
+ *                   Pass all 5 to verify all documents at once.
+ *           examples:
+ *             UpdateProfile:
+ *               summary: Update name and mentors
+ *               value:
+ *                 name: "Ravi Sharma"
+ *                 mentor_ids: ["uuid-of-user-1", "uuid-of-user-2"]
+ *             VerifySingleDocument:
+ *               summary: Verify only id_proof
+ *               value:
+ *                 verify_document_fields: ["id_proof"]
+ *             VerifyAllDocuments:
+ *               summary: Verify all 5 document fields at once
+ *               value:
+ *                 verify_document_fields: ["id_proof", "photo", "resume", "last_sem_marksheet", "document_type"]
+ *     responses:
+ *       200:
+ *         description: Intern updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Intern updated successfully.
+ *                 intern:
+ *                   $ref: '#/components/schemas/Intern'
+ *       400:
+ *         description: Validation error (invalid mobile, dates, reference type, or invalid document field name)
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden — Admin only
+ *       404:
+ *         description: Intern not found, or one or more mentor IDs not found
+ *       409:
+ *         description: Email or enrollment number already in use by another intern
+ *       500:
+ *         description: Internal server error
+ */
 /**
  * @swagger
  * /api/intern/worklogs/{id}:

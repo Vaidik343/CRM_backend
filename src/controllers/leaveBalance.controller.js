@@ -44,7 +44,7 @@ const getMyBalance = async (req, res) => {
     const balance = await LeaveBalance.findOne({
       where: { user_id, month, year },
     });
-    console.log("🚀 ~ getMyBalance ~ balance:", balance)
+    // console.log("🚀 ~ getMyBalance ~ balance:", balance)
 
     // if no record yet this month — return default entitlement
     if (!balance) {

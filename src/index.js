@@ -17,6 +17,9 @@ const server = http.createServer(app);  // wrap express in http server for socke
 const cron = require("node-cron");
 const { cleanupOldNotifications } = require("./utils/notificationCleanup");
 
+const {transporter} = require("./utils/mailer");
+
+
 
 const io = new Server(server, {
   cors: {
@@ -142,6 +145,16 @@ io.on("connection", (socket) => {
   });
 });
 
+
+(async () => {
+  try {
+    await transporter.verify();
+    console.log("✅ SMTP Server Ready");
+  } catch (err) {
+    console.error("❌ SMTP Verify Failed");
+    console.error(err);
+  }
+})();
 
 // ── Start ─────────────────────────────────────────────────────
 const startServer = async () => {
