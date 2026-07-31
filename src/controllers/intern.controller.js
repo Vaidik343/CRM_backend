@@ -16,6 +16,8 @@ const {
   sequelize,
 } = require('../models');
 
+const { createNotification, notifyAdmins } = require('./notifications.controller');
+
 const { moveUploadedFile, deleteUploadedFile, deleteInternFolder } = require('../utils/fileUpload');
 const generateDisplayId = require('../utils/generateDisplayId');
 
@@ -245,6 +247,15 @@ if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReference
 
     await t.commit();
 
+    const io = req.app.get('io');
+await notifyAdmins(io, {
+  type:    'INTERN_REGISTERED',
+  title:   'New Intern Application',
+  message: `${name} has submitted an internship application. Review and approve or reject.`,
+  data:    { intern_id: intern.id },
+});
+
+
     return res.status(201).json({
       message:   'Registration submitted successfully. Please wait for admin approval.',
       intern_id: intern.id,
@@ -377,6 +388,16 @@ const setupPassword = async (req, res) => {
       setup_token:             null, // clear token after use
       setup_token_expires_at:  null,
     });
+
+
+    const io = req.app.get('io');
+await notifyAdmins(io, {
+  type:    'INTERN_ACTIVATED',
+  title:   'Intern Account Activated',
+  message: `${intern.name} has set their password and is now active.`,
+  data:    { intern_id: intern.id, display_id: intern.display_id },
+});
+
 
     return res.status(200).json({
       message: 'Password set successfully. You can now login.',

@@ -4,6 +4,10 @@ const { handleValidation } = require("../utils/validate");
 const {appendRemark} = require("../utils/remarksLog")
 const { Op } = require("sequelize");
 
+
+const { notifyAdmins } = require('./notifications.controller');
+
+
 // ── Validators ────────────────────────────────────────────────────────────────
 
 const createWorkLogValidators = [
@@ -85,6 +89,17 @@ const createWorkLog = async(req, res) => {
     });
 
       await workLog.reload({ include: workLogIncludes }); 
+
+
+      const io = req.app.get('io');
+await notifyAdmins(io, {
+  type:    'WORKLOG_CREATED',
+  title:   'Work Log Added',
+  message: `${req.user.name} logged work on ${workLog.Project?.name || 'a project'}: "${req.body.description.slice(0, 60)}${req.body.description.length > 60 ? '...' : ''}"`,
+  data:    { worklog_id: workLog.id },
+});
+
+
     
     // console.log("🚀 ~ createWorkLog ~ workLog:", workLog)
     return res.status(201).json({ workLog });
@@ -195,6 +210,18 @@ const updateWorkLog = async (req, res) => {
     }
 
     await workLog.update(patch);
+
+    if (req.body.remark) {
+  const io = req.app.get('io');
+  await notifyAdmins(io, {
+    type:    'REMARK_ADDED',
+    title:   'Remark Added on Work Log',
+    message: `${req.user.name} added a remark on work log: "${req.body.remark.slice(0, 80)}${req.body.remark.length > 80 ? '...' : ''}"`,
+    data:    { worklog_id: workLog.id },
+  });
+}
+
+
     await workLog.reload({ include: workLogIncludes });  // ← reload for consistent response
     return res.json({ workLog });
   } catch (err) {

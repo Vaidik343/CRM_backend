@@ -4,7 +4,7 @@ const { handleValidation } = require("../utils/validate");
 const { Op } = require("sequelize");
 const generateDisplayId = require("../utils/generateDisplayId");
 const { appendRemark } = require("../utils/remarksLog");
-const { createNotification } = require("./notifications.controller");
+const { createNotification, notifyAdmins  } = require("./notifications.controller");
 // ── Validators ────────────────────────────────────────────────────────────────
 
 const createTaskValidators = [
@@ -189,12 +189,22 @@ if (assignedId !== req.user.id) {
   });
 }
     await newTask.reload({ include: taskIncludes });
+
+    
     const io = req.app.get("io");
 if (assignedId !== req.user.id) {
   io.to(`user:${assignedId}`).emit("TASK_CREATED", newTask);
 }
 io.to("user:admins_room").emit("TASK_CREATED", newTask);
 
+
+await notifyAdmins(io, {
+  type:    'TASK_CREATED',
+  title:   'New Task Created',
+  message: `${req.user.name} created a task: "${task.task.slice(0, 80)}" (${task.display_id})`,
+  data:    { task_id: task.id, display_id: task.display_id },
+});
+io.to('admins_room').emit('TASK_CREATED', task);
     return res.status(201).json({ task: newTask });
 
   } catch (err) {
@@ -397,6 +407,19 @@ if (remarkText) {
 }
 
     await task.update(patch);
+
+
+    if (remark) {
+  const io = req.app.get('io');
+  await notifyAdmins(io, {
+    type:    'REMARK_ADDED',
+    title:   'Remark Added on Task',
+    message: `${req.user.name} added a remark on task ${task.display_id}: "${remark.slice(0, 80)}${remark.length > 80 ? '...' : ''}"`,
+    data:    { task_id: task.id, display_id: task.display_id },
+  });
+}
+
+
 
     if (statusChanged) {
   await TaskStatusLog.create({

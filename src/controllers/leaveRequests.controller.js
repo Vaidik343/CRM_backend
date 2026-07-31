@@ -13,11 +13,11 @@ const generateProjectCode = require("../utils/generateProjectCode");
 const { appendRemark } = require("../utils/remarksLog");
 
 const { countLeaveDays } = require('../utils/leaveValidation'); 
-const { createNotification } = require("./notifications.controller");
+const { createNotification , notifyAdmins } = require("./notifications.controller");
 
 const { Op } = require("sequelize");
 
-const { sendLeaveRequestEmail } = require("../utils/email");
+const { sendLeaveRequestEmail, sendLeaveApprovedEmail} = require("../utils/email");
 
 
 const {
@@ -154,9 +154,10 @@ const user_id = req.user.id;
 
     // ── 7. Generate display_id ──
     const employee = await User.findByPk(user_id, {
-      attributes: ['id', 'employee_id'],
+      attributes: ['id', 'employee_id',   "name",
+    "email",],
     });
-
+console.log(employee.toJSON());
     const display_id = generateDisplayId({
       prefix: 'LV',
       employeeId: employee.employee_id,
@@ -232,22 +233,18 @@ io.to("user:admins_room").emit("LEAVE_REQUESTED", leave);
 
     await t.commit();
 
+res.status(201).json({
+  message: "Leave request submitted successfully.",
+  leave,
+});
 
-    try {
-  await sendLeaveRequestEmail({
-    employee,
-    leave,
-  });
-} catch (err) {
+// Fire and forget
+sendLeaveRequestEmail({
+  employee,
+  leave,
+}).catch(err => {
   console.error("Leave email failed:", err);
-}
-
-
-
-    return res.status(201).json({
-      message: 'Leave request submitted successfully.',
-      leave,
-    });
+});
 
 
   } catch (error) {
@@ -451,9 +448,14 @@ const approveLeave = async (req, res) => {
 
   try {
     const admin_id = req.user.id;
+
+   
     const { id }   = req.params;
 
-
+ const approvedBy = await User.findByPk(admin_id, {
+  attributes: ['id', 'name'],
+});
+ console.log("🚀 ~ approveLeave ~ approvedBy:", approvedBy)
 
 
     // ── 1. Find leave with employee info ──
@@ -462,7 +464,7 @@ const approveLeave = async (req, res) => {
         {
           model: User,
           as: 'employee',
-          attributes: ['id', 'name', 'employee_id', 'saturday_group'],
+          attributes: ['id', 'name', 'employee_id','email', 'saturday_group'],
         },
       ],
     });
@@ -562,12 +564,37 @@ const approveLeave = async (req, res) => {
       data:    { leave_id: leave.id, display_id: leave.display_id },
     });
 
+    await notifyAdmins(io, {
+  type:    'LEAVE_APPROVED',
+  title:   'Leave Approved',
+  message: `You approved ${leave.employee.name}'s leave request (${leave.display_id}) — ${leaveDays} day(s).`,
+  data:    { leave_id: leave.id, display_id: leave.display_id },
+});
+
     io.to(`user:${leave.user_id}`).emit('LEAVE_UPDATED', {
       id:     leave.id,
       status: 'approved',
     });
 
     await t.commit();
+
+    try {
+ const slp =  await sendLeaveApprovedEmail({
+
+    
+    employee: leave.employee,
+    leave,
+    approvedBy,
+    leaveDays,
+
+
+    
+  });
+ console.log("🚀 ~ approveLeave ~ slp:", slp)
+} catch (err) {
+  console.error("Leave approval email failed:", err);
+}
+
 
     return res.status(200).json({
       message: 'Leave request approved.',
@@ -645,6 +672,14 @@ await createNotification(io, {
 io.to(`user:${leave.user_id}`).emit('LEAVE_UPDATED', {
   id:     leave.id,
   status: 'rejected',
+});
+
+// ← ADD: admin confirmation copy
+await notifyAdmins(io, {
+  type:    'LEAVE_REJECTED',
+  title:   'Leave Rejected',
+  message: `You rejected ${(await User.findByPk(leave.user_id, { attributes: ['name'] }))?.name}'s leave request (${leave.display_id}).`,
+  data:    { leave_id: leave.id, display_id: leave.display_id },
 });
 
     return res.status(200).json({ message: 'Leave request rejected.' });

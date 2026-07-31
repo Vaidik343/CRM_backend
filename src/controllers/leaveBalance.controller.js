@@ -209,6 +209,61 @@ const getPublicHolidays = async (req, res) => {
   }
 };
 
+
+const updatePublicHoliday = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, date } = req.body;
+
+    const holiday = await PublicHoliday.findByPk(id);
+    console.log("🚀 ~ updatePublicHoliday ~ holiday:", holiday)
+
+    if (!holiday) {
+      return res.status(404).json({
+        message: "Holiday not found.",
+      });
+    }
+
+    if (!name || !date) {
+      return res.status(400).json({
+        message: "name and date are required.",
+      });
+    }
+
+    const duplicate = await PublicHoliday.findOne({
+      where: {
+        date,
+        id: {
+          [Op.ne]: id,
+        },
+      },
+    });
+    console.log("🚀 ~ updatePublicHoliday ~ duplicate:", duplicate)
+
+    if (duplicate) {
+      return res.status(409).json({
+        message: `A holiday already exists on ${date}: ${duplicate.name}`,
+      });
+    }
+
+    await holiday.update({
+      name: name.trim(),
+      date,
+      year: new Date(date).getFullYear(),
+    });
+
+    return res.json({
+      message: "Holiday updated.",
+      holiday,
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+
 const deletePublicHoliday = async (req, res) => {
   try {
     const { id } = req.params;
@@ -234,5 +289,6 @@ module.exports.leaveBalanceController = {
   getEmployeeBalanceHistory,
   addPublicHoliday,
   getPublicHolidays,
+  updatePublicHoliday,
   deletePublicHoliday,
 };

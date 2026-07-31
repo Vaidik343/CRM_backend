@@ -50,6 +50,32 @@ const createNotification = async (io, { user_id, type, title, message, data = {}
   }
 };
 
+
+// helper
+
+// Helper — notify all admins with a different message than the employee gets
+const notifyAdmins = async (io, { type, title, message, data = {} }) => {
+  try {
+    const admins = await User.findAll({
+      where: { is_admin: true },
+      attributes: ['id'],
+    });
+
+    for (const admin of admins) {
+      await createNotification(io, {
+        user_id: admin.id,
+        type,
+        title,
+        message,
+        data,
+      });
+    }
+  } catch (err) {
+    console.error("notifyAdmins error:", err);
+  }
+};
+
+
 // ── Route handlers ────────────────────────────────────────────────────────────
 
 
@@ -135,6 +161,7 @@ const markAllRead = async (req, res) => {
 module.exports = {
   createNotification,   // internal helper — import this in other controllers
   getNotifications,
+   notifyAdmins,  
   markRead,
   markAllRead,
 };

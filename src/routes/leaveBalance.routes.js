@@ -26,6 +26,15 @@ router.get('/leaves/balance/:user_id/history', authenticate, requireAdmin, leave
 // Public holidays — admin manages, all can read
 router.get('/leaves/holidays',     authenticate, leaveBalanceController.getPublicHolidays);
 router.post('/leaves/holidays',    authenticate, requireAdmin, leaveBalanceController.addPublicHoliday);
+
+router.put(
+  "/leaves/holidays/:id",
+authenticate, requireAdmin,
+
+  leaveBalanceController.updatePublicHoliday
+);
+
+
 router.delete('/leaves/holidays/:id', authenticate, requireAdmin, leaveBalanceController.deletePublicHoliday);
 
 

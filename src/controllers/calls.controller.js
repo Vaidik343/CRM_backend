@@ -4,7 +4,7 @@ const { handleValidation } = require("../utils/validate");
 const CALL_TYPES = require("../constants/callTypes");
 const { appendRemark } = require("../utils/remarksLog");
 const generateDisplayId = require("../utils/generateDisplayId");
-const { createNotification } = require("./notifications.controller");
+const { createNotification , notifyAdmins } = require("./notifications.controller");
 const { Op } = require("sequelize");
 const {findOrCreateClientForCall} = require("./client.controller");
 
@@ -324,6 +324,19 @@ if (resolvedAttendees.length > 0) {
   }
 }
 
+
+// Notify admins about new call logged
+
+await notifyAdmins(io, {
+  type:    "CALL_LOGGED",
+  title:   "New Call Logged",
+  message: `${req.user.name} logged a ${call_type} call from ${caller_name} (${call.display_id})`,
+  data:    { call_id: call.id, display_id: call.display_id },
+});
+io.to("admins_room").emit("CALL_LOGGED", call);
+
+
+
     // 5. If is_task → auto-create task from call data
     if (resolvedIsTask) {
   // console.log("🚀 ~ createCall ~ is_task:", is_task)
@@ -371,6 +384,14 @@ const task = await Task.create({
       message: `You have been assigned a task from call: ${call.display_id}`,
       data:    { task_id: task.id, display_id: task.display_id, call_id: call.id },
     });
+
+      await notifyAdmins(io, {
+    type:    "TASK_ASSIGNED",
+    title:   "Task Assigned",
+    message: `${req.user.name} assigned a task to ${(await User.findByPk(taskAssignee, { attributes: ['name'] }))?.name} from call ${call.display_id}`,
+    data:    { task_id: task.id, display_id: task.display_id, call_id: call.id },
+  });
+
   }
 
       return res.status(201).json({ call, task});
@@ -411,6 +432,16 @@ if (transfer_to) {
   });
     io.to(`user:${transfer_to}`).emit("CALL_TRANSFERRED", call);
     io.to("user:admins_room").emit("CALL_TRANSFERRED", call);
+
+
+  // ← ADD
+  await notifyAdmins(io, {
+    type:    "CALL_TRANSFER",
+    title:   "Call Transferred",
+    message: `${req.user.name} transferred a call (${call.display_id}) from ${caller_name} to ${(await User.findByPk(transfer_to, { attributes: ['name'] }))?.name}`,
+    data:    { call_id: call.id, display_id: call.display_id },
+  });
+
 }
 
 // task auto-created and assigned to someone else
@@ -650,6 +681,18 @@ if (becomingTask) {
 
 
     await call.update(patch);
+
+    if (req.body.remark) {
+  const io = req.app.get('io');
+  await notifyAdmins(io, {
+    type:    'REMARK_ADDED',
+    title:   'Remark Added on Call',
+    message: `${req.user.name} added a remark on call ${call.display_id}: "${req.body.remark.slice(0, 80)}${req.body.remark.length > 80 ? '...' : ''}"`,
+    data:    { call_id: call.id, display_id: call.display_id },
+  });
+}
+
+
     await call.reload({ include: callIncludes });
      const io = req.app.get("io");
 let task = null;
