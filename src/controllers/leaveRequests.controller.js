@@ -298,6 +298,8 @@ const getMyLeaves = async (req, res) => {
     });
 
   } catch (err) {
+    
+  console.log("🚀 ~ getMyLeaves ~ err:", err)
     return res.status(500).json({ message: err.message });
   }
 };
@@ -822,7 +824,84 @@ const getLeaveLogs = async (req, res) => {
 };
 
 
+// ─────────────────────────────────────────────
+// GET Company Settings
+// ─────────────────────────────────────────────
 
+const getCompanySettings = async (req, res) => {
+  try {
+    const settings = await CompanySettings.findOne();
+    if (!settings) {
+      return res.status(404).json({ message: 'Company settings not found.' });
+    }
+    return res.status(200).json({ settings });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// UPDATE Company Settings
+// ─────────────────────────────────────────────
+
+const updateCompanySettings = async (req, res) => {
+  try {
+    const { office_start_time, full_day_notice_hours, half_day_notice_hours } = req.body;
+
+    const errors = [];
+
+    if (office_start_time !== undefined) {
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      if (!timeRegex.test(office_start_time)) {
+        errors.push('office_start_time must be in HH:MM format.');
+      }
+    }
+
+    if (full_day_notice_hours !== undefined) {
+      if (!Number.isInteger(Number(full_day_notice_hours)) || Number(full_day_notice_hours) < 1) {
+        errors.push('full_day_notice_hours must be a positive integer.');
+      }
+    }
+
+    if (half_day_notice_hours !== undefined) {
+      if (!Number.isInteger(Number(half_day_notice_hours)) || Number(half_day_notice_hours) < 1) {
+        errors.push('half_day_notice_hours must be a positive integer.');
+      }
+    }
+
+    if (
+      full_day_notice_hours !== undefined &&
+      half_day_notice_hours !== undefined &&
+      Number(half_day_notice_hours) >= Number(full_day_notice_hours)
+    ) {
+      errors.push('half_day_notice_hours must be less than full_day_notice_hours.');
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ message: 'Validation failed.', errors });
+    }
+
+    const settings = await CompanySettings.findOne();
+
+    if (!settings) {
+      return res.status(404).json({ message: 'Company settings not found.' });
+    }
+
+    await settings.update({
+      office_start_time:      office_start_time      ?? settings.office_start_time,
+      full_day_notice_hours:  full_day_notice_hours  ?? settings.full_day_notice_hours,
+      half_day_notice_hours:  half_day_notice_hours  ?? settings.half_day_notice_hours,
+    });
+
+    return res.status(200).json({
+      message:  'Settings updated successfully.',
+      settings,
+    });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
 
 // ─────────────────────────────────────────────
 
@@ -835,5 +914,8 @@ module.exports.leaveController = {
   rejectLeave,
   markWorkedSaturday,
   getWorkedSaturdays,
-  getLeaveLogs
+  getLeaveLogs,
+    getCompanySettings,
+  updateCompanySettings,
+
 }

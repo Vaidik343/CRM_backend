@@ -387,82 +387,142 @@ if (
 const updateTask = async (req, res) => {
   try {
     const task = await Task.findByPk(req.params.id);
-    // console.log("🚀 ~ updateTask ~ task:", task)
-    if (!task) return res.status(404).json({ message: "Task not found" });
 
-   if (
-  !req.user.is_admin &&
-  task.assigned_to !== req.user.id &&
-  task.assigned_by !== req.user.id
-) {
-  return res.status(403).json({
-    message: "Forbidden",
-  });
-}
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
 
-const patch = {};
-["task", "description", "due_date", "status"].forEach((f) => {
-  if (typeof req.body[f] !== "undefined") patch[f] = req.body[f] ?? null;
-});
+    if (
+      !req.user.is_admin &&
+      task.assigned_to !== req.user.id &&
+      task.assigned_by !== req.user.id
+    ) {
+      return res.status(403).json({
+        message: "Forbidden",
+      });
+    }
 
-const oldStatus = task.status; 
-const statusChanged = patch.status && patch.status !== task.status;
+    // Save old values before updating
+    const oldStatus = task.status;
+    const oldDueDate = task.due_date;
 
-    if (req.body.status === "closed" && task.status !== "closed") {
-  patch.completedAt = new Date();
-}
+    const patch = {};
 
-const remarkText = req.body.remark || req.body.remarks;
-if (remarkText) {
-  patch.remarks = appendRemark({
-    existingRemarks: task.remarks || [],  
-    text: remarkText,
-    user_id: req.user.id,
-    user_name: req.user.name,
-  });
-}
+    ["task", "description", "due_date", "status"].forEach((field) => {
+      if (typeof req.body[field] !== "undefined") {
+        patch[field] = req.body[field] ?? null;
+      }
+    });
+
+    const statusChanged =
+      patch.status &&
+      patch.status !== oldStatus;
+
+    const dueDateChanged =
+      typeof patch.due_date !== "undefined" &&
+      String(oldDueDate || "") !== String(patch.due_date || "");
+
+    // Set completed date when closing
+    if (patch.status === "closed" && oldStatus !== "closed") {
+      patch.completedAt = new Date();
+    }
+
+    // Append remark
+    const remarkText = req.body.remark || req.body.remarks;
+
+    if (remarkText) {
+      patch.remarks = appendRemark({
+        existingRemarks: task.remarks || [],
+        text: remarkText,
+        user_id: req.user.id,
+        user_name: req.user.name,
+      });
+    }
 
     await task.update(patch);
 
-
- if (remarkText) {
-  const io = req.app.get('io');
-  await notifyAdmins(io, {
-    type:    'REMARK_ADDED',
-    title:   'Remark Added on Task',
-    message: `${req.user.name} added a remark on task ${task.display_id}: "${remarkText.slice(0, 80)}${remarkText.length > 80 ? '...' : ''}"`,
-    data:    { task_id: task.id, display_id: task.display_id },
-  });
-}
-
-
-
+    // Status history
     if (statusChanged) {
-  await TaskStatusLog.create({
-    task_id: task.id,
-    changed_by: req.user.id,
-     from_status: oldStatus,   
-    to_status: patch.status,
-    reason: req.body.reason || null,
-    changed_at: new Date(),
-  });
-}
-
+      await TaskStatusLog.create({
+        task_id: task.id,
+        changed_by: req.user.id,
+        from_status: oldStatus,
+        to_status: patch.status,
+        reason: req.body.reason || null,
+        changed_at: new Date(),
+      });
+    }
 
     await task.reload({ include: taskIncludes });
-    const io = req.app.get("io");
-io.to(`user:${task.assigned_to}`).emit("TASK_UPDATED", task);
-if (task.assigned_by !== task.assigned_to) {
-  io.to(`user:${task.assigned_by}`).emit("TASK_UPDATED", task);
-}
-io.to("user:admins_room").emit("TASK_UPDATED", task);
 
+    const io = req.app.get("io");
+
+    // -------------------------
+    // Existing notification
+    // -------------------------
+
+    if (remarkText) {
+      await notifyAdmins(io, {
+        type: "REMARK_ADDED",
+        title: "Remark Added on Task",
+        message: `${req.user.name} added a remark on task ${task.display_id}: "${remarkText.slice(0, 80)}${remarkText.length > 80 ? "..." : ""}"`,
+        data: {
+          task_id: task.id,
+          display_id: task.display_id,
+        },
+      });
+    }
+
+    // -------------------------
+    // Due date changed
+    // -------------------------
+
+    if (dueDateChanged) {
+      await notifyAdmins(io, {
+        type: "TASK_DUE_DATE_CHANGED",
+        title: "Task Due Date Updated",
+        message: `${req.user.name} changed the due date for task ${task.display_id}.`,
+        data: {
+          task_id: task.id,
+          display_id: task.display_id,
+          old_due_date: oldDueDate,
+          new_due_date: task.due_date,
+        },
+      });
+    }
+
+    // -------------------------
+    // Status changed to Closed
+    // -------------------------
+
+    if (statusChanged && task.status === "closed") {
+      await notifyAdmins(io, {
+        type: "TASK_CLOSED",
+        title: "Task Closed",
+        message: `${req.user.name} closed task ${task.display_id}.`,
+        data: {
+          task_id: task.id,
+          display_id: task.display_id,
+        },
+      });
+    }
+
+    // Socket updates
+    io.to(`user:${task.assigned_to}`).emit("TASK_UPDATED", task);
+
+    if (task.assigned_by !== task.assigned_to) {
+      io.to(`user:${task.assigned_by}`).emit("TASK_UPDATED", task);
+    }
+
+    io.to("user:admins_room").emit("TASK_UPDATED", task);
 
     return res.status(200).json({ task });
 
   } catch (err) {
     console.error("updateTask error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 };
 

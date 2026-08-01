@@ -92,48 +92,37 @@ const validateDuplicateLeave = async ({
  * Half Day  -> 16 Hours
  * Emergency -> Skip validation
  */
-const validateNoticePeriod = async ({
-  reason_type,
-  duration,
-  start_date,
-}) => {
-  if (reason_type === LEAVE_REASONS.EMERGENCY) {
-    return;
-  }
+const validateNoticePeriod = async ({ reason_type, duration, start_date }) => {
+  if (reason_type === LEAVE_REASONS.EMERGENCY) return;
 
   const settings = await CompanySettings.findOne();
-
-  if (!settings) {
-    throw new Error("Company settings not configured.");
-  }
+  if (!settings) throw new Error("Company settings not configured.");
 
   const officeTime = settings.office_start_time; // "09:00:00"
-
   const officeHour = Number(officeTime.split(":")[0]);
   const officeMinute = Number(officeTime.split(":")[1]);
 
-  const leaveStart = new Date(start_date);
+  // Parse date parts directly to avoid UTC shift
+  const [year, month, day] = start_date.split("T")[0].split("-").map(Number);
 
-  leaveStart.setHours(
-    officeHour,
-    officeMinute,
-    0,
-    0
-  );
+  // Build leave start as IST (UTC+5:30)
+  // IST offset = 5.5 hours = 330 minutes
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+  // Office start time on leave date in IST, converted to UTC ms
+  const leaveStartUTC =
+    Date.UTC(year, month - 1, day, officeHour, officeMinute, 0, 0) - IST_OFFSET_MS;
 
   const noticeHours =
     duration === LEAVE_DURATION.FULL_DAY
       ? settings.full_day_notice_hours
       : settings.half_day_notice_hours;
 
-  const deadline = new Date(
-    leaveStart.getTime() -
-      noticeHours * 60 * 60 * 1000
-  );
+  const deadlineUTC = leaveStartUTC - noticeHours * 60 * 60 * 1000;
 
-  const now = new Date();
+  const nowUTC = Date.now();
 
-  if (now > deadline) {
+  if (nowUTC > deadlineUTC) {
     throw new Error(
       `Leave request must be submitted at least ${noticeHours} hours before office start time.`
     );

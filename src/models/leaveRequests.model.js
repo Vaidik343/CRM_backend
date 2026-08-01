@@ -84,6 +84,7 @@ module.exports = (sequelize, DataTypes) => {
         }, {
       tableName: "leave_requests",
       timestamps: true,
+      underscored: true,
     },
     )
 
