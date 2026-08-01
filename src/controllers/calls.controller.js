@@ -107,6 +107,7 @@ function validateSubtype(call_type, call_subtype) {
 
 
 const createCall = async (req, res) => {
+    const io = req.app.get("io");
   try {
     const {
       caller_name,
@@ -419,7 +420,7 @@ if (is_worklog) {
 
 
 
-    const io = req.app.get("io");
+  
 
 // call transferred
 if (transfer_to) {

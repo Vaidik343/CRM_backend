@@ -141,7 +141,7 @@ const status =
 
 // if fronted sends initial remark
 const remarkText = req.body.remark || req.body.remarks;
-if (remarkText) {
+if (remarkText?.trim()) {
   remarksLog = appendRemark({
     existingRemarks: [],
     text: remarkText,
@@ -198,12 +198,28 @@ if (assignedId !== req.user.id) {
 io.to("user:admins_room").emit("TASK_CREATED", newTask);
 
 
+const action =
+  assignedId === req.user.id
+    ? `created a task`
+    : `assigned a task to ${assignee.name}`;
+
 await notifyAdmins(io, {
-  type:    'TASK_CREATED',
-  title:   'New Task Created',
-  message: `${req.user.name} created a task: "${task.task.slice(0, 80)}" (${task.display_id})`,
-  data:    { task_id: task.id, display_id: task.display_id },
+  type: "TASK_CREATED",
+  title: "New Task Created",
+  message: `${req.user.name} ${action}: "${newTask.task.slice(0, 80)}" (${newTask.display_id})`,
+  data: {
+    task_id: newTask.id,
+    display_id: newTask.display_id,
+  },
 });
+
+// await notifyAdmins(io, {
+//   type:    'TASK_CREATED',
+//   title:   'New Task Created',
+//   message: `${req.user.name} created a task: "${newTask.task.slice(0, 80)}" (${newTask.display_id})`,
+//   data:    { task_id: newTask.id, display_id: newTask.display_id },
+// });
+
 io.to('admins_room').emit('TASK_CREATED', task);
     return res.status(201).json({ task: newTask });
 
@@ -409,12 +425,12 @@ if (remarkText) {
     await task.update(patch);
 
 
-    if (remark) {
+ if (remarkText) {
   const io = req.app.get('io');
   await notifyAdmins(io, {
     type:    'REMARK_ADDED',
     title:   'Remark Added on Task',
-    message: `${req.user.name} added a remark on task ${task.display_id}: "${remark.slice(0, 80)}${remark.length > 80 ? '...' : ''}"`,
+    message: `${req.user.name} added a remark on task ${task.display_id}: "${remarkText.slice(0, 80)}${remarkText.length > 80 ? '...' : ''}"`,
     data:    { task_id: task.id, display_id: task.display_id },
   });
 }
@@ -440,6 +456,7 @@ if (task.assigned_by !== task.assigned_to) {
   io.to(`user:${task.assigned_by}`).emit("TASK_UPDATED", task);
 }
 io.to("user:admins_room").emit("TASK_UPDATED", task);
+
 
     return res.status(200).json({ task });
 

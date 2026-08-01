@@ -37,7 +37,7 @@ const startDueDateCron = (io) => {
 
              console.log(`✅ Due date cron ran — checked ${tasks.length} tasks`);
         } catch (error) {
-              console.error("Due date cron error:", err); 
+              console.error("Due date cron error:", error); 
         }
     })
 }
