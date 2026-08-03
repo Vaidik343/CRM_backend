@@ -59,7 +59,7 @@ router.get('/leaves/:id/logs', authenticate, leaveController.getLeaveLogs);
 // GET  /api/settings     → get company settings
 // PATCH /api/settings    → update company settings
 router.get('/settings',   authenticate, requireAdmin, leaveController.getCompanySettings);
-router.patch('/settings', authenticate, requireAdmin, leaveController.updateCompanySettings);
+router.put('/settings', authenticate, requireAdmin, leaveController.updateCompanySettings);
 // ─────────────────────────────────────────────
 
 module.exports = router;

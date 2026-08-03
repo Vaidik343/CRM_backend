@@ -545,6 +545,7 @@ const getAllInterns = async (req, res) => {
 // ADMIN — Get Intern By ID
 // ─────────────────────────────────────────────
 
+  
 const getInternById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -552,6 +553,7 @@ const getInternById = async (req, res) => {
     const intern = await Intern.findByPk(id, {
       include: internIncludes,
     });
+    console.log("🚀 ~ getInternById ~ intern:", intern)
     console.log("🚀 ~ getInternById ~ intern:", intern)
 
     if (!intern) {
@@ -561,8 +563,9 @@ const getInternById = async (req, res) => {
     const internWithMentors = await attachMentors(intern);
 
     return res.status(200).json({ intern: internWithMentors });
-
+ console.log('intern')
   } catch (err) {
+    console.log("🚀 ~ getInternById ~ err:", err)
     return res.status(500).json({ message: err.message });
   }
 };

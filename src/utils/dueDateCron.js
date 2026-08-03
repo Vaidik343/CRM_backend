@@ -17,7 +17,7 @@ const startDueDateCron = (io) => {
             const tasks = await Task.findAll({
                 where: {
                     status: {[Op.ne]: "closed"},
-                    due_data: {
+                    due_date: {
                         [Op.between] : [today, threeDaysLater],
                     },
                 },

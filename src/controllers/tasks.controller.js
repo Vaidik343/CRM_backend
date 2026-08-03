@@ -405,10 +405,11 @@ const updateTask = async (req, res) => {
     // Save old values before updating
     const oldStatus = task.status;
     const oldDueDate = task.due_date;
+    const oldProjectId = task.project_id;
 
     const patch = {};
 
-    ["task", "description", "due_date", "status"].forEach((field) => {
+    ["task", "description", "due_date", "status",  "project_id"].forEach((field) => {
       if (typeof req.body[field] !== "undefined") {
         patch[field] = req.body[field] ?? null;
       }
@@ -422,6 +423,11 @@ const updateTask = async (req, res) => {
       typeof patch.due_date !== "undefined" &&
       String(oldDueDate || "") !== String(patch.due_date || "");
 
+      const projectChanged =
+  typeof patch.project_id !== "undefined" &&
+  oldProjectId !== patch.project_id;
+
+  
     // Set completed date when closing
     if (patch.status === "closed" && oldStatus !== "closed") {
       patch.completedAt = new Date();
@@ -438,6 +444,17 @@ const updateTask = async (req, res) => {
         user_name: req.user.name,
       });
     }
+
+
+    if (typeof patch.project_id !== "undefined" && patch.project_id) {
+  const project = await Project.findByPk(patch.project_id);
+
+  if (!project) {
+    return res.status(404).json({
+      message: "Project not found",
+    });
+  }
+}
 
     await task.update(patch);
 

@@ -413,6 +413,21 @@ const adminUpdateTask = async (req, res) => {
   }
 };
 
+const deleteTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const internTask = await InternTask.findByPk(id);
+    if (!internTask) return res.status(404).json({ message: 'Task not found.' });
+
+    await internTask.destroy();
+    return res.status(200).json({ message: 'Task deleted.' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+
 module.exports = {
   createTask,
   getMyTasks,
@@ -420,4 +435,5 @@ module.exports = {
   adminAssignTask,
   getInternTasks,
   adminUpdateTask,
+  deleteTask
 };

@@ -35,6 +35,7 @@ const {
   adminAssignTask,
   getInternTasks,
   adminUpdateTask,
+  deleteTask
 } = require('../controllers/internTask.controller');
 
 const {
@@ -391,6 +392,7 @@ router.patch('/admin/interns/:intern_id/project', authenticate, requireAdmin, ad
 router.post('/admin/intern/tasks',                authenticate, requireAdmin, adminAssignTask);
 router.get('/admin/interns/:intern_id/tasks',     authenticate, requireAdmin, getInternTasks);
 router.patch('/admin/intern/tasks/:id',           authenticate, requireAdmin, adminUpdateTask);
+router.delete('/admin/intern/tasks/:id',   authenticate, requireAdmin, deleteTask);
 
 // ─────────────────────────────────────────────
 // ADMIN — WorkLog Routes

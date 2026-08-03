@@ -1574,3 +1574,75 @@
  *                   items:
  *                     $ref: '#/components/schemas/InternWorkLog'
  */
+
+/**
+ * @swagger
+ * /api/intern/documents:
+ *   patch:
+ *     summary: Update intern's own documents
+ *     description: |
+ *       Authenticated intern can update their documents and document details.
+ *       **Lock Mechanism**: Any document field (`id_proof`, `photo`, `resume`, `last_sem_marksheet`, `document_type`) 
+ *       that has already been verified by Admin (present in `verified_fields`) is LOCKED and CANNOT be updated/overwritten. 
+ *       Unverified fields can still be updated.
+ *     tags: [Interns]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               document_type:
+ *                 type: string
+ *                 enum: [aadhaar, voter_card, passport, driving_licence]
+ *               id_proof:
+ *                 type: string
+ *                 format: binary
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *               resume:
+ *                 type: string
+ *                 format: binary
+ *               last_sem_marksheet:
+ *                 type: string
+ *                 format: binary
+ *               college_detail:
+ *                 type: string
+ *                 description: JSON string object containing college details
+ *     responses:
+ *       200:
+ *         description: Documents updated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 documents:
+ *                   $ref: '#/components/schemas/InternDocument'
+ *       400:
+ *         description: Validation error or attempt to modify locked/verified documents.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Cannot replace verified document(s): id_proof. These have been verified by admin and are locked."
+ *                 locked_fields:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Document record not found
+ *       500:
+ *         description: Internal server error
+ */
+

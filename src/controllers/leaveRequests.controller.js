@@ -386,18 +386,17 @@ io.to("user:admins_room").emit("LEAVE_UPDATED", {
   
 const getAllLeaves = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const offset = (page - 1 ) * limit;
+    const page   = parseInt(req.query.page)  || 1;
+    const limit  = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-    const {status, leave_type, from, to , search, user_id} = req.query;
+    const { status, leave_type, from, to, search, user_id, month, year } = req.query; // ← add month, year
 
     const where = {};
 
-
-    if (status)     where.status = status;
+    if (status)     where.status     = status;
     if (leave_type) where.leave_type = leave_type;
-    if (user_id)    where.user_id = user_id;
+    if (user_id)    where.user_id    = user_id;
 
     if (from || to) {
       where.start_date = {};
@@ -405,10 +404,27 @@ const getAllLeaves = async (req, res) => {
       if (to)   where.start_date[Op.lte] = new Date(to);
     }
 
+    // ── Month + Year filter ──
+    if (month && year) {
+      const startOfMonth = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const endOfMonth   = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+      where.start_date   = {
+        [Op.gte]: startOfMonth,
+        [Op.lte]: endOfMonth,
+      };
+    } else if (year && !month) {
+      const startOfYear = new Date(parseInt(year), 0, 1);
+      const endOfYear   = new Date(parseInt(year), 11, 31, 23, 59, 59);
+      where.start_date  = {
+        [Op.gte]: startOfYear,
+        [Op.lte]: endOfYear,
+      };
+    }
+
     const employeeWhere = {};
     if (search) {
       employeeWhere[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
+        { name:        { [Op.iLike]: `%${search}%` } },
         { employee_id: { [Op.iLike]: `%${search}%` } },
       ];
     }
@@ -420,7 +436,7 @@ const getAllLeaves = async (req, res) => {
         approverInclude,
         logsInclude,
       ],
-      order: [['created_at', 'DESC']],
+      order:    [['created_at', 'DESC']],
       limit,
       offset,
       distinct: true,
@@ -428,17 +444,15 @@ const getAllLeaves = async (req, res) => {
     });
 
     return res.status(200).json({
-      total: count,
+      total:      count,
       page,
       totalPages: Math.ceil(count / limit),
-      data: rows,
+      data:       rows,
     });
   } catch (error) {
-    
-     return res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
-}
-
+};
 // ─────────────────────────────────────────────
 // ADMIN — Approve Leave
 // ─────────────────────────────────────────────
