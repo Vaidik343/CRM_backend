@@ -460,12 +460,8 @@ const getAllLeaves = async (req, res) => {
 const approveLeave = async (req, res) => {
   const t = await sequelize.transaction();
 
- 
-
   try {
-    const admin_id = req.user.id;
-
-   
+    const admin_id = req.user.id;   
     const { id }   = req.params;
 
  const approvedBy = await User.findByPk(admin_id, {
@@ -917,6 +913,153 @@ const updateCompanySettings = async (req, res) => {
   }
 };
 
+
+const getLeaveCalculation = async (req, res) => {
+  try {
+    const { user_id, month } = req.query;
+
+    if (!req.query.years) {
+      return res.status(400).json({
+        message: "At least one year is required.",
+      });
+    }
+
+    const selectedYears = req.query.years
+      .split(",")
+      .map(Number)
+      .filter(Boolean);
+
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1;
+
+    const result = [];
+
+    for (const year of selectedYears) {
+      let maxMonth;
+
+      if (month) {
+        maxMonth = Number(month);
+      } else if (year < currentYear) {
+        maxMonth = 12;
+      } else if (year === currentYear) {
+        maxMonth = currentMonth;
+      } else {
+        maxMonth = 0;
+      }
+
+      const where = { year };
+
+      if (month) {
+        // Monthly report
+        where.month = maxMonth;
+      } else {
+        // Yearly report
+        where.month = {
+          [Op.lte]: maxMonth,
+        };
+      }
+
+      if (user_id) {
+        where.user_id = user_id;
+      }
+
+      const balances = await LeaveBalance.findAll({
+        where,
+        include: [employeeInclude],
+        order: [[{ model: User, as: "employee" }, "name", "ASC"]],
+      });
+
+      const employeeMap = {};
+
+      for (const balance of balances) {
+        const id = balance.user_id;
+
+        if (!employeeMap[id]) {
+          employeeMap[id] = {
+            employee_id: balance.employee.employee_id,
+            name: balance.employee.name,
+
+            entitled_paid: 0,
+            used_paid: 0,
+            used_unpaid: 0,
+            used_exchange: 0,
+          };
+        }
+
+        employeeMap[id].entitled_paid += Number(balance.entitled_paid);
+        employeeMap[id].used_paid += Number(balance.used_paid);
+        employeeMap[id].used_unpaid += Number(balance.used_unpaid);
+        employeeMap[id].used_exchange += Number(balance.used_exchange);
+      }
+
+      const employees = Object.values(employeeMap).map((emp) => {
+        if (month) {
+          return {
+            ...emp,
+            total_leave:
+              emp.used_paid +
+              emp.used_unpaid +
+              emp.used_exchange,
+          };
+        }
+
+        return {
+          ...emp,
+          remaining_paid: Math.max(
+            emp.entitled_paid - emp.used_paid,
+            0
+          ),
+        };
+      });
+
+      const totals = employees.reduce(
+  (acc, emp) => {
+    acc.employees++;
+    acc.entitled_paid += emp.entitled_paid;
+    acc.used_paid += emp.used_paid;
+    acc.used_unpaid += emp.used_unpaid;
+    acc.used_exchange += emp.used_exchange;
+
+    if (month) {
+      acc.total_leave += emp.total_leave;
+    } else {
+      acc.remaining_paid += emp.remaining_paid;
+    }
+
+    return acc;
+  },
+  {
+    employees: 0,
+    entitled_paid: 0,
+    used_paid: 0,
+    used_unpaid: 0,
+    used_exchange: 0,
+    remaining_paid: 0,
+    total_leave: 0,
+  }
+);
+      result.push({
+        year,
+        type: month ? "monthly" : "yearly",
+        ...(month && { month: Number(month) }),
+        totals,
+        employees,
+      });
+    }
+
+    return res.status(200).json({
+      message: "leave calculation",
+      result,
+    });
+  } catch (err) {
+    console.log("getLeaveCalculation:", err);
+    return res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+
 // ─────────────────────────────────────────────
 
 module.exports.leaveController = {
@@ -931,5 +1074,6 @@ module.exports.leaveController = {
   getLeaveLogs,
     getCompanySettings,
   updateCompanySettings,
+   getLeaveCalculation,
 
 }

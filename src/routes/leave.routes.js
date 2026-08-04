@@ -48,6 +48,14 @@ router.patch('/leaves/reject/:id', authenticate, requireAdmin, validateRejectLea
 // Required body: user_id, saturday_date (must be a Saturday)
 router.post('/leaves/saturday/mark', authenticate, requireAdmin, validateMarkSaturday, leaveController.markWorkedSaturday);
 
+
+router.get(
+  "/leaves/calculation",
+authenticate, requireAdmin,
+  leaveController.getLeaveCalculation
+);
+
+
 // GET /api/leave/saturday/:user_id
 // Params: user_id (UUID)
 // Both admin and employee can access — employee needs it when submitting exchange leave

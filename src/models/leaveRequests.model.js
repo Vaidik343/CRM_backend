@@ -1,4 +1,3 @@
-const { BOOLEAN } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
     const LeaveRequests = sequelize.define(
