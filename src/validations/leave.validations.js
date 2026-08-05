@@ -13,9 +13,10 @@ const validateCreateLeave = (req, res, next) => {
     duration,
     reason,
     worked_saturday_id,
-  } = req.body;
+  } = req.body|| {};
 
   const errors = [];
+  console.log("🚀 ~ validateCreateLeave ~ errors:", errors)
 
   // ── Required fields ──
   if (!leave_type)              errors.push('leave_type is required.');

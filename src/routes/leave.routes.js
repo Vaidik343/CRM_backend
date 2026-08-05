@@ -15,13 +15,14 @@ const {
   validateGetSaturdays,
 } = require('../validations/leave.validations');
 
+const {leaveUpload} = require("../middlewares/leaveUpload");
+
 // ─────────────────────────────────────────────
 // EMPLOYEE ROUTES
 // ─────────────────────────────────────────────
 
 // emp create leaves
-router.post('/leaves/request', authenticate, validateCreateLeave, leaveController.createLeave);
-
+router.post('/leaves/request', authenticate,leaveUpload, validateCreateLeave,  leaveController.createLeave);
 // my leaves
 router.get('/leaves/my', authenticate, leaveController.getMyLeaves );
  
@@ -62,6 +63,7 @@ authenticate, requireAdmin,
 router.get('/leaves/saturday/:user_id', authenticate, validateGetSaturdays, leaveController.getWorkedSaturdays);
 
 router.get('/leaves/:id/logs', authenticate, leaveController.getLeaveLogs);
+
 
 
 // GET  /api/settings     → get company settings

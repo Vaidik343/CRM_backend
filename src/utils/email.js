@@ -30,7 +30,7 @@ const sendLeaveRequestEmail = async ({ employee, leave }) => {
     employee,
     leave,
   });
-  console.log("🚀 ~ sendLeaveRequestEmail ~ html:", html)
+  // console.log("🚀 ~ sendLeaveRequestEmail ~ html:", html)
 
   const admins = await User.findAll({
     where: {
@@ -39,7 +39,7 @@ const sendLeaveRequestEmail = async ({ employee, leave }) => {
     },
     attributes: ["email"],
   });
-  console.log("🚀 ~ sendLeaveRequestEmail ~ admins:", admins)
+  // console.log("🚀 ~ sendLeaveRequestEmail ~ admins:", admins)
 
   const adminEmails = admins
     .map((a) => a.email)
@@ -59,7 +59,7 @@ const sendLeaveRequestEmail = async ({ employee, leave }) => {
     subject,
     html,
   });
- console.log("🚀 ~ sendLeaveRequestEmail ~ slr:", slr)
+//  console.log("🚀 ~ sendLeaveRequestEmail ~ slr:", slr)
 };
 
 

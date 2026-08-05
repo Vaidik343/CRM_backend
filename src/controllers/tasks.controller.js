@@ -3,7 +3,7 @@ const { Task, User, Call, Project, Role, ProjectMember, TaskStatusLog } = requir
 const { handleValidation } = require("../utils/validate");
 const { Op } = require("sequelize");
 const generateDisplayId = require("../utils/generateDisplayId");
-const { appendRemark } = require("../utils/remarksLog");
+const { appendRemark, updateRemark  } = require("../utils/remarksLog");
 const { createNotification, notifyAdmins  } = require("./notifications.controller");
 // ── Validators ────────────────────────────────────────────────────────────────
 
@@ -137,14 +137,16 @@ const status =
     ? req.body.status
     : defaultStatus;
 
-    let remarksLog = [];
-
 // if fronted sends initial remark
-const remarkText = req.body.remark || req.body.remarks;
-if (remarkText?.trim()) {
+// Handles req.body.remark = "Text" or req.body.remarks = ["Text 1", "Text 2"]
+const remarkInput = req.body.remarks || req.body.remark;
+    console.log("🚀 ~ updateTask ~ remarkInput:", remarkInput)
+let remarksLog = [];
+
+if (remarkInput) {
   remarksLog = appendRemark({
     existingRemarks: [],
-    text: remarkText,
+    text: remarkInput,
     user_id: req.user.id,
     user_name: req.user.name,
   });
@@ -397,68 +399,87 @@ const updateTask = async (req, res) => {
       task.assigned_to !== req.user.id &&
       task.assigned_by !== req.user.id
     ) {
-      return res.status(403).json({
-        message: "Forbidden",
-      });
+      return res.status(403).json({ message: "Forbidden" });
     }
 
-    // Save old values before updating
     const oldStatus = task.status;
     const oldDueDate = task.due_date;
-    const oldProjectId = task.project_id;
 
     const patch = {};
 
-    ["task", "description", "due_date", "status",  "project_id"].forEach((field) => {
+    ["task", "description", "due_date", "status", "project_id"].forEach((field) => {
       if (typeof req.body[field] !== "undefined") {
         patch[field] = req.body[field] ?? null;
       }
     });
 
-    const statusChanged =
-      patch.status &&
-      patch.status !== oldStatus;
-
+    const statusChanged = patch.status && patch.status !== oldStatus;
     const dueDateChanged =
       typeof patch.due_date !== "undefined" &&
       String(oldDueDate || "") !== String(patch.due_date || "");
 
-      const projectChanged =
-  typeof patch.project_id !== "undefined" &&
-  oldProjectId !== patch.project_id;
-
-  
-    // Set completed date when closing
     if (patch.status === "closed" && oldStatus !== "closed") {
       patch.completedAt = new Date();
     }
 
-    // Append remark
-    const remarkText = req.body.remark || req.body.remarks;
+    // ── Remark Handling ───────────────────────────────────────────
+    const remarkInput = req.body.remarks || req.body.remark;
+    const editRemarkInput = req.body.edit_remark; // { remark_id, text }
 
-    if (remarkText) {
-      patch.remarks = appendRemark({
-        existingRemarks: task.remarks || [],
-        text: remarkText,
-        user_id: req.user.id,
-        user_name: req.user.name,
-      });
+    let updatedRemarks = task.remarks || [];
+
+    // 1. Validate edit_remark shape BEFORE doing anything
+    if (editRemarkInput !== undefined) {
+      if (
+        typeof editRemarkInput.remark_id !== "string" ||
+        typeof editRemarkInput.text !== "string" ||
+        !editRemarkInput.text.trim()
+      ) {
+        return res.status(400).json({ message: "Invalid edit_remark payload." });
+      }
+
+      // Now safe to call updateRemark
+      try {
+        updatedRemarks = updateRemark({
+          existingRemarks: updatedRemarks,
+          remarkId: editRemarkInput.remark_id,
+          newText: editRemarkInput.text,
+          user_id: req.user.is_admin ? null : req.user.id,
+        });
+      } catch (err) {
+        return res.status(403).json({ message: err.message });
+      }
     }
 
+    // 2. Append new remarks if present
+    if (remarkInput) {
+      try {
+        updatedRemarks = appendRemark({
+          existingRemarks: updatedRemarks,
+          text: remarkInput,
+          user_id: req.user.id,
+          user_name: req.user.name,
+        });
+      } catch (err) {
+        return res.status(400).json({ message: err.message });
+      }
+    }
 
+    if (remarkInput || editRemarkInput !== undefined) {
+      patch.remarks = updatedRemarks;
+    }
+
+    // Project Validation
     if (typeof patch.project_id !== "undefined" && patch.project_id) {
-  const project = await Project.findByPk(patch.project_id);
-
-  if (!project) {
-    return res.status(404).json({
-      message: "Project not found",
-    });
-  }
-}
+      const project = await Project.findByPk(patch.project_id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+    }
 
     await task.update(patch);
 
-    // Status history
+    // Status Log
     if (statusChanged) {
       await TaskStatusLog.create({
         task_id: task.id,
@@ -474,76 +495,46 @@ const updateTask = async (req, res) => {
 
     const io = req.app.get("io");
 
-    // -------------------------
-    // Existing notification
-    // -------------------------
-
-    if (remarkText) {
+    if (remarkInput) {
       await notifyAdmins(io, {
         type: "REMARK_ADDED",
         title: "Remark Added on Task",
-        message: `${req.user.name} added a remark on task ${task.display_id}: "${remarkText.slice(0, 80)}${remarkText.length > 80 ? "..." : ""}"`,
-        data: {
-          task_id: task.id,
-          display_id: task.display_id,
-        },
+        message: `${req.user.name} added a remark on task ${task.display_id}`,
+        data: { task_id: task.id, display_id: task.display_id },
       });
     }
-
-    // -------------------------
-    // Due date changed
-    // -------------------------
 
     if (dueDateChanged) {
       await notifyAdmins(io, {
         type: "TASK_DUE_DATE_CHANGED",
         title: "Task Due Date Updated",
         message: `${req.user.name} changed the due date for task ${task.display_id}.`,
-        data: {
-          task_id: task.id,
-          display_id: task.display_id,
-          old_due_date: oldDueDate,
-          new_due_date: task.due_date,
-        },
+        data: { task_id: task.id, display_id: task.display_id },
       });
     }
-
-    // -------------------------
-    // Status changed to Closed
-    // -------------------------
 
     if (statusChanged && task.status === "closed") {
       await notifyAdmins(io, {
         type: "TASK_CLOSED",
         title: "Task Closed",
         message: `${req.user.name} closed task ${task.display_id}.`,
-        data: {
-          task_id: task.id,
-          display_id: task.display_id,
-        },
+        data: { task_id: task.id, display_id: task.display_id },
       });
     }
 
-    // Socket updates
     io.to(`user:${task.assigned_to}`).emit("TASK_UPDATED", task);
-
     if (task.assigned_by !== task.assigned_to) {
       io.to(`user:${task.assigned_by}`).emit("TASK_UPDATED", task);
     }
-
     io.to("user:admins_room").emit("TASK_UPDATED", task);
 
     return res.status(200).json({ task });
 
   } catch (err) {
     console.error("updateTask error:", err);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
-
-
 const getTaskStatusLogs = async (req, res) => {
   try {
     const task = await Task.findByPk(req.params.id);

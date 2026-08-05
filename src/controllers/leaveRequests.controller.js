@@ -12,6 +12,8 @@ const generateDisplayId = require("../utils/generateDisplayId");
 const generateProjectCode = require("../utils/generateProjectCode");
 const { appendRemark } = require("../utils/remarksLog");
 
+const { moveUploadedFile } = require('../utils/fileUpload');
+
 const { countLeaveDays } = require('../utils/leaveValidation'); 
 const { createNotification , notifyAdmins } = require("./notifications.controller");
 
@@ -92,8 +94,6 @@ const logsInclude = {
 const createLeave = async (req, res) => {
   const t = await sequelize.transaction();
  
-
-
   try {
     const {
 
@@ -151,6 +151,22 @@ const user_id = req.user.id;
     // ── 6. Exchange validation ──
     await validateExchangeLeave({ leave_type, worked_saturday_id, user_id });
 
+console.log("req.file:", req.file);
+console.log("req.body:", req.body);
+    // ── Emergency sub-type validation ──
+let emergency_sub_type = null;
+
+if (reason_type === LEAVE_REASONS.EMERGENCY) {
+  const sub = req.body.emergency_sub_type;
+  if (!sub || !['medical', 'other'].includes(sub)) {
+    await t.rollback();
+    return res.status(400).json({
+      message: "Emergency leave requires a sub-type: 'medical' or 'other'.",
+    });
+  }
+  emergency_sub_type = sub;
+}
+
 
     // ── 7. Generate display_id ──
     const employee = await User.findByPk(user_id, {
@@ -169,6 +185,8 @@ console.log(employee.toJSON());
       display_id,
       leave_type,
       reason_type,
+        emergency_sub_type,          // ← new
+  medical_document: null,      // ← set after file move below
       start_date,
       end_date,
       duration,
@@ -178,6 +196,18 @@ console.log(employee.toJSON());
     }, { transaction: t });
     // console.log("🚀 ~ createLeave ~ leave:", leave)
 
+    // ── Medical document upload ──
+if (emergency_sub_type === 'medical' && req.file) {
+  const moved = moveUploadedFile(
+    req.file.path,
+    `leaves/${leave.id}`,
+    'medical_document'
+  );
+
+  if (moved) {
+    await leave.update({ medical_document: moved }, { transaction: t });
+  }
+}
 
       // ── 9. Mark Saturday as exchanged ──
     if (leave_type === LEAVE_TYPES.EXCHANGE) {

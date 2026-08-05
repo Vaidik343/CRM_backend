@@ -27,6 +27,19 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM('normal', 'emergency'),
         allowNull: false,
     },
+
+    emergency_sub_type: {
+  type: DataTypes.STRING(20),
+  allowNull: true,
+  defaultValue: null,
+},
+medical_document: {
+  type: DataTypes.JSONB,
+  allowNull: true,
+  defaultValue: null,
+},
+
+
     start_date: {
         type: DataTypes.DATE,
         allowNull: false
