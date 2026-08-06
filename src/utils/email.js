@@ -1,6 +1,8 @@
 const nodemailer = require("nodemailer");
 const leaveRequestTemplate = require("./emailTemplates/leaveRequestTemplate");
 const leaveApprovedTemplate = require("./emailTemplates/leaveApprovedTemplate");
+const leaveRejectedTemplate = require("./emailTemplates/leaveRejectedTemplate");
+const  leaveCancelledTemplate  = require("./emailTemplates/leaveCancelledTemplate");
 const { User } = require("../models");
 
 const { sendMail } = require("./mailer");
@@ -94,8 +96,79 @@ console.log("SMTP Response:", info);
 
 return info;
 };
+
+
+const sendLeaveRejectedEmail = async ({
+  employee,
+  leave,
+  rejectedBy,
+  rejectionReason,
+  leaveDays,
+}) => {
+
+  const html = leaveRejectedTemplate({
+    employee,
+    leave,
+    rejectedBy,
+    rejectionReason,
+    leaveDays,
+  });
+  console.log("🚀 ~ sendLeaveRejectedEmail ~ html:", html)
+
+  const subject = `Leave Rejected - ${leave.reason_type} Leave (${leaveDays} ${
+    leaveDays === 1 ? "Day" : "Days"
+  })`;
+  console.log("🚀 ~ sendLeaveRejectedEmail ~ subject:", subject)
+
+  return await sendMail({
+    to: employee.email,
+    cc: process.env.OWNER_EMAIL,
+    subject,
+    html,
+  });
+};
+
+
+const sendLeaveCancelledEmail = async ({
+    employee,
+    leave,
+    leaveDays,
+}) => {
+
+    const html = leaveCancelledTemplate({
+        employee,
+        leave,
+        leaveDays,
+    });
+    console.log("🚀 ~ sendLeaveCancelledEmail ~ html:", html)
+
+    const admins = await User.findAll({
+        where: {
+            is_admin: true,
+            is_active: true,
+        },
+        attributes: ["email"],
+    });
+    console.log("🚀 ~ sendLeaveCancelledEmail ~ admins:", admins)
+
+    const adminEmails = admins
+        .map(a => a.email)
+        .filter(Boolean);
+
+    const subject =
+        `Leave Cancelled by ${employee.name} - ${leave.reason_type} Leave (${leaveDays} ${leaveDays === 1 ? "Day" : "Days"})`;
+
+    return await sendMail({
+        to: adminEmails,
+        cc: process.env.OWNER_EMAIL,
+        subject,
+        html,
+    });
+};
 module.exports = {
   
   sendLeaveRequestEmail,
-  sendLeaveApprovedEmail
+  sendLeaveApprovedEmail,
+  sendLeaveRejectedEmail,
+  sendLeaveCancelledEmail
 };

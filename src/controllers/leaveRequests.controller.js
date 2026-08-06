@@ -19,7 +19,7 @@ const { createNotification , notifyAdmins } = require("./notifications.controlle
 
 const { Op } = require("sequelize");
 
-const { sendLeaveRequestEmail, sendLeaveApprovedEmail} = require("../utils/email");
+const { sendLeaveRequestEmail, sendLeaveApprovedEmail, sendLeaveRejectedEmail, sendLeaveCancelledEmail} = require("../utils/email");
 
 
 const {
@@ -164,9 +164,13 @@ if (reason_type === LEAVE_REASONS.EMERGENCY) {
       message: "Emergency leave requires a sub-type: 'medical' or 'other'.",
     });
   }
-  emergency_sub_type = sub;
+  if (!req.file) {
+    await t.rollback();
+    return res.status(400).json({
+      message: "A supporting document is required for emergency leave.",
+    });
+  }
 }
-
 
     // ── 7. Generate display_id ──
     const employee = await User.findByPk(user_id, {
@@ -185,7 +189,9 @@ console.log(employee.toJSON());
       display_id,
       leave_type,
       reason_type,
-        emergency_sub_type,          // ← new
+       emergency_sub_type: reason_type === LEAVE_REASONS.EMERGENCY
+    ? req.body.emergency_sub_type
+    : null,
   medical_document: null,      // ← set after file move below
       start_date,
       end_date,
@@ -197,7 +203,7 @@ console.log(employee.toJSON());
     // console.log("🚀 ~ createLeave ~ leave:", leave)
 
     // ── Medical document upload ──
-if (emergency_sub_type === 'medical' && req.file) {
+if (req.file) {
   const moved = moveUploadedFile(
     req.file.path,
     `leaves/${leave.id}`,
@@ -343,10 +349,22 @@ const cancelLeave = async (req, res) => {
   try {
     const user_id = req.user.id;
     const {id} = req.params;
-
-    const leave = await LeaveRequest.findOne({
-      where: {id, user_id},
-    });
+const leave = await LeaveRequest.findOne({
+  where: { id, user_id },
+  include: [
+    {
+      model: User,
+      as: "employee",
+      attributes: [
+        "id",
+        "name",
+        "employee_id",
+        "email",
+        "saturday_group",
+      ],
+    },
+  ],
+});
 
     if(!leave)
     {
@@ -379,6 +397,8 @@ const cancelLeave = async (req, res) => {
       action: 'cancelled',
       remarks: { cancelled_by: 'employee' },
     }, { transaction: t });
+
+    
 const employee = await User.findByPk(user_id, { attributes: ['name'] });
     const io = req.app.get("io");
 
@@ -403,13 +423,35 @@ io.to("user:admins_room").emit("LEAVE_UPDATED", {
 });
 
 
-    await t.commit();
+  await t.commit();
 
-    return res.status(200).json({ message: 'Leave request cancelled.' });
+const leaveDays = await countLeaveDays(
+  leave.start_date,
+  leave.end_date,
+  leave.duration,
+  leave.employee.saturday_group
+);
 
-  } catch (error) {
-     await t.rollback();
-    return res.status(500).json({ message: err.message });
+// Fire-and-forget email
+sendLeaveCancelledEmail({
+  employee: leave.employee,
+  leave,
+  leaveDays,
+}).catch(err => {
+  console.error("Leave cancellation email failed:", err);
+});
+
+return res.status(200).json({
+  message: "Leave request cancelled.",
+});
+
+  } 
+  
+  catch (error) {
+    if (t.finished !== "commit") {
+  await t.rollback();
+}
+    return res.status(500).json({ message: error.message });
   }
 }
 
@@ -497,7 +539,6 @@ const approveLeave = async (req, res) => {
  const approvedBy = await User.findByPk(admin_id, {
   attributes: ['id', 'name'],
 });
- console.log("🚀 ~ approveLeave ~ approvedBy:", approvedBy)
 
 
     // ── 1. Find leave with employee info ──
@@ -653,6 +694,7 @@ const approveLeave = async (req, res) => {
 // ADMIN — Reject Leave
 // ─────────────────────────────────────────────
 
+
 const rejectLeave = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -665,12 +707,39 @@ const rejectLeave = async (req, res) => {
       return res.status(400).json({ message: 'Rejection reason is required.' });
     }
 
-    const leave = await LeaveRequest.findByPk(id);
+    const rejectedBy = await User.findByPk(admin_id, {
+  attributes: ["id", "name"],
+});
+    const leave = await LeaveRequest.findByPk(id, {
+  include: [
+    {
+      model: User,
+      as: "employee",
+      attributes: [
+        "id",
+        "name",
+        "employee_id",
+        "email",
+        "saturday_group",
+      ],
+    },
+  ],
+});
+
 
     if (!leave) {
       await t.rollback();
       return res.status(404).json({ message: 'Leave request not found.' });
     }
+
+    const leaveDays = await countLeaveDays(
+  leave.start_date,
+  leave.end_date,
+  leave.duration,
+  leave.employee.saturday_group
+);
+
+
 
     if (leave.status !== LEAVE_STATUS.PENDING) {
       await t.rollback();
@@ -701,6 +770,22 @@ const rejectLeave = async (req, res) => {
 
     await t.commit();
 
+
+
+try {
+    const slr = await sendLeaveRejectedEmail({
+    employee: leave.employee,
+    leave,
+    rejectedBy,
+    rejectionReason: leave.rejection_reason,
+    leaveDays,
+});
+  console.log("🚀 ~ rejectLeave ~ slr:", slr)
+
+} catch (error) {
+  console.log("🚀 ~ rejectLeave ~ error:", error)
+}
+
     const io = req.app.get('io');
 
 await createNotification(io, {
@@ -727,7 +812,9 @@ await notifyAdmins(io, {
     return res.status(200).json({ message: 'Leave request rejected.' });
 
   } catch (err) {
+    if (t.finished !== "commit") {
     await t.rollback();
+}
     return res.status(500).json({ message: err.message });
   }
 };

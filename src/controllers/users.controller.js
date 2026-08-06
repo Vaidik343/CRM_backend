@@ -135,7 +135,7 @@ const updateUser = async(req, res) => {
     }
 
     const patch = {};
-    ["name", "email", "role_id", "is_admin"].forEach((f) => {
+    ["name", "email", "role_id", "is_admin", "mobile", "date_of_birth", "address"].forEach((f) => {
       if (typeof req.body[f] !== "undefined") patch[f] = req.body[f];
     });
 
