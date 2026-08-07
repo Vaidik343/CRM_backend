@@ -28,7 +28,7 @@ const validateCreateLeave = (req, res, next) => {
 
   // ── Enum checks ──
   const validLeaveTypes  = ['paid', 'unpaid', 'exchange'];
-  const validReasonTypes = ['normal', 'emergency'];
+  const validReasonTypes = ['casual', 'emergency']
   const validDurations   = ['full_day', 'first_half', 'second_half'];
 
   if (leave_type && !validLeaveTypes.includes(leave_type)) {

@@ -140,7 +140,7 @@ const sendLeaveCancelledEmail = async ({
         leave,
         leaveDays,
     });
-    console.log("🚀 ~ sendLeaveCancelledEmail ~ html:", html)
+    // console.log("🚀 ~ sendLeaveCancelledEmail ~ html:", html)
 
     const admins = await User.findAll({
         where: {
@@ -149,7 +149,7 @@ const sendLeaveCancelledEmail = async ({
         },
         attributes: ["email"],
     });
-    console.log("🚀 ~ sendLeaveCancelledEmail ~ admins:", admins)
+    // console.log("🚀 ~ sendLeaveCancelledEmail ~ admins:", admins)
 
     const adminEmails = admins
         .map(a => a.email)

@@ -1105,9 +1105,659 @@ const exportLeaveData = async (req, res) => {
   }
 };
 
+const exportAllLeavesExcel = async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "EWM CRM";
+    workbook.created = new Date();
+
+    const MONTH_NAMES = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+
+    // Helper function to safely parse dates
+    const parseSafeDate = (dateVal) => {
+      if (!dateVal) return null;
+      const d = new Date(dateVal);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    // ── Target employees ──
+    const userWhere = user_id
+      ? { id: user_id }
+      : { is_admin: false, is_active: true };
+
+    const employees = await User.findAll({
+      where: userWhere,
+      attributes: ["id", "name", "employee_id"],
+      order: [["name", "ASC"]],
+    });
+
+    const employeeIds = employees.map((e) => e.id);
+
+    // ── Fetch all leave requests ──
+    const leaves = await LeaveRequest.findAll({
+      where: user_id ? { user_id } : { user_id: { [Op.in]: employeeIds } },
+      include: [
+        { model: User, as: "employee", attributes: ["id", "name", "employee_id"] },
+        { model: User, as: "approver", attributes: ["name"], required: false },
+      ],
+      order: [["start_date", "DESC"]],
+    });
+
+    // ── Fetch all balance records ──
+    const balances = await LeaveBalance.findAll({
+      where: user_id ? { user_id } : { user_id: { [Op.in]: employeeIds } },
+      include: [
+        { model: User, as: "employee", attributes: ["name", "employee_id"] },
+      ],
+      order: [["year", "DESC"], ["month", "DESC"]],
+    });
+
+    // ════════════════════════
+    // SHEET 1 — Leave Requests
+    // ════════════════════════
+    const leaveSheet = workbook.addWorksheet("Leave Requests");
+
+    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF132EA7" } };
+    const headerFont = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    const totalFill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE9D9" } };
+
+    leaveSheet.columns = [
+      { header: "Display ID",       key: "display_id",       width: 18 },
+      { header: "Employee",         key: "employee_name",    width: 22 },
+      { header: "Employee ID",      key: "employee_id",      width: 15 },
+      { header: "Leave Type",       key: "leave_type",       width: 15 },
+      { header: "Reason Type",      key: "reason_type",      width: 15 },
+      { header: "Duration",         key: "duration",         width: 15 },
+      { header: "From",             key: "start_date",       width: 14 },
+      { header: "To",               key: "end_date",         width: 14 },
+      { header: "Days",             key: "days",             width: 8  },
+      { header: "Status",           key: "status",           width: 13 },
+      { header: "Reason",           key: "reason",           width: 30 },
+      { header: "Rejection Reason", key: "rejection_reason", width: 30 },
+      { header: "Approved By",      key: "approved_by",      width: 20 },
+      { header: "Approved At",      key: "approved_at",      width: 20 },
+      { header: "Applied On",       key: "applied_on",       width: 20 },
+    ];
+
+    // Style header row
+    leaveSheet.getRow(1).eachCell((cell) => {
+      cell.font = headerFont;
+      cell.fill = headerFill;
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+      };
+    });
+    leaveSheet.getRow(1).height = 32;
+
+    // Add data rows
+    leaves.forEach((leave, index) => {
+      const startDate  = parseSafeDate(leave.start_date);
+      const endDate    = parseSafeDate(leave.end_date);
+      const approvedAt = parseSafeDate(leave.approved_at);
+      
+      // Fallback check for Sequelize timestamps (createdAt vs created_at)
+      const rawAppliedDate = leave.created_at || leave.createdAt;
+      const appliedOn  = parseSafeDate(rawAppliedDate);
+
+      let days = 0;
+      if (leave.duration === "first_half" || leave.duration === "second_half") {
+        days = 0.5;
+      } else if (startDate && endDate) {
+        days = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+      }
+
+      const row = leaveSheet.addRow({
+        display_id:       leave.display_id,
+        employee_name:    leave.employee?.name        || "—",
+        employee_id:      leave.employee?.employee_id || "—",
+        leave_type:       leave.leave_type,
+        reason_type:      leave.reason_type,
+        duration:         leave.duration,
+        start_date:       startDate  || "—",
+        end_date:         endDate    || "—",
+        days,
+        status:           leave.status,
+        reason:           leave.reason,
+        rejection_reason: leave.rejection_reason || "—",
+        approved_by:      leave.approver?.name    || "—",
+        approved_at:      approvedAt || "—",
+        applied_on:       appliedOn  || "—",
+      });
+
+      // Alternating row color
+      if (index % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFF" } };
+        });
+      }
+
+      // Status color
+      const statusCell = row.getCell("status");
+      const statusColors = {
+        approved:  { argb: "FF16A34A" },
+        pending:   { argb: "FFD97706" },
+        rejected:  { argb: "FFDC2626" },
+        cancelled: { argb: "FF64748B" },
+      };
+      if (statusColors[leave.status]) {
+        statusCell.font = { bold: true, color: statusColors[leave.status] };
+      }
+
+      // Apply number formats ONLY if valid Date objects exist
+      if (startDate)  row.getCell("start_date").numFmt = "dd/mm/yyyy";
+      if (endDate)    row.getCell("end_date").numFmt   = "dd/mm/yyyy";
+      if (appliedOn)  row.getCell("applied_on").numFmt = "dd/mm/yyyy";
+      if (approvedAt) row.getCell("approved_at").numFmt = "dd/mm/yyyy hh:mm AM/PM";
+    });
+
+    // Total row
+    const leaveTotalRow = leaveSheet.addRow({
+      display_id:    "TOTAL",
+      employee_name: `${leaves.length} requests`,
+    });
+    leaveTotalRow.font = { bold: true };
+    leaveTotalRow.fill = totalFill;
+
+    // ════════════════════════
+    // SHEET 2 — Monthly Summary
+    // ════════════════════════
+    const summarySheet = workbook.addWorksheet("Monthly Summary");
+
+    summarySheet.columns = [
+      { header: "Employee",     key: "employee_name",  width: 22 },
+      { header: "Employee ID",  key: "employee_id",    width: 15 },
+      { header: "Month",        key: "month_label",    width: 14 },
+      { header: "Year",         key: "year",           width: 10 },
+      { header: "Entitled",     key: "entitled_paid",  width: 12 },
+      { header: "Paid Used",    key: "used_paid",      width: 12 },
+      { header: "Unpaid",       key: "used_unpaid",    width: 12 },
+      { header: "Exchange",     key: "used_exchange",  width: 12 },
+      { header: "Remaining",    key: "remaining_paid", width: 12 },
+    ];
+
+    summarySheet.getRow(1).eachCell((cell) => {
+      cell.font = headerFont;
+      cell.fill = headerFill;
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+    });
+    summarySheet.getRow(1).height = 32;
+
+    balances.forEach((b, index) => {
+      const remaining = parseFloat(b.entitled_paid) - parseFloat(b.used_paid);
+      const row = summarySheet.addRow({
+        employee_name:  b.employee?.name        || "—",
+        employee_id:    b.employee?.employee_id || "—",
+        month_label:    MONTH_NAMES[(b.month || 1) - 1],
+        year:           b.year,
+        entitled_paid:  parseFloat(b.entitled_paid  || 0),
+        used_paid:      parseFloat(b.used_paid      || 0),
+        used_unpaid:    parseFloat(b.used_unpaid    || 0),
+        used_exchange:  parseFloat(b.used_exchange  || 0),
+        remaining_paid: remaining,
+      });
+
+      if (index % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFF" } };
+        });
+      }
+
+      // Color remaining
+      const remCell = row.getCell("remaining_paid");
+      if (remaining <= 0) {
+        remCell.font = { bold: true, color: { argb: "FFDC2626" } };
+      } else if (remaining < parseFloat(b.entitled_paid)) {
+        remCell.font = { bold: true, color: { argb: "FFD97706" } };
+      } else {
+        remCell.font = { bold: true, color: { argb: "FF16A34A" } };
+      }
+
+      // Unpaid warning color
+      if (parseFloat(b.used_unpaid) > 0) {
+        row.getCell("used_unpaid").font = { bold: true, color: { argb: "FFDC2626" } };
+      }
+    });
+
+    // Total row
+    const summaryTotalRow = summarySheet.addRow({
+      employee_name: "TOTAL RECORDS",
+      employee_id:   String(balances.length),
+    });
+    summaryTotalRow.font = { bold: true };
+    summaryTotalRow.fill = totalFill;
+
+    // ── Send ──
+    const empLabel = user_id
+      ? employees[0]?.employee_id || "employee"
+      : "all_employees";
+
+    const dateLabel = new Date().toISOString().split("T")[0];
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${empLabel}_leaves_${dateLabel}.xlsx"`
+    );
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("exportAllLeavesExcel error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 
-module.exports = { exportData, exportMyData, exportEmployeeData, exportProjectData , exportAllEmployeeData, exportLeaveData  };
+const exportAllLeavesPDF = async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    const MONTH_NAMES = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+
+    const formatD = (d) => {
+      if (!d) return "—";
+      const date = new Date(d);
+      return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+    };
+
+    // ── Fetch employees ──
+    const userWhere = user_id
+      ? { id: user_id }
+      : { is_admin: false, is_active: true };
+
+    const employees = await User.findAll({
+      where: userWhere,
+      attributes: ["id", "name", "employee_id"],
+      order: [["name", "ASC"]],
+    });
+
+    const employeeIds = employees.map((e) => e.id);
+
+    // ── Fetch leaves ──
+    const leaves = await LeaveRequest.findAll({
+      where: user_id ? { user_id } : { user_id: { [Op.in]: employeeIds } },
+      include: [
+        { model: User, as: "employee", attributes: ["id", "name", "employee_id"] },
+        { model: User, as: "approver", attributes: ["name"], required: false },
+      ],
+      order: [["start_date", "DESC"]],
+    });
+
+    // ── Fetch balances ──
+    const balances = await LeaveBalance.findAll({
+      where: user_id ? { user_id } : { user_id: { [Op.in]: employeeIds } },
+      include: [
+        { model: User, as: "employee", attributes: ["name", "employee_id"] },
+      ],
+      order: [["year", "DESC"], ["month", "DESC"]],
+    });
+
+    // ── Summary stats ──
+    const totalLeaves    = leaves.length;
+    const totalApproved  = leaves.filter((l) => l.status === "approved").length;
+    const totalPending   = leaves.filter((l) => l.status === "pending").length;
+    const totalRejected  = leaves.filter((l) => l.status === "rejected").length;
+    const totalCancelled = leaves.filter((l) => l.status === "cancelled").length;
+    const totalUnpaid    = balances.reduce((sum, b) => sum + parseFloat(b.used_unpaid || 0), 0);
+
+    const empLabel = user_id
+      ? `${employees[0]?.name} (${employees[0]?.employee_id})`
+      : "All Employees";
+
+    const generatedOn = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit", month: "long", year: "numeric",
+    });
+
+    // ── Build leave rows HTML ──
+    const leaveRowsHTML = leaves.map((leave, i) => {
+      const start = new Date(leave.start_date);
+      const end   = new Date(leave.end_date);
+      const days  =
+        leave.duration === "first_half" || leave.duration === "second_half"
+          ? 0.5
+          : Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+      const statusColors = {
+        approved:  { bg: "#dcfce7", text: "#16a34a" },
+        pending:   { bg: "#fef9c3", text: "#d97706" },
+        rejected:  { bg: "#fee2e2", text: "#dc2626" },
+        cancelled: { bg: "#f1f5f9", text: "#64748b" },
+      };
+      const sc = statusColors[leave.status] || statusColors.pending;
+
+      return `
+        <tr style="background:${i % 2 === 0 ? "#f8faff" : "#ffffff"};">
+          <td style="padding:10px 12px;font-family:monospace;font-size:11px;color:#132ea7;font-weight:700;">
+            ${leave.display_id}
+          </td>
+          <td style="padding:10px 12px;font-size:12px;font-weight:700;color:#1e293b;">
+            ${leave.employee?.name || "—"}
+            <div style="font-size:10px;color:#94a3b8;font-weight:600;">${leave.employee?.employee_id || ""}</div>
+          </td>
+          <td style="padding:10px 12px;font-size:11px;font-weight:700;color:#475569;text-transform:capitalize;">
+            ${leave.leave_type}
+            ${leave.reason_type === "emergency"
+              ? `<div style="font-size:9px;background:#fee2e2;color:#dc2626;padding:2px 6px;border-radius:4px;display:inline-block;margin-top:2px;font-weight:800;text-transform:uppercase;">Emergency</div>`
+              : ""}
+          </td>
+          <td style="padding:10px 12px;font-size:11px;color:#475569;font-weight:600;">${formatD(leave.start_date)}</td>
+          <td style="padding:10px 12px;font-size:11px;color:#475569;font-weight:600;">${formatD(leave.end_date)}</td>
+          <td style="padding:10px 12px;font-size:11px;color:#475569;font-weight:700;text-align:center;">${days}</td>
+          <td style="padding:10px 12px;">
+            <span style="background:${sc.bg};color:${sc.text};padding:3px 10px;border-radius:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;">
+              ${leave.status}
+            </span>
+          </td>
+          <td style="padding:10px 12px;font-size:11px;color:#475569;">${leave.approver?.name || "—"}</td>
+        </tr>`;
+    }).join("");
+
+    // ── Build balance rows HTML ──
+    const balanceRowsHTML = balances.map((b, i) => {
+      const remaining = parseFloat(b.entitled_paid) - parseFloat(b.used_paid);
+      const remColor  = remaining <= 0 ? "#dc2626" : remaining < parseFloat(b.entitled_paid) ? "#d97706" : "#16a34a";
+      const unpaidColor = parseFloat(b.used_unpaid) > 0 ? "#dc2626" : "#64748b";
+
+      return `
+        <tr style="background:${i % 2 === 0 ? "#f8faff" : "#ffffff"};">
+          <td style="padding:10px 12px;font-size:12px;font-weight:700;color:#1e293b;">
+            ${b.employee?.name || "—"}
+            <div style="font-size:10px;color:#94a3b8;font-weight:600;">${b.employee?.employee_id || ""}</div>
+          </td>
+          <td style="padding:10px 12px;font-size:12px;font-weight:700;color:#475569;">
+            ${MONTH_NAMES[(b.month || 1) - 1]} ${b.year}
+          </td>
+          <td style="padding:10px 12px;font-size:12px;font-weight:700;color:#132ea7;text-align:center;">${parseFloat(b.entitled_paid)}</td>
+          <td style="padding:10px 12px;font-size:12px;font-weight:700;color:#132ea7;text-align:center;">${parseFloat(b.used_paid)}</td>
+          <td style="padding:10px 12px;font-size:12px;font-weight:700;color:${unpaidColor};text-align:center;">${parseFloat(b.used_unpaid)}</td>
+          <td style="padding:10px 12px;font-size:12px;font-weight:700;color:#d97706;text-align:center;">${parseFloat(b.used_exchange)}</td>
+          <td style="padding:10px 12px;text-align:center;">
+            <span style="background:${remaining <= 0 ? "#fee2e2" : remaining < parseFloat(b.entitled_paid) ? "#fef9c3" : "#dcfce7"};
+              color:${remColor};padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;">
+              ${remaining}
+            </span>
+          </td>
+        </tr>`;
+    }).join("");
+
+    // ── Full HTML ──
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8"/>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1e293b; }
+          
+          .cover {
+            background: linear-gradient(135deg, #132ea7 0%, #1e40af 50%, #0f2490 100%);
+            padding: 60px 50px;
+            min-height: 220px;
+            position: relative;
+            overflow: hidden;
+          }
+          .cover::after {
+            content: '';
+            position: absolute;
+            top: -60px; right: -60px;
+            width: 250px; height: 250px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 50%;
+          }
+          .cover::before {
+            content: '';
+            position: absolute;
+            bottom: -40px; left: 30%;
+            width: 180px; height: 180px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 50%;
+          }
+          .cover-label {
+            font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.5);
+            text-transform: uppercase; letter-spacing: 0.3em; margin-bottom: 10px;
+          }
+          .cover-title {
+            font-size: 36px; font-weight: 900; color: #fff;
+            letter-spacing: -0.5px; margin-bottom: 6px;
+          }
+          .cover-sub {
+            font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.75);
+            margin-bottom: 30px;
+          }
+          .cover-meta {
+            display: flex; gap: 30px; flex-wrap: wrap;
+          }
+          .cover-meta-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px; padding: 10px 18px;
+          }
+          .cover-meta-label {
+            font-size: 9px; font-weight: 800; color: rgba(255,255,255,0.5);
+            text-transform: uppercase; letter-spacing: 0.2em;
+          }
+          .cover-meta-value {
+            font-size: 14px; font-weight: 900; color: #fff; margin-top: 2px;
+          }
+
+          .stats-bar {
+            display: flex; gap: 0;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .stat-item {
+            flex: 1; padding: 20px 24px; text-align: center;
+            border-right: 1px solid #e2e8f0;
+          }
+          .stat-item:last-child { border-right: none; }
+          .stat-value {
+            font-size: 28px; font-weight: 900; color: #132ea7;
+          }
+          .stat-label {
+            font-size: 9px; font-weight: 800; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 0.15em; margin-top: 3px;
+          }
+          .stat-approved .stat-value { color: #16a34a; }
+          .stat-pending  .stat-value { color: #d97706; }
+          .stat-rejected .stat-value { color: #dc2626; }
+          .stat-unpaid   .stat-value { color: #dc2626; }
+
+          .section { padding: 40px 50px; }
+          .section-title {
+            font-size: 10px; font-weight: 800; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 0.25em;
+            margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+          }
+          .section-title::after {
+            content: ''; flex: 1; height: 1px; background: #e2e8f0;
+          }
+
+          table { width: 100%; border-collapse: collapse; }
+          thead tr {
+            background: #132ea7;
+          }
+          thead th {
+            padding: 12px 12px;
+            font-size: 9px; font-weight: 800; color: #fff;
+            text-transform: uppercase; letter-spacing: 0.15em;
+            text-align: left;
+          }
+          tbody tr:hover { background: #f1f5f9; }
+          tbody td { border-bottom: 1px solid #f1f5f9; }
+
+          .footer {
+            padding: 20px 50px;
+            border-top: 1px solid #e2e8f0;
+            display: flex; justify-content: space-between; align-items: center;
+          }
+          .footer-text {
+            font-size: 10px; color: #94a3b8; font-weight: 600;
+          }
+
+          .page-break { page-break-before: always; }
+        </style>
+      </head>
+      <body>
+
+        <!-- COVER SECTION -->
+        <div class="cover">
+          <div class="cover-label">Employee Work Management — CRM</div>
+          <div class="cover-title">Leave Report</div>
+          <div class="cover-sub">${empLabel}</div>
+          <div class="cover-meta">
+            <div class="cover-meta-item">
+              <div class="cover-meta-label">Generated On</div>
+              <div class="cover-meta-value">${generatedOn}</div>
+            </div>
+            <div class="cover-meta-item">
+              <div class="cover-meta-label">Total Requests</div>
+              <div class="cover-meta-value">${totalLeaves}</div>
+            </div>
+            <div class="cover-meta-item">
+              <div class="cover-meta-label">Scope</div>
+              <div class="cover-meta-value">${user_id ? "Individual" : "All Employees"}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATS BAR -->
+        <div class="stats-bar">
+          <div class="stat-item">
+            <div class="stat-value">${totalLeaves}</div>
+            <div class="stat-label">Total</div>
+          </div>
+          <div class="stat-item stat-approved">
+            <div class="stat-value">${totalApproved}</div>
+            <div class="stat-label">Approved</div>
+          </div>
+          <div class="stat-item stat-pending">
+            <div class="stat-value">${totalPending}</div>
+            <div class="stat-label">Pending</div>
+          </div>
+          <div class="stat-item stat-rejected">
+            <div class="stat-value">${totalRejected}</div>
+            <div class="stat-label">Rejected</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">${totalCancelled}</div>
+            <div class="stat-label">Cancelled</div>
+          </div>
+          <div class="stat-item stat-unpaid">
+            <div class="stat-value">${totalUnpaid}</div>
+            <div class="stat-label">Unpaid Days</div>
+          </div>
+        </div>
+
+        <!-- LEAVE REQUESTS TABLE -->
+        <div class="section">
+          <div class="section-title">Leave Requests</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Display ID</th>
+                <th>Employee</th>
+                <th>Type</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Days</th>
+                <th>Status</th>
+                <th>Approved By</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${leaveRowsHTML || `<tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;font-size:13px;">No leave requests found</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PAGE BREAK -->
+        <div class="page-break"></div>
+
+        <!-- MONTHLY SUMMARY TABLE -->
+        <div class="cover" style="min-height:100px;padding:40px 50px;">
+          <div class="cover-label">Employee Work Management — CRM</div>
+          <div class="cover-title" style="font-size:26px;">Monthly Balance Summary</div>
+          <div class="cover-sub" style="margin-bottom:0;">${empLabel} • ${generatedOn}</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Balance History</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Month</th>
+                <th style="text-align:center;">Entitled</th>
+                <th style="text-align:center;">Paid Used</th>
+                <th style="text-align:center;">Unpaid</th>
+                <th style="text-align:center;">Exchange</th>
+                <th style="text-align:center;">Remaining</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${balanceRowsHTML || `<tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;font-size:13px;">No balance records found</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+          <div class="footer-text">EWM CRM — Leave Report</div>
+          <div class="footer-text">Generated on ${generatedOn}</div>
+        </div>
+
+      </body>
+      </html>`;
+
+    // ── Generate PDF via Puppeteer ──
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: true,
+      printBackground: true,
+      margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
+    });
+
+    await browser.close();
+
+    const empFileLabel = user_id
+      ? employees[0]?.employee_id || "employee"
+      : "all_employees";
+    const dateLabel = new Date().toISOString().split("T")[0];
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${empFileLabel}_leaves_${dateLabel}.pdf"`
+    );
+    res.send(pdfBuffer);
+
+  } catch (err) {
+    console.error("exportAllLeavesPDF error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+module.exports = { exportData, exportMyData, exportEmployeeData, exportProjectData , exportAllEmployeeData, exportLeaveData  ,  exportAllLeavesExcel,
+  exportAllLeavesPDF};
 // module.exports = { exportData };
 
 

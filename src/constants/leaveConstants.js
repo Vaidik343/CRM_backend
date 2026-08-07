@@ -6,7 +6,7 @@ export const LEAVE_TYPES = {
 };
 
 export const LEAVE_REASONS = {
-  NORMAL: "normal",
+  CASUAL:    'casual',
   EMERGENCY: "emergency",
 };
 

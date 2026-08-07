@@ -23,10 +23,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM('paid', 'unpaid', 'exchange'),
         allowNull: false,
     },
-    reason_type : {
-        type: DataTypes.ENUM('normal', 'emergency'),
-        allowNull: false,
-    },
+ reason_type: {
+  type: DataTypes.ENUM('casual', 'emergency'),
+  allowNull: false,
+},
 
     emergency_sub_type: {
   type: DataTypes.STRING(20),
