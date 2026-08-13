@@ -12,7 +12,6 @@ This folder contains Swagger/OpenAPI documentation for all CRM APIs using JSDoc 
 - **calls.swagger.js** - Call logging and management APIs
 - **tasks.swagger.js** - Task assignment and management APIs
 - **password.swagger.js** - Password change and reset APIs
-- **dashboard.swagger.js** - Dashboard analytics APIs (Admin only)
 - **workLogs.swagger.js** - Work log tracking APIs
 - **export.swagger.js** - Data export APIs (Admin only)
 
@@ -50,7 +49,7 @@ const options = {
     },
     servers: [
       {
-        url: `http://localhost:${process.env.PORT || 3000}`,
+        url: `http://localhost:${process.env.PORT }`,
         description: 'Development server'
       }
     ],
@@ -75,7 +74,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 Once configured, access the Swagger documentation at:
 ```
-http://localhost:3000/api-docs
+http://localhost:7015/api-docs
 ```
 
 ## Authentication

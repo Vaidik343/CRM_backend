@@ -10,13 +10,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendMail = async ({
-  to,
-  cc = [],
-  subject,
-  html,
-  text = "",
-}) => {
+const sendMail = async ({ to, cc = [], subject, html, text = "", attachments = [] }) => {
   return transporter.sendMail({
     from: process.env.SMTP_FROM,
     to,
@@ -24,6 +18,7 @@ const sendMail = async ({
     subject,
     text,
     html,
+    attachments,  
   });
 };
 console.log("🚀 ~ sendMail ~ sendMail:", sendMail)

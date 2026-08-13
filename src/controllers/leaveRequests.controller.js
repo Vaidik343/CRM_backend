@@ -19,8 +19,9 @@ const { createNotification , notifyAdmins } = require("./notifications.controlle
 
 const { Op } = require("sequelize");
 
-const { sendLeaveRequestEmail, sendLeaveApprovedEmail, sendLeaveRejectedEmail, sendLeaveCancelledEmail} = require("../utils/email");
+const { sendLeaveRequestEmail, sendLeaveApprovedEmail, sendLeaveRejectedEmail, sendLeaveCancelledEmail, sendDocumentUploadedEmail } = require("../utils/email");
 
+const path = require("path");
 
 const {
   validateLeaveDates,
@@ -106,6 +107,8 @@ const createLeave = async (req, res) => {
       reason,
     } = req.body;
 
+
+    console.log(req.body);
 const user_id = req.user.id;
 
       if (!leave_type || !reason_type || !start_date || !end_date || !duration || !reason) {
@@ -164,12 +167,12 @@ if (reason_type === LEAVE_REASONS.EMERGENCY) {
       message: "Emergency leave requires a sub-type: 'medical' or 'other'.",
     });
   }
-  if (!req.file) {
-    await t.rollback();
-    return res.status(400).json({
-      message: "A supporting document is required for emergency leave.",
-    });
-  }
+  // if (!req.file) {
+  //   await t.rollback();
+  //   return res.status(400).json({
+  //     message: "A supporting document is required for emergency leave.",
+  //   });
+  // }
 }
 
     // ── 7. Generate display_id ──
@@ -200,9 +203,14 @@ console.log(employee.toJSON());
       reason,
       status: LEAVE_STATUS.PENDING,
     }, { transaction: t });
+    console.log("🚀 ~ createLeave ~ leave:", leave)
     // console.log("🚀 ~ createLeave ~ leave:", leave)
 
     // ── Medical document upload ──
+
+    let movedDoc = null;
+
+
 if (req.file) {
   const moved = moveUploadedFile(
     req.file.path,
@@ -211,7 +219,8 @@ if (req.file) {
   );
 
   if (moved) {
-    await leave.update({ medical_document: moved }, { transaction: t });
+      movedDoc = moved;
+    await leave.update({ medical_document: moved.url  }, { transaction: t });
   }
 }
 
@@ -272,12 +281,14 @@ io.to("user:admins_room").emit("LEAVE_REQUESTED", leave);
 res.status(201).json({
   message: "Leave request submitted successfully.",
   leave,
+  leave_type: leave.leave_type, 
 });
 
 // Fire and forget
 sendLeaveRequestEmail({
   employee,
   leave,
+    documentPath: movedDoc?.file_path || null,
 }).catch(err => {
   console.error("Leave email failed:", err);
 });
@@ -570,11 +581,13 @@ const approveLeave = async (req, res) => {
       leave.employee.saturday_group,
     );
 
+
     // ── 3. Approve the leave ──
     await leave.update({
       status:      LEAVE_STATUS.APPROVED,
       approved_by: admin_id,
       approved_at: new Date(),
+
     }, { transaction: t });
 
     // ── 4. Update leave balance ──
@@ -593,39 +606,39 @@ const approveLeave = async (req, res) => {
       transaction: t,
     });
 
-    if (leave.leave_type === LEAVE_TYPES.EXCHANGE) {
-      // exchange leave — doesn't touch paid/unpaid balance
-      await balance.update({
-        used_exchange: parseFloat(balance.used_exchange) + leaveDays,
-      }, { transaction: t });
+let addToPaid   = 0;
+let addToUnpaid = 0;
 
-    } else {
-      // paid or unpaid — consume paid first, rest goes to unpaid
-      const remainingPaid = parseFloat(balance.entitled_paid) - parseFloat(balance.used_paid);
+if (leave.leave_type === LEAVE_TYPES.EXCHANGE) {
+  await balance.update({
+    used_exchange: parseFloat(balance.used_exchange) + leaveDays,
+  }, { transaction: t });
+} else {
+  const remainingPaid = parseFloat(balance.entitled_paid) - parseFloat(balance.used_paid);
 
-      let addToPaid   = 0;
-      let addToUnpaid = 0;
+  if (remainingPaid <= 0) {
+    addToUnpaid = leaveDays;
+  } else if (remainingPaid >= leaveDays) {
+    addToPaid = leaveDays;
+  } else {
+    addToPaid   = remainingPaid;
+    addToUnpaid = leaveDays - remainingPaid;
+  }
 
-      if (remainingPaid <= 0) {
-        // no paid leaves left — fully unpaid
-        addToUnpaid = leaveDays;
+  await balance.update({
+    used_paid:   parseFloat(balance.used_paid)   + addToPaid,
+    used_unpaid: parseFloat(balance.used_unpaid) + addToUnpaid,
+  }, { transaction: t });
+}
 
-      } else if (remainingPaid >= leaveDays) {
-        // enough paid leaves to cover all days
-        addToPaid = leaveDays;
+// ── Now finalLeaveType is safe — addToPaid/addToUnpaid are defined ──
+let finalLeaveType = leave.leave_type;
+if (leave.leave_type !== LEAVE_TYPES.EXCHANGE) {
+  finalLeaveType = addToUnpaid > 0 ? LEAVE_TYPES.UNPAID : LEAVE_TYPES.PAID;
+}
 
-      } else {
-        // partial — use remaining paid, rest unpaid
-        addToPaid   = remainingPaid;
-        addToUnpaid = leaveDays - remainingPaid;
-      }
-
-      await balance.update({
-        used_paid:   parseFloat(balance.used_paid)   + addToPaid,
-        used_unpaid: parseFloat(balance.used_unpaid) + addToUnpaid,
-      }, { transaction: t });
-    }
-
+// Update leave_type on the record
+await leave.update({ leave_type: finalLeaveType }, { transaction: t });
     // ── 5. Leave log ──
     await LeaveLog.create({
       leave_request_id: leave.id,
@@ -682,6 +695,7 @@ const approveLeave = async (req, res) => {
     return res.status(200).json({
       message: 'Leave request approved.',
       leave_days: leaveDays,
+       leave_type: finalLeaveType,
     });
 
   } catch (err) {
@@ -1177,6 +1191,108 @@ const getLeaveCalculation = async (req, res) => {
   }
 };
 
+
+// PATCH /api/leaves/:id/upload-document
+// Employee only — own emergency leave only — medical_document must still be null
+const uploadLeaveDocument = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const user_id = req.user.id;
+    const { id }  = req.params;
+
+    console.log(req.body)
+    if (!req.file) {
+      await t.rollback();
+      return res.status(400).json({ message: "A document file is required." });
+    }
+
+    const leave = await LeaveRequest.findOne({
+      where: { id, user_id },
+      include: [
+        { model: User, as: "employee", attributes: ["id", "name", "email", "employee_id"] },
+      ],
+    });
+
+    if (!leave) {
+      await t.rollback();
+      return res.status(404).json({ message: "Leave request not found." });
+    }
+
+    if (leave.reason_type !== LEAVE_REASONS.EMERGENCY) {
+      await t.rollback();
+      return res.status(400).json({ message: "Document upload is only for emergency leaves." });
+    }
+
+    if (leave.medical_document) {
+      await t.rollback();
+      return res.status(400).json({ message: "A document has already been uploaded for this leave." });
+    }
+
+    // Move file from temp upload to permanent location
+    const moved = moveUploadedFile(
+      req.file.path,
+      `leaves/${leave.id}`,
+      "medical_document"
+    );
+
+    if (!moved) {
+      await t.rollback();
+      return res.status(500).json({ message: "Failed to save document." });
+    }
+
+
+
+    await leave.update(
+      {
+        medical_document:     moved.url,
+        document_uploaded_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    await LeaveLog.create(
+      {
+        leave_request_id: leave.id,
+        user_id,
+        action:  "document_uploaded",
+        remarks: { file_path: moved },
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+
+    // Fire-and-forget email to admins with attachment
+    const leaveDays = await countLeaveDays(
+      leave.start_date,
+      leave.end_date,
+      leave.duration
+    );
+
+    // const absoluteDocPath = moved.path;
+
+    sendDocumentUploadedEmail({
+      employee: leave.employee,
+      leave: {
+        ...leave.toJSON(),
+        medical_document_path:  moved.file_path,  // absolute path for nodemailer attachment
+      },
+      leaveDays,
+    }).catch((err) => console.error("Document upload email failed:", err));
+
+    return res.status(200).json({
+      message: "Document uploaded successfully.",
+      medical_document: moved.url,
+       document_uploaded_at: leave.document_uploaded_at,
+    });
+  } catch (err) {
+    if (t.finished !== "commit") {
+    await t.rollback();
+  }
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 // ─────────────────────────────────────────────
 
 module.exports.leaveController = {
@@ -1192,5 +1308,6 @@ module.exports.leaveController = {
     getCompanySettings,
   updateCompanySettings,
    getLeaveCalculation,
+   uploadLeaveDocument
 
 }

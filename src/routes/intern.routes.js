@@ -33,6 +33,8 @@ const {
   getMyTasks,
   updateTask,
   adminAssignTask,
+    mentorAssignTask,
+  getMyMentoredInterns,
   getInternTasks,
   adminUpdateTask,
   deleteTask
@@ -361,6 +363,8 @@ router.patch('/intern/project',  authenticateIntern, updateProject);
 router.post('/intern/tasks',        authenticateIntern, createTask);
 router.get('/intern/tasks',         authenticateIntern, getMyTasks);
 router.patch('/intern/tasks/:id',   authenticateIntern, updateTask);
+router.get('/interns/my-mentored',        authenticate, getMyMentoredInterns);
+router.post('/intern-tasks/mentor-assign', authenticateIntern, mentorAssignTask);
 
 // ─────────────────────────────────────────────
 // INTERN — WorkLog Routes
@@ -391,7 +395,7 @@ router.patch('/admin/interns/:intern_id/project', authenticate, requireAdmin, ad
 // PATCH  /api/admin/intern/tasks/:id          → update any intern task
 router.post('/admin/intern/tasks',                authenticate, requireAdmin, adminAssignTask);
 router.get('/admin/interns/:intern_id/tasks',     authenticate, requireAdmin, getInternTasks);
-router.patch('/admin/intern/tasks/:id',           authenticate, requireAdmin, adminUpdateTask);
+router.put('/admin/intern/tasks/:id',           authenticate, requireAdmin, adminUpdateTask);
 router.delete('/admin/intern/tasks/:id',   authenticate, requireAdmin, deleteTask);
 
 // ─────────────────────────────────────────────

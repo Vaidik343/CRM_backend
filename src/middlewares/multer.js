@@ -48,7 +48,7 @@ const upload = multer({
   fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB per file
-    files: 4,                   // id_proof, photo, resume, marksheet
+    files: 5,                   // id_proof, photo, resume, marksheet
   },
 });
 
@@ -58,6 +58,8 @@ const internUpload = upload.fields([
   { name: 'photo',               maxCount: 1 },
   { name: 'resume',              maxCount: 1 },
   { name: 'last_sem_marksheet',  maxCount: 1 },
+   { name: 'noc',                 maxCount: 1 },
+
 ]);
 
 module.exports = { upload, internUpload, tempPath, BASE_UPLOAD_PATH };

@@ -312,6 +312,118 @@ const adminAssignTask = async (req, res) => {
   }
 };
 
+// Add after adminAssignTask, before deleteTask
+
+// ─────────────────────────────────────────────
+// MENTOR (Employee) — Assign Task to Their Intern
+// ─────────────────────────────────────────────
+
+const mentorAssignTask = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const mentor_id = req.user.id; // employee JWT
+
+    const {
+      intern_id,
+      task,
+      description,
+      intern_project_id,
+      due_date,
+      remark,
+    } = req.body;
+
+    if (!intern_id || !task?.trim()) {
+      await t.rollback();
+      return res.status(400).json({ message: 'intern_id and task are required.' });
+    }
+
+    // verify intern exists and is active
+    const intern = await Intern.findByPk(intern_id);
+    if (!intern || intern.status !== 'active') {
+      await t.rollback();
+      return res.status(404).json({ message: 'Active intern not found.' });
+    }
+
+    // ── KEY CHECK: requesting employee must be in intern's mentor_ids ──
+    const mentorIds = Array.isArray(intern.mentor_ids) ? intern.mentor_ids : [];
+    if (!mentorIds.includes(mentor_id)) {
+      await t.rollback();
+      return res.status(403).json({
+        message: 'You are not assigned as a mentor for this intern.',
+      });
+    }
+
+    if (intern_project_id) {
+      const project = await InternProject.findOne({
+        where: { id: intern_project_id, intern_id },
+      });
+      if (!project) {
+        await t.rollback();
+        return res.status(404).json({ message: 'Project not found for this intern.' });
+      }
+    }
+
+    // same ITA prefix as admin — mentor-assigned tasks behave the same way
+    const display_id = generateDisplayId({
+      prefix:     'ITA',
+      employeeId: intern.enrollment_no,
+    });
+
+    let remarks = [];
+    if (remark) {
+      const mentor = await User.findByPk(mentor_id, { attributes: ['name'] });
+      remarks = appendRemark({
+        existingRemarks: [],
+        text:            remark,
+        user_id:         mentor_id,
+        user_name:       mentor.name,
+      });
+    }
+
+    const internTask = await InternTask.create({
+      intern_id,
+      display_id,
+      intern_project_id: intern_project_id || null,
+      task:              task.trim(),
+      description:       description?.trim() || null,
+      assigned_by:       mentor_id, // non-null = assigned (same field as admin)
+      status:            'open',
+      due_date:          due_date || null,
+      remarks,
+    }, { transaction: t });
+
+    await t.commit();
+    await internTask.reload({ include: taskIncludes });
+
+    return res.status(201).json({
+      message: 'Task assigned to intern successfully.',
+      task: internTask,
+    });
+
+  } catch (err) {
+    await t.rollback();
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// also add a helper for the frontend to fetch mentored interns
+const getMyMentoredInterns = async (req, res) => {
+  try {
+    const mentor_id = req.user.id;
+
+    const interns = await Intern.findAll({
+      where: {
+        mentor_ids: { [Op.contains]: [mentor_id] },
+        status: 'active',
+      },
+      attributes: ['id', 'name', 'display_id', 'intern_type', 'college_name', 'enrollment_no'],
+    });
+
+    return res.status(200).json({ interns });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
 // ─────────────────────────────────────────────
 // ADMIN — Get Intern Tasks
 // ─────────────────────────────────────────────
@@ -433,6 +545,8 @@ module.exports = {
   getMyTasks,
   updateTask,
   adminAssignTask,
+  mentorAssignTask,
+  getMyMentoredInterns,
   getInternTasks,
   adminUpdateTask,
   deleteTask

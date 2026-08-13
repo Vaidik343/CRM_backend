@@ -28,7 +28,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     hours: {
       type: DataTypes.DECIMAL(4, 1), // e.g. 2.5 hours
-      allowNull: false,
+      allowNull: true,
     },
     log_date: {
       type: DataTypes.DATEONLY,

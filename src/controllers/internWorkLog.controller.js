@@ -31,6 +31,7 @@ const worklogIncludes = [
 // INTERN — Create WorkLog
 // ─────────────────────────────────────────────
 
+ 
 const createWorkLog = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -50,20 +51,23 @@ const createWorkLog = async (req, res) => {
       return res.status(400).json({ message: 'description is required.' });
     }
 
-    if (!hours) {
-      await t.rollback();
-      return res.status(400).json({ message: 'hours is required.' });
-    }
+    // if (!hours) {
+    //   await t.rollback();
+    //   return res.status(400).json({ message: 'hours is required.' });
+    // }
 
     if (!log_date) {
       await t.rollback();
       return res.status(400).json({ message: 'log_date is required.' });
     }
 
-    if (isNaN(parseFloat(hours)) || parseFloat(hours) <= 0) {
-      await t.rollback();
-      return res.status(400).json({ message: 'hours must be a positive number.' });
-    }
+    if (hours !== null && hours !== undefined && hours !== '') {
+  const parsedHours = parseFloat(hours);
+  if (isNaN(parsedHours) || parsedHours <= 0) {
+    await t.rollback();
+    return res.status(400).json({ message: 'hours must be a positive number.' });
+  }
+}
 
     // ── Validate project if provided ──
     if (intern_project_id) {
@@ -92,19 +96,26 @@ const createWorkLog = async (req, res) => {
       employeeId: req.intern.enrollment_no,
     });
 
+    const parsedHours = (hours !== null && hours !== undefined && hours !== '') 
+  ? parseFloat(hours) 
+  : null;
+
+
     const worklog = await InternWorkLog.create({
       intern_id,
       display_id,
       description:       description.trim(),
-      hours:             parseFloat(hours),
+     hours:             parsedHours,
       log_date,
       intern_project_id: intern_project_id || null,
       intern_task_id:    intern_task_id    || null,
     }, { transaction: t });
+    console.log("🚀 ~ createWorkLog ~ worklog:", worklog)
 
     await t.commit();
 
     await worklog.reload({ include: worklogIncludes });
+   console.log("🚀 ~ createWorkLog ~ wl:", wl)
 
     return res.status(201).json({
       message: 'Work log created successfully.',
@@ -112,6 +123,7 @@ const createWorkLog = async (req, res) => {
     });
 
   } catch (err) {
+     console.log("🚀 ~ createWorkLog ~ err:", err)
     await t.rollback();
     return res.status(500).json({ message: err.message });
   }
@@ -207,11 +219,14 @@ const updateWorkLog = async (req, res) => {
       }
     }
 
+    const parsedHours = (hours !== null && hours !== undefined && hours !== '') 
+  ? parseFloat(hours) 
+  : null;
+
+
     await worklog.update({
       description: description?.trim()      || worklog.description,
-      hours:       hours !== undefined
-        ? parseFloat(hours)
-        : worklog.hours,
+  hours:             parsedHours,
       log_date:    log_date                 || worklog.log_date,
       intern_project_id: intern_project_id !== undefined
         ? intern_project_id || null

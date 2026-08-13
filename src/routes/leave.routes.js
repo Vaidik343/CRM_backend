@@ -32,6 +32,15 @@ router.get('/leaves/my', authenticate, leaveController.getMyLeaves );
 
 router.patch('/leaves/cancel/:id', authenticate, leaveController.cancelLeave);
 
+// document upload
+router.patch(
+  "/leaves/:id/upload-document",
+  authenticate,
+  
+  leaveUpload,
+  leaveController.uploadLeaveDocument
+);
+
 // ─────────────────────────────────────────────
 // ADMIN ROUTES
 // ─────────────────────────────────────────────

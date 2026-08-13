@@ -18,7 +18,7 @@ const cron = require("node-cron");
 const { cleanupOldNotifications } = require("./utils/notificationCleanup");
 
 const {transporter} = require("./utils/mailer");
-
+const { scheduleEventNotifications } = require("./utils/scheduleEventNotifications");
 
 
 const io = new Server(server, {
@@ -32,6 +32,7 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 7015;
 
 const routeFiles = [
+  "backup.routes.js",
   "auth.routes.js",
   "calls.routes.js",
   "client.routes.js",
@@ -50,15 +51,32 @@ const routeFiles = [
   "leaveBalance.routes.js",
   "probation.routes.js",
   "intern.routes.js",
+  "event.routes.js",
   "notifications.routes.js",  // new
   "report.routes.js",
+  
   
   
 ];
 
 // ── Middleware ────────────────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: "*" }));
+// Replace your current cors line
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:7015",
+      "http://ewm.bbcspldev.in",
+      "http://ewmapi.bbcspldev.in",
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+// app.options("*", cors());
 app.use(express.json());
 app.use(cookieParser());
 app.use("/public", express.static(path.join(__dirname, "public")));
@@ -92,26 +110,19 @@ app.get("/api/users", (req, res) => {
 
 
 // ── Swagger ───────────────────────────────────────────────────
+
+
+// Your existing hand-written docs (keep as-is, no work wasted)
 const apiDocsPath = path.join(__dirname, "api-docs");
 const apiFiles = fs
   .readdirSync(apiDocsPath)
   .filter((f) => f.endsWith(".js"))
   .map((f) => path.join(apiDocsPath, f));
 
-const swaggerSpec = swaggerJsdoc({
+const manualSpec = swaggerJsdoc({
   definition: {
     openapi: "3.0.0",
     info: { title: "CRM API", version: "3.0.0", description: "API documentation" },
-    servers: [
-  {
-    url: `http://localhost:${PORT}`,
-    description: "Local Development",
-  },
-  {
-    url: 'http://ewmapi.bbcspldev.in/',
-    description: "Production",
-  },
-],
     components: {
       securitySchemes: {
         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
@@ -122,7 +133,38 @@ const swaggerSpec = swaggerJsdoc({
   apis: apiFiles,
 });
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Auto-generated spec (new routes going forward)
+let autoSpec = { paths: {} };
+const autoSpecPath = path.join(__dirname, "../swagger-output.json");
+if (fs.existsSync(autoSpecPath)) {
+  autoSpec = require(autoSpecPath);
+}
+
+// Merge: manual paths take priority over auto-generated
+const mergedSpec = {
+  ...autoSpec,
+  paths: {
+    ...autoSpec.paths,
+    ...manualSpec.paths,   // hand-written overrides auto if same path
+  },
+  components: manualSpec.components,
+  security: manualSpec.security,
+};
+
+// ── Fix CORS for Swagger UI ───────────────────────────────────
+const swaggerUiOptions = {
+  swaggerOptions: {
+    url: null,                    // don't fetch from URL, use spec directly
+    persistAuthorization: true,   // token stays after page refresh
+    displayRequestDuration: true,
+  },
+};
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(mergedSpec, swaggerUiOptions)
+);
 console.log("✅ Swagger docs loaded from:", apiFiles);
 
 // ── Socket.io ─────────────────────────────────────────────────
@@ -161,6 +203,7 @@ const startServer = async () => {
   try {
     await connectDB();
     startDueDateCron(io);
+    scheduleEventNotifications(io);
 
     cron.schedule("0 2 * * *", () => {
       cleanupOldNotifications();

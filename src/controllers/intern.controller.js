@@ -122,7 +122,7 @@ const register = async (req, res) => {
     // ── 4. Validate enums ──
     const validInternTypes   = ['intern', 'trainee'];
     const validDegreeTypes   = ['bachelor', 'master'];
-    const validDocumentTypes = ['aadhaar', 'voter_card', 'passport', 'driving_licence'];
+    const validDocumentTypes = ['aadhaar', 'voter_card', 'passport', 'driving_licence', 'noc'];
 
     if (!validInternTypes.includes(intern_type)) {
       await t.rollback();
@@ -193,6 +193,7 @@ if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReference
   reference_name: normalizedReferenceName,
   reference_contact: normalizedReferenceContact,
     }, { transaction: t });
+    console.log("🚀 ~ register ~ intern:", intern)
 
     // ── 7. Move uploaded files ──
     const idProofResult = moveUploadedFile(
@@ -233,6 +234,15 @@ if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReference
       );
     }
 
+    let nocResult = null;
+if (req.files?.noc?.[0]) {
+  nocResult = moveUploadedFile(
+    req.files.noc[0].path,
+    `interns/${intern.id}`,
+    'noc'
+  );
+}
+
     // ── 8. Create document record ──
   const id =   await InternDocument.create({
       intern_id:          intern.id,
@@ -242,6 +252,8 @@ if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReference
       college_detail:     parsedCollegeDetail, // ✅ already parsed above
       resume:             resumeResult?.url    || null,
       last_sem_marksheet: marksheetResult?.url || null,
+       noc:                nocResult?.url       || null,
+      
     }, { transaction: t });
   console.log("🚀 ~ register ~ id:", id)
 
@@ -265,7 +277,7 @@ await notifyAdmins(io, {
     await t.rollback();
     console.log("🚀 ~ register ~ err:", err);
 
-    ['id_proof', 'photo', 'resume', 'last_sem_marksheet'].forEach((field) => {
+    ['id_proof', 'photo', 'resume', 'last_sem_marksheet',  'noc'].forEach((field) => {
       if (req.files?.[field]?.[0]?.path) {
         if (fs.existsSync(req.files[field][0].path)) {
           fs.unlinkSync(req.files[field][0].path);
@@ -886,27 +898,24 @@ if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReference
 const updateMyDocuments = async (req, res) => {
   try {
     const intern_id = req.intern.id;
-
+ 
     const doc = await InternDocument.findOne({ where: { intern_id } });
-    console.log("🚀 ~ updateMyDocuments ~ doc:", doc)
     if (!doc) {
       return res.status(404).json({ message: 'Document record not found.' });
     }
-
+ 
     const { document_type, college_detail } = req.body;
-
-    // ── Validate document_type if provided ──
+ 
+    // ── Validate document_type if provided ────────────────────────────────
     const validDocumentTypes = ['aadhaar', 'voter_card', 'passport', 'driving_licence'];
     if (document_type && !validDocumentTypes.includes(document_type)) {
       return res.status(400).json({ message: 'Invalid document_type.' });
     }
-
+ 
     const updates = {};
-
-    // ── Update document_type if provided ──
+ 
     if (document_type) updates.document_type = document_type;
-
-    // ── Update college_detail if provided ──
+ 
     if (college_detail) {
       try {
         updates.college_detail = typeof college_detail === 'string'
@@ -916,87 +925,54 @@ const updateMyDocuments = async (req, res) => {
         return res.status(400).json({ message: 'Invalid college_detail format.' });
       }
     }
-
-    // ── Handle individual file replacements ──
+ 
+    // ── File fields — write to updated_* columns, never originals ─────────
     const fileFields = ['id_proof', 'photo', 'resume', 'last_sem_marksheet'];
-
-    // Fields already verified by admin are locked -- intern cannot overwrite them
-    const verifiedFields = doc.verified_fields || [];
-
-    // Collect any locked fields the intern is trying to upload
-    const lockedAttempts = fileFields.filter(
-      (f) => req.files?.[f]?.[0] && verifiedFields.includes(f)
-    );
-
-    if (lockedAttempts.length > 0) {
-      // clean up temp files before returning
-      fileFields.forEach((f) => {
-        if (req.files?.[f]?.[0]?.path && fs.existsSync(req.files[f][0].path)) {
-          fs.unlinkSync(req.files[f][0].path);
-        }
-      });
-      return res.status(400).json({
-        message: `Cannot replace verified document(s): ${lockedAttempts.join(', ')}. These have been verified by admin and are locked.`,
-        locked_fields: lockedAttempts,
-      });
-    }
-
-    // Also block document_type change if it is verified
-    if (document_type && verifiedFields.includes('document_type')) {
-      fileFields.forEach((f) => {
-        if (req.files?.[f]?.[0]?.path && fs.existsSync(req.files[f][0].path)) {
-          fs.unlinkSync(req.files[f][0].path);
-        }
-      });
-      return res.status(400).json({
-        message: 'Cannot change document_type: it has been verified by admin and is locked.',
-        locked_fields: ['document_type'],
-      });
-    }
-
+ 
     for (const field of fileFields) {
-      if (req.files?.[field]?.[0]) {
-        // delete old file if exists (field is confirmed NOT verified)
-        if (doc[field]) {
-          deleteUploadedFile(doc[field]);
-        }
-
-        // move new file
-        const result = moveUploadedFile(
-          req.files[field][0].path,
-          `interns/${intern_id}`,
-          field
-        );
-        console.log("🚀 ~ updateMyDocuments ~ result:", result)
-
-        if (!result) {
-          // clean up temp files uploaded so far
-          ['id_proof', 'photo', 'resume', 'last_sem_marksheet'].forEach((f) => {
-            if (req.files?.[f]?.[0]?.path && fs.existsSync(req.files[f][0].path)) {
-              fs.unlinkSync(req.files[f][0].path);
-            }
-          });
-          return res.status(500).json({ message: `Failed to upload ${field}.` });
-        }
-
-        updates[field] = result.url;
+      if (!req.files?.[field]?.[0]) continue;
+ 
+      const updatedFieldKey = `updated_${field}`; // e.g. updated_id_proof
+ 
+      // delete the previous pending update for this field (if any)
+      if (doc[updatedFieldKey]) {
+        deleteUploadedFile(doc[updatedFieldKey]);
       }
+ 
+      // move new file to intern's folder
+      const result = moveUploadedFile(
+        req.files[field][0].path,
+        `interns/${intern_id}/updates`,  // keep updates in a subfolder for clarity
+        field
+      );
+ 
+      if (!result) {
+        // clean up remaining temp files before aborting
+        fileFields.forEach((f) => {
+          if (req.files?.[f]?.[0]?.path && fs.existsSync(req.files[f][0].path)) {
+            fs.unlinkSync(req.files[f][0].path);
+          }
+        });
+        return res.status(500).json({ message: `Failed to upload ${field}.` });
+      }
+ 
+      updates[updatedFieldKey] = result.url;
     }
-
+ 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ message: 'No fields provided to update.' });
     }
-
+ 
     await doc.update(updates);
-
+ 
     return res.status(200).json({
-      message: 'Documents updated successfully.',
+      message:   'Documents submitted for admin review. Your original documents remain unchanged until admin approves.',
       documents: doc,
     });
-
+ 
   } catch (err) {
-      console.log("🚀 ~ updateMyDocuments ~ err:", err)
-    // clean up any temp files on error
+    console.log('updateMyDocuments error:', err);
+    // clean up temp files on unexpected error
     ['id_proof', 'photo', 'resume', 'last_sem_marksheet'].forEach((field) => {
       if (req.files?.[field]?.[0]?.path && fs.existsSync(req.files[field][0].path)) {
         fs.unlinkSync(req.files[field][0].path);
@@ -1005,12 +981,15 @@ const updateMyDocuments = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
+ 
+ 
+
 
 
 const adminUpdateIntern = async (req, res) => {
   try {
     const { id } = req.params;
-
+ 
     const {
       name,
       email,
@@ -1027,140 +1006,155 @@ const adminUpdateIntern = async (req, res) => {
       reference_contact,
       status,
       verify_document_fields,
+      promote_document_fields, // ← NEW: ['id_proof', 'photo', 'resume', 'last_sem_marksheet']
     } = req.body;
-
+ 
     const intern = await Intern.findByPk(id);
     if (!intern) {
-      return res.status(404).json({ message: "Intern not found." });
+      return res.status(404).json({ message: 'Intern not found.' });
     }
-
-    // validate mobile
+ 
+    // ── Validate mobile ───────────────────────────────────────────────────
     if (mobile && !/^\d{10}$/.test(mobile)) {
-      return res.status(400).json({
-        message: "Mobile must be a 10-digit number.",
-      });
+      return res.status(400).json({ message: 'Mobile must be a 10-digit number.' });
     }
-
-    // validate mentor_ids
+ 
+    // ── Validate mentor_ids ───────────────────────────────────────────────
     if (mentor_ids && Array.isArray(mentor_ids) && mentor_ids.length > 0) {
-      const mentors = await User.findAll({
-        where: { id: mentor_ids },
-      });
-
+      const mentors = await User.findAll({ where: { id: mentor_ids } });
       if (mentors.length !== mentor_ids.length) {
-        return res.status(404).json({
-          message: "One or more mentors not found.",
-        });
+        return res.status(404).json({ message: 'One or more mentors not found.' });
       }
     }
-
-    // validate dates
+ 
+    // ── Validate dates ────────────────────────────────────────────────────
     const newStart = start_date || intern.start_date;
-    const newEnd = end_date || intern.end_date;
-
+    const newEnd   = end_date   || intern.end_date;
     if (newStart && newEnd && new Date(newStart) >= new Date(newEnd)) {
-      return res.status(400).json({
-        message: "end_date must be after start_date.",
-      });
+      return res.status(400).json({ message: 'end_date must be after start_date.' });
     }
-
-    // check email uniqueness
+ 
+    // ── Check email uniqueness ────────────────────────────────────────────
     if (email && email !== intern.email) {
-      const existing = await Intern.findOne({
-        where: { email: email.trim().toLowerCase() },
-      });
-
+      const existing = await Intern.findOne({ where: { email: email.trim().toLowerCase() } });
       if (existing) {
-        return res.status(409).json({
-          message: "Email already in use.",
-        });
+        return res.status(409).json({ message: 'Email already in use.' });
       }
     }
-
-    // check enrollment uniqueness
+ 
+    // ── Check enrollment uniqueness ───────────────────────────────────────
     if (enrollment_no && enrollment_no !== intern.enrollment_no) {
-      const existing = await Intern.findOne({
-        where: { enrollment_no: enrollment_no.trim() },
-      });
-
+      const existing = await Intern.findOne({ where: { enrollment_no: enrollment_no.trim() } });
       if (existing) {
-        return res.status(409).json({
-          message: "Enrollment number already in use.",
-        });
+        return res.status(409).json({ message: 'Enrollment number already in use.' });
       }
     }
-
-    // ===== Reference Validation =====
-    const validReferenceTypes = [
-      "employee",
-      "intern",
-      "college",
-      "friend",
-      "social_media",
-      "website",
-      "other",
-    ];
-
+ 
+    // ── Validate reference_type ───────────────────────────────────────────
+    const validReferenceTypes = ['employee', 'intern', 'college', 'friend', 'social_media', 'website', 'other'];
     let normalizedReferenceType = null;
-
-    if (reference_type && reference_type.trim() !== "") {
+    if (reference_type && reference_type.trim() !== '') {
       if (!validReferenceTypes.includes(reference_type)) {
-        return res.status(400).json({
-          message: "Invalid reference type.",
-        });
+        return res.status(400).json({ message: 'Invalid reference type.' });
       }
-
       normalizedReferenceType = reference_type;
     }
-
+ 
+    // ── Update intern record ──────────────────────────────────────────────
     await intern.update({
-      name: name?.trim() ?? intern.name,
-      email: email?.trim().toLowerCase() ?? intern.email,
-      mobile: mobile ?? intern.mobile,
-      college_name: college_name?.trim() ?? intern.college_name,
-      enrollment_no: enrollment_no?.trim() ?? intern.enrollment_no,
-      degree_type: degree_type ?? intern.degree_type,
-      intern_type: intern_type ?? intern.intern_type,
-      start_date: start_date ?? intern.start_date,
-      end_date: end_date ?? intern.end_date,
-      mentor_ids: mentor_ids !== undefined ? mentor_ids : intern.mentor_ids,
-
-      reference_type: normalizedReferenceType,
-      reference_name: reference_name?.trim() || null,
-      reference_contact: reference_contact?.trim() || null,
+      name:              name?.trim()               ?? intern.name,
+      email:             email?.trim().toLowerCase() ?? intern.email,
+      mobile:            mobile                      ?? intern.mobile,
+      college_name:      college_name?.trim()        ?? intern.college_name,
+      enrollment_no:     enrollment_no?.trim()       ?? intern.enrollment_no,
+      degree_type:       degree_type                 ?? intern.degree_type,
+      intern_type:       intern_type                 ?? intern.intern_type,
+      start_date:        start_date                  ?? intern.start_date,
+      end_date:          end_date                    ?? intern.end_date,
+      mentor_ids:        mentor_ids !== undefined    ? mentor_ids : intern.mentor_ids,
+      reference_type:    normalizedReferenceType,
+      reference_name:    reference_name?.trim()      || null,
+      reference_contact: reference_contact?.trim()   || null,
     });
-
-     if (verify_document_fields && Array.isArray(verify_document_fields) && verify_document_fields.length > 0) {
-      const validFields = ['id_proof', 'photo', 'resume', 'last_sem_marksheet', 'document_type'];
-      const invalid = verify_document_fields.filter((f) => !validFields.includes(f));
-
-      if (invalid.length > 0) {
-        return res.status(400).json({ message: `Invalid document fields: ${invalid.join(', ')}` });
-      }
-
+ 
+    // ── Handle document changes ───────────────────────────────────────────
+    const validDocFields = ['id_proof', 'photo', 'resume', 'last_sem_marksheet', 'noc'];
+ 
+    if (
+      (verify_document_fields && Array.isArray(verify_document_fields) && verify_document_fields.length > 0) ||
+      (promote_document_fields && Array.isArray(promote_document_fields) && promote_document_fields.length > 0)
+    ) {
       const doc = await InternDocument.findOne({ where: { intern_id: id } });
+ 
       if (doc) {
-        const existing = doc.verified_fields || [];
-        const merged   = [...new Set([...existing, ...verify_document_fields])];
-        await doc.update({ verified_fields: merged });
+        const docUpdates = {};
+ 
+        // ── verify_document_fields: mark originals as verified ────────────
+        if (verify_document_fields?.length > 0) {
+          const validVerifyFields = [...validDocFields, 'document_type'];
+          const invalidVerify = verify_document_fields.filter((f) => !validVerifyFields.includes(f));
+          if (invalidVerify.length > 0) {
+            return res.status(400).json({ message: `Invalid verify fields: ${invalidVerify.join(', ')}` });
+          }
+ 
+          const existing = doc.verified_fields || [];
+          docUpdates.verified_fields = [...new Set([...existing, ...verify_document_fields])];
+        }
+ 
+        // ── promote_document_fields: copy updated_* → original ────────────
+        // Deletes the old original file and replaces it with the updated one.
+        // Clears the updated_* field after promotion.
+        if (promote_document_fields?.length > 0) {
+          const invalidPromote = promote_document_fields.filter((f) => !validDocFields.includes(f));
+          if (invalidPromote.length > 0) {
+            return res.status(400).json({ message: `Invalid promote fields: ${invalidPromote.join(', ')}` });
+          }
+ 
+          for (const field of promote_document_fields) {
+            const updatedKey = `updated_${field}`;
+            const updatedUrl = doc[updatedKey];
+ 
+            if (!updatedUrl) {
+              return res.status(400).json({
+                message: `No pending update found for ${field}. Intern has not submitted a new file for this field.`,
+              });
+            }
+ 
+            // delete old original (best-effort — don't fail if missing)
+            if (doc[field]) {
+              deleteUploadedFile(doc[field]);
+            }
+ 
+            // promote
+            docUpdates[field]      = updatedUrl;
+            docUpdates[updatedKey] = null; // clear pending
+          }
+ 
+          // also auto-verify promoted fields
+          const existing = docUpdates.verified_fields || doc.verified_fields || [];
+          docUpdates.verified_fields = [...new Set([...existing, ...promote_document_fields])];
+        }
+ 
+        if (Object.keys(docUpdates).length > 0) {
+          await doc.update(docUpdates);
+        }
       }
     }
-
+ 
     const updated = await attachMentors(intern);
-
+ 
     return res.status(200).json({
-      message: "Intern updated successfully.",
-      intern: updated,
+      message: 'Intern updated successfully.',
+      intern:  updated,
     });
-
+ 
   } catch (err) {
-    console.log("🚀 ~ adminUpdateIntern ~ err:", err);
-
-    return res.status(500).json({
-      message: err.message,
-    });
+    console.log('adminUpdateIntern error:', err);
+    return res.status(500).json({ message: err.message });
   }
 };
+ 
+
 // ─────────────────────────────────────────────
 
 module.exports = {

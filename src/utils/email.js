@@ -3,6 +3,9 @@ const leaveRequestTemplate = require("./emailTemplates/leaveRequestTemplate");
 const leaveApprovedTemplate = require("./emailTemplates/leaveApprovedTemplate");
 const leaveRejectedTemplate = require("./emailTemplates/leaveRejectedTemplate");
 const  leaveCancelledTemplate  = require("./emailTemplates/leaveCancelledTemplate");
+const  leaveDocumentUploadedTemplate  = require("./emailTemplates/leaveDocumentUploadedTemplate");
+const path = require("path");
+
 const { User } = require("../models");
 
 const { sendMail } = require("./mailer");
@@ -27,7 +30,7 @@ const calculateLeaveDays = (startDate, endDate, duration) => {
 /**
  * Send leave request notification email
  */
-const sendLeaveRequestEmail = async ({ employee, leave }) => {
+const sendLeaveRequestEmail = async ({ employee, leave,  documentPath = null }) => {
   const html = leaveRequestTemplate({
     employee,
     leave,
@@ -54,12 +57,22 @@ const sendLeaveRequestEmail = async ({ employee, leave }) => {
   );
 
   const subject = `Leave Request from ${employee.name} for ${totalDays} Days - ${leave.reason_type}`;
+ 
+  const attachments = [];
+  if (documentPath) {
+    const ext = path.extname(documentPath);
+    attachments.push({
+      filename: `${leave.display_id}_medical_document${ext}`,
+      path: documentPath,
+    });
+  }
 
- const slr = await sendMail({
+  return await sendMail({
     to: adminEmails,
     cc: process.env.OWNER_EMAIL,
     subject,
     html,
+    attachments,
   });
 //  console.log("🚀 ~ sendLeaveRequestEmail ~ slr:", slr)
 };
@@ -165,10 +178,46 @@ const sendLeaveCancelledEmail = async ({
         html,
     });
 };
+
+
+const sendDocumentUploadedEmail = async ({ employee, leave, leaveDays }) => {
+  const html = leaveDocumentUploadedTemplate({ employee, leave, leaveDays });
+  console.log("🚀 ~ sendDocumentUploadedEmail ~ html:", html)
+
+  const admins = await User.findAll({
+    where: { is_admin: true, is_active: true },
+    attributes: ["email"],
+  });
+  const adminEmails = admins.map((a) => a.email).filter(Boolean);
+
+  const daysSinceSubmission = Math.floor(
+    (new Date() - new Date(leave.created_at || leave.createdAt)) /
+      (1000 * 60 * 60 * 24)
+  );
+
+  const subject = `Emergency Document Uploaded — ${leave.display_id} (${employee.name}, ${daysSinceSubmission}d ago)`;
+
+  // Extract extension from the absolute path
+  const ext = path.extname(leave.medical_document_path || "");
+
+  return await sendMail({
+    to: adminEmails,
+    cc: process.env.OWNER_EMAIL,
+    subject,
+    html,
+    attachments: [
+      {
+        filename: `${leave.display_id}_medical_document${ext}`,
+        path: leave.medical_document_path,  // absolute disk path
+      },
+    ],
+  });
+};
 module.exports = {
   
   sendLeaveRequestEmail,
   sendLeaveApprovedEmail,
   sendLeaveRejectedEmail,
-  sendLeaveCancelledEmail
+  sendLeaveCancelledEmail,
+  sendDocumentUploadedEmail
 };

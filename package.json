@@ -4,6 +4,7 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
+    "swagger": "node swagger.js",
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "seed:admin": "node src/scripts/seedAdmin.js"
@@ -12,6 +13,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "archiver": "^8.0.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -26,8 +29,10 @@
     "nodemailer": "^9.0.3",
     "pg": "^8.20.0",
     "pg-hstore": "^2.3.4",
+    "puppeteer": "^25.5.0",
     "sequelize": "^6.37.8",
     "socket.io": "^4.8.3",
+    "swagger-autogen": "^2.23.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.0"
