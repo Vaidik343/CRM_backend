@@ -22,37 +22,44 @@ const employeeInclude = {
 
 const buildCardHTML = (event, aiConfig = null) => {
   const templates = {
-    birthday_1: (e) => `
-      <div style="width:800px;height:500px;background:#4f46e5;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
-        <!-- Geometric SVG Background Pattern -->
-        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.12;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
-          <circle cx="100" cy="100" r="180" fill="#ffffff"/>
-          <circle cx="700" cy="400" r="220" fill="#ffffff"/>
-          <path d="M 0,250 Q 200,150 400,250 T 800,250" fill="none" stroke="#ffffff" stroke-width="20"/>
-        </svg>
+   birthday_1: (e) => `
+  <div style="width:800px;height:500px;background:#4f46e5;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+    
+    <!-- Updated Soft Wavy Grid & Sparkles SVG (Replaces the 2 solid circles) -->
+    <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.15;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" fill="none">
+      <path d="M-100 100 C 200 300, 400 0, 900 200" stroke="#ffffff" stroke-width="3" stroke-dasharray="8 8"/>
+      <path d="M-100 300 C 300 500, 500 200, 900 400" stroke="#ffffff" stroke-width="2"/>
+      
+      <!-- Subtle Decorative Sparkles -->
+      <path d="M 120 80 L 124 92 L 136 96 L 124 100 L 120 112 L 116 100 L 104 96 L 116 92 Z" fill="#ffffff"/>
+      <path d="M 680 380 L 683 389 L 692 392 L 683 395 L 680 404 L 677 395 L 668 392 L 677 389 Z" fill="#ffffff"/>
+      <circle cx="650" cy="120" r="4" fill="#ffffff"/>
+      <circle cx="150" cy="380" r="6" fill="#ffffff"/>
+      <circle cx="720" cy="220" r="3" fill="#ffffff"/>
+    </svg>
 
-        <!-- Centered Illustration Badge -->
-        <div style="position:relative;z-index:2;background:#ffffff;padding:16px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.2);">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/>
-            <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/>
-            <path d="M2 21h20"/>
-            <path d="M7 8v2"/>
-            <path d="M12 8v2"/>
-            <path d="M17 8v2"/>
-            <path d="M7 4h0"/>
-            <path d="M12 4h0"/>
-            <path d="M17 4h0"/>
-          </svg>
-        </div>
+    <!-- Centered Illustration Badge -->
+    <div style="position:relative;z-index:2;background:#ffffff;padding:16px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.2);">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/>
+        <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/>
+        <path d="M2 21h20"/>
+        <path d="M7 8v2"/>
+        <path d="M12 8v2"/>
+        <path d="M17 8v2"/>
+        <path d="M7 4h0"/>
+        <path d="M12 4h0"/>
+        <path d="M17 4h0"/>
+      </svg>
+    </div>
 
-        <span style="position:relative;z-index:2;color:#c7d2fe;font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Happy Birthday</span>
-        <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 8px;text-align:center;">${e.employee_name}</h1>
-        <div style="position:relative;z-index:2;width:60px;height:4px;background:#818cf8;border-radius:2px;margin-bottom:20px;"></div>
-        <p style="position:relative;z-index:2;color:#e0e7ff;font-size:16px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
-          ${e.message || "Wishing you a wonderful birthday filled with joy and happiness!"}
-        </p>
-      </div>`,
+    <span style="position:relative;z-index:2;color:#c7d2fe;font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Happy Birthday</span>
+    <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 8px;text-align:center;">${e.employee_name}</h1>
+    <div style="position:relative;z-index:2;width:60px;height:4px;background:#818cf8;border-radius:2px;margin-bottom:20px;"></div>
+    <p style="position:relative;z-index:2;color:#e0e7ff;font-size:16px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
+      ${e.message || "Wishing you a wonderful birthday filled with joy and happiness!"}
+    </p>
+  </div>`,
 
     birthday_2: (e) => `
       <div style="width:800px;height:500px;background:#fffdfa;border:2px solid #fef3c7;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">

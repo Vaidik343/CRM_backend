@@ -1,11 +1,12 @@
-//  its only for intern doc for
+'use strict';
+
 const multer = require('multer');
 const path   = require('path');
 const fs     = require('fs');
 
 const BASE_UPLOAD_PATH = process.env.UPLOAD_PATH
-  ? path.join(process.env.UPLOAD_PATH, 'interns')
-  : path.join(__dirname, '..', 'uploads', 'interns');
+  ? path.join(process.env.UPLOAD_PATH, 'employee-applications')
+  : path.join(__dirname, '..', 'uploads', 'employee-applications');
 
 // ensure temp dir exists on startup
 const tempPath = path.join(BASE_UPLOAD_PATH, 'temp');
@@ -47,21 +48,16 @@ const upload = multer({
   fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB per file
-    files: 5,                   // id_proof, photo, resume, marksheet
+    files: 4,
   },
 });
 
-// specific field config for intern registration
-const internUpload = upload.fields([
-  { name: 'id_proof',            maxCount: 1 },
-  { name: 'photo',               maxCount: 1 },
-  { name: 'resume',              maxCount: 1 },
-  { name: 'last_sem_marksheet',  maxCount: 1 },
-   { name: 'noc',                 maxCount: 1 },
-
+// fields: photo_id, address_id, educational_certificate, bank_document
+const employeeUpload = upload.fields([
+  { name: 'photo_id',                maxCount: 1 },
+  { name: 'address_id',              maxCount: 1 },
+  { name: 'educational_certificate', maxCount: 1 },
+  { name: 'bank_document',           maxCount: 1 },
 ]);
 
-
-
-
-module.exports = { upload, internUpload, tempPath, BASE_UPLOAD_PATH };
+module.exports = { employeeUpload, tempPath, BASE_UPLOAD_PATH };

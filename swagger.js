@@ -1,4 +1,6 @@
-const swaggerAutogen = require("swagger-autogen")();
+const swaggerAutogen = require("swagger-autogen")({
+  openapi: "3.0.0",
+});
 
 const doc = {
   info: {
@@ -6,16 +8,33 @@ const doc = {
     version: "3.0.0",
     description: "API documentation",
   },
+
   servers: [
-    { url: "http://localhost:7015", description: "Local Development" },
-    { url: "http://ewmapi.bbcspldev.in", description: "Production" },
+    {
+      url: "http://localhost:7015/api",
+      description: "Local Development",
+    },
+    {
+      url: "http://ewmapi.bbcspldev.in/api",
+      description: "Production",
+    },
   ],
+
   components: {
     securitySchemes: {
-      bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      bearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+      },
     },
   },
-  security: [{ bearerAuth: [] }],
+
+  security: [
+    {
+      bearerAuth: [],
+    },
+  ],
 };
 
 const outputFile = "./swagger-output.json";
@@ -39,9 +58,10 @@ const routes = [
   "./src/routes/leaveBalance.routes.js",
   "./src/routes/probation.routes.js",
   "./src/routes/intern.routes.js",
+  "./src/routes/event.routes.js",
   "./src/routes/notifications.routes.js",
   "./src/routes/report.routes.js",
+   "./src/routes/backup.routes.js",
 ];
-console.log("🚀 ~ routes:", routes)
 
 swaggerAutogen(outputFile, routes, doc);

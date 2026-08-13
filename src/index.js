@@ -8,7 +8,7 @@ const path = require("path");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const swaggerUi = require("swagger-ui-express");
-const swaggerJsdoc = require("swagger-jsdoc");
+// const swaggerJsdoc = require("swagger-jsdoc");
 const http = require("http");
 const { Server } = require("socket.io");
 const { startDueDateCron } = require("./utils/dueDateCron");
@@ -52,6 +52,7 @@ const routeFiles = [
   "probation.routes.js",
   "intern.routes.js",
   "event.routes.js",
+  "employeeApplication.routes.js",
   "notifications.routes.js",  // new
   "report.routes.js",
   
@@ -113,49 +114,69 @@ app.get("/api/users", (req, res) => {
 
 
 // Your existing hand-written docs (keep as-is, no work wasted)
-const apiDocsPath = path.join(__dirname, "api-docs");
-const apiFiles = fs
-  .readdirSync(apiDocsPath)
-  .filter((f) => f.endsWith(".js"))
-  .map((f) => path.join(apiDocsPath, f));
+// const apiDocsPath = path.join(__dirname, "api-docs");
+// const apiFiles = fs
+//   .readdirSync(apiDocsPath)
+//   .filter((f) => f.endsWith(".js"))
+//   .map((f) => path.join(apiDocsPath, f));
 
-const manualSpec = swaggerJsdoc({
-  definition: {
-    openapi: "3.0.0",
-    info: { title: "CRM API", version: "3.0.0", description: "API documentation" },
-    components: {
-      securitySchemes: {
-        bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
-      },
-    },
-    security: [{ bearerAuth: [] }],
-  },
-  apis: apiFiles,
-});
+// const manualSpec = swaggerJsdoc({
+//   definition: {
+//     openapi: "3.0.0",
+//     info: { title: "CRM API", version: "3.0.0", description: "API documentation" },
+//     components: {
+//       securitySchemes: {
+//         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+//       },
+//     },
+//     security: [{ bearerAuth: [] }],
+//   },
+//   apis: apiFiles,
+// });
 
 // Auto-generated spec (new routes going forward)
-let autoSpec = { paths: {} };
-const autoSpecPath = path.join(__dirname, "../swagger-output.json");
-if (fs.existsSync(autoSpecPath)) {
-  autoSpec = require(autoSpecPath);
-}
+// let autoSpec = { paths: {} };
+// const autoSpecPath = path.join(__dirname, "../swagger-output.json");
+// if (fs.existsSync(autoSpecPath)) {
+//   autoSpec = require(autoSpecPath);
+// }
 
-// Merge: manual paths take priority over auto-generated
-const mergedSpec = {
-  ...autoSpec,
-  paths: {
-    ...autoSpec.paths,
-    ...manualSpec.paths,   // hand-written overrides auto if same path
-  },
-  components: manualSpec.components,
-  security: manualSpec.security,
-};
+// // Merge: manual paths take priority over auto-generated
+// const mergedSpec = {
+//   ...autoSpec,
+//   paths: {
+//     ...autoSpec.paths,
+//     ...manualSpec.paths,   // hand-written overrides auto if same path
+//   },
+//   components: manualSpec.components,
+//   security: manualSpec.security,
+// };
 
 // ── Fix CORS for Swagger UI ───────────────────────────────────
+// const swaggerUiOptions = {
+//   swaggerOptions: {
+//     url: null,                    // don't fetch from URL, use spec directly
+//     persistAuthorization: true,   // token stays after page refresh
+//     displayRequestDuration: true,
+//   },
+// };
+
+// app.use(
+//   "/api-docs",
+//   swaggerUi.serve,
+//   swaggerUi.setup(mergedSpec, swaggerUiOptions)
+// );
+// console.log("✅ Swagger docs loaded from:", apiFiles);
+
+
+
+// ── Swagger ────────────────────────────────────────────────
+
+const swaggerDocument = require("../swagger-output.json");
+
 const swaggerUiOptions = {
   swaggerOptions: {
-    url: null,                    // don't fetch from URL, use spec directly
-    persistAuthorization: true,   // token stays after page refresh
+    persistAuthorization: true,
     displayRequestDuration: true,
   },
 };
@@ -163,10 +184,10 @@ const swaggerUiOptions = {
 app.use(
   "/api-docs",
   swaggerUi.serve,
-  swaggerUi.setup(mergedSpec, swaggerUiOptions)
+  swaggerUi.setup(swaggerDocument, swaggerUiOptions)
 );
-console.log("✅ Swagger docs loaded from:", apiFiles);
 
+console.log("✅ Swagger docs loaded from swagger-output.json");
 // ── Socket.io ─────────────────────────────────────────────────
 io.on("connection", (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);

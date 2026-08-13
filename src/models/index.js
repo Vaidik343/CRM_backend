@@ -29,6 +29,8 @@ const InternProject = require("./internProjects.model")(sequelize, DataTypes);
 const InternTask = require("./internTasks.model")(sequelize, DataTypes);
 const InternWorkLog = require("./internWorkLog.model")(sequelize, DataTypes);
 const Event = require("./event.model")(sequelize, DataTypes);
+const EmployeeApplication = require("./employeeApplication.model")(sequelize, DataTypes);
+const EmployeeApplicationDocument  = require("./employeeApplicationDocument.model")(sequelize, DataTypes);
  
 // ── Role ↔ User ───────────────────────────────────────────────
 Role.hasMany(User, { foreignKey: "role_id", onDelete: "RESTRICT" });
@@ -340,6 +342,18 @@ InternWorkLog.belongsTo(InternTask, {
     Event.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
     Event.belongsTo(User, { foreignKey: 'employee_id', as: 'employee' });
   
+// employee applications
+
+// ── EmployeeApplication → EmployeeApplicationDocument ──
+EmployeeApplication.hasMany(EmployeeApplicationDocument, {
+  foreignKey: 'application_id',
+  as: 'documents',
+});
+
+EmployeeApplicationDocument.belongsTo(EmployeeApplication, {
+  foreignKey: 'application_id',
+  as: 'application',
+});
 
 // Team creator
 Team.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
@@ -404,5 +418,7 @@ InternProject,
 InternTask,
 InternWorkLog,
 Event,
+EmployeeApplication,
+EmployeeApplicationDocument,
   Notification
 };
