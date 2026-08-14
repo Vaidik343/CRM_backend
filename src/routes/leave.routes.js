@@ -68,6 +68,9 @@ authenticate, requireAdmin,
 );
 
 
+router.get('/leaves/adjacent-check', authenticate, leaveController.checkAdjacentLeaves);
+router.patch('/leaves/:id/reverse', requireAdmin, leaveController.reverseLeave);
+
 // GET /api/leave/saturday/:user_id
 // Params: user_id (UUID)
 // Both admin and employee can access — employee needs it when submitting exchange leave

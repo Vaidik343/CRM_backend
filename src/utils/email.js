@@ -4,6 +4,7 @@ const leaveApprovedTemplate = require("./emailTemplates/leaveApprovedTemplate");
 const leaveRejectedTemplate = require("./emailTemplates/leaveRejectedTemplate");
 const  leaveCancelledTemplate  = require("./emailTemplates/leaveCancelledTemplate");
 const  leaveDocumentUploadedTemplate  = require("./emailTemplates/leaveDocumentUploadedTemplate");
+const  approvedLeaveCancelledEmailTemplate  = require("./emailTemplates/approvedLeaveCancelledTemplate");
 const path = require("path");
 
 const { User } = require("../models");
@@ -213,11 +214,35 @@ const sendDocumentUploadedEmail = async ({ employee, leave, leaveDays }) => {
     ],
   });
 };
+
+
+const sendApprovedLeaveCancelledEmail = async ({
+  employee,
+  leave,
+  leaveDays,
+}) => {
+  const subject = `Your Approved Leave Has Been Cancelled — Balance Restored`;
+
+  const html = approvedLeaveCancelledEmailTemplate({
+    employee,
+  leave,
+  leaveDays,
+  })
+  console.log("🚀 ~ sendApprovedLeaveCancelledEmail ~ html:", html)
+
+  return await sendMail({
+    to: employee.email,
+    cc: process.env.OWNER_EMAIL,
+    subject,
+    html,
+  });
+};
 module.exports = {
   
   sendLeaveRequestEmail,
   sendLeaveApprovedEmail,
   sendLeaveRejectedEmail,
   sendLeaveCancelledEmail,
-  sendDocumentUploadedEmail
+  sendDocumentUploadedEmail,
+    sendApprovedLeaveCancelledEmail,
 };

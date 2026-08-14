@@ -14,12 +14,11 @@ const { appendRemark } = require("../utils/remarksLog");
 
 const { moveUploadedFile } = require('../utils/fileUpload');
 
-const { countLeaveDays } = require('../utils/leaveValidation'); 
 const { createNotification , notifyAdmins } = require("./notifications.controller");
 
 const { Op } = require("sequelize");
 
-const { sendLeaveRequestEmail, sendLeaveApprovedEmail, sendLeaveRejectedEmail, sendLeaveCancelledEmail, sendDocumentUploadedEmail } = require("../utils/email");
+const { sendLeaveRequestEmail, sendLeaveApprovedEmail, sendLeaveRejectedEmail, sendLeaveCancelledEmail, sendDocumentUploadedEmail, sendApprovedLeaveCancelledEmail } = require("../utils/email");
 
 const path = require("path");
 
@@ -28,6 +27,10 @@ const {
   validateDuplicateLeave,
   validateNoticePeriod,
   validateExchangeLeave,
+  countLeaveDays,
+  splitDaysByMonth,
+  computeSandwichDays,
+  getOffDaysInRange,
 } = require('../utils/leaveValidation');
 
 const {
@@ -146,7 +149,7 @@ const user_id = req.user.id;
     validateLeaveDates({ start_date, end_date });
 
     // ── 4. Duplicate/overlap check ──
-    await validateDuplicateLeave({ user_id, start_date, end_date });
+    await validateDuplicateLeave({ user_id, start_date, end_date , duration });
 
     // ── 5. Notice period (skip for emergency) ──
     await validateNoticePeriod({ reason_type, duration, start_date });
@@ -356,115 +359,179 @@ const getMyLeaves = async (req, res) => {
 
 const cancelLeave = async (req, res) => {
   const t = await sequelize.transaction();
-
   try {
     const user_id = req.user.id;
-    const {id} = req.params;
-const leave = await LeaveRequest.findOne({
-  where: { id, user_id },
-  include: [
-    {
-      model: User,
-      as: "employee",
-      attributes: [
-        "id",
-        "name",
-        "employee_id",
-        "email",
-        "saturday_group",
-      ],
-    },
-  ],
-});
-
-    if(!leave)
-    {
-      await t.rollback();
-       return res.status(404).json({ message: 'Leave request not found.' });
-    }
-
-
-    if (leave.status !== LEAVE_STATUS.PENDING) {
-      await t.rollback();
-      return res.status(400).json({ message: 'Only pending leave requests can be cancelled.' });
-    }
-
-     await leave.update({ status: LEAVE_STATUS.CANCELLED }, { transaction: t });
-
-      // Free up the Saturday if it was an exchange leave
-    if (leave.leave_type === LEAVE_TYPES.EXCHANGE && leave.worked_saturday_id) {
-      await WorkedSaturday.update(
-        { is_exchanged: false },
+    const { id } = req.params;
+    const { reason } = req.body; // optional reason for approved leave cancellation
+ console.log(req.body)
+    const leave = await LeaveRequest.findOne({
+      where: { id, user_id },
+      include: [
         {
-          where: { id: leave.worked_saturday_id, user_id },
-          transaction: t,
-        }
-      );
+          model: User,
+          as: 'employee',
+          attributes: ['id', 'name', 'employee_id', 'email', 'saturday_group'],
+        },
+      ],
+    });
+    console.log("🚀 ~ cancelLeave ~ leave:", leave)
+
+    if (!leave) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Leave request not found.' });
     }
 
-    await LeaveLog.create({
-      leave_request_id: leave.id,
-      user_id,
-      action: 'cancelled',
-      remarks: { cancelled_by: 'employee' },
-    }, { transaction: t });
+    // ── Pending: simple cancel, no balance impact ──
+    if (leave.status === LEAVE_STATUS.PENDING) {
+      await leave.update({ status: LEAVE_STATUS.CANCELLED }, { transaction: t });
 
-    
-const employee = await User.findByPk(user_id, { attributes: ['name'] });
-    const io = req.app.get("io");
+      if (leave.leave_type === LEAVE_TYPES.EXCHANGE && leave.worked_saturday_id) {
+        await WorkedSaturday.update(
+          { is_exchanged: false },
+          { where: { id: leave.worked_saturday_id, user_id }, transaction: t }
+        );
+      }
 
-const admins = await User.findAll({
-  where: { is_admin: true },
-  attributes: ["id"],
-});
+      await LeaveLog.create({
+        leave_request_id: leave.id,
+        user_id,
+        action: 'cancelled',
+        remarks: { cancelled_by: 'employee' },
+      }, { transaction: t });
 
-for (const admin of admins) {
-  await createNotification(io, {
-    user_id: admin.id,
-    type:    "LEAVE_CANCELLED",
-    title:   "Leave Request Cancelled",
-    message: `A leave request (${leave.display_id}) has been cancelled by the employee.`,
-    data:    { leave_id: leave.id, display_id: leave.display_id },
-  });
-}
+      await t.commit();
 
-io.to("user:admins_room").emit("LEAVE_UPDATED", {
-  id:     leave.id,
-  status: "cancelled",
-});
+      const io = req.app.get('io');
+      const admins = await User.findAll({ where: { is_admin: true }, attributes: ['id'] });
+      for (const admin of admins) {
+        await createNotification(io, {
+          user_id: admin.id,
+          type:    'LEAVE_CANCELLED',
+          title:   'Leave Request Cancelled',
+          message: `A leave request (${leave.display_id}) has been cancelled by the employee.`,
+          data:    { leave_id: leave.id, display_id: leave.display_id },
+        });
+      }
+      io.to('user:admins_room').emit('LEAVE_UPDATED', { id: leave.id, status: 'cancelled' });
 
+      const leaveDays = await countLeaveDays(leave.start_date, leave.end_date, leave.duration);
+      sendLeaveCancelledEmail({ employee: leave.employee, leave, leaveDays })
+        .catch(err => console.error('Leave cancellation email failed:', err));
 
-  await t.commit();
+      return res.status(200).json({ message: 'Leave request cancelled.' });
+    }
 
-const leaveDays = await countLeaveDays(
-  leave.start_date,
-  leave.end_date,
-  leave.duration,
-  leave.employee.saturday_group
-);
+    // ── Approved: only allow before start_date ──
+    if (leave.status === LEAVE_STATUS.APPROVED) {
+      const now = new Date();
+      const leaveStart = new Date(leave.start_date);
+      // Strip time — compare date only
+      now.setHours(0, 0, 0, 0);
+      leaveStart.setHours(0, 0, 0, 0);
 
-// Fire-and-forget email
-sendLeaveCancelledEmail({
-  employee: leave.employee,
-  leave,
-  leaveDays,
-}).catch(err => {
-  console.error("Leave cancellation email failed:", err);
-});
+      if (now >= leaveStart) {
+        await t.rollback();
+        return res.status(400).json({
+          message: 'Approved leave can only be cancelled before the leave start date.',
+        });
+      }
 
-return res.status(200).json({
-  message: "Leave request cancelled.",
-});
+      // Read approval log for exact bucket breakdown
+      const approvalLog = await LeaveLog.findOne({
+        where: { leave_request_id: id, action: 'approved' },
+        order: [['created_at', 'DESC']],
+      });
 
-  } 
-  
-  catch (error) {
-    if (t.finished !== "commit") {
-  await t.rollback();
-}
+      const monthBuckets = approvalLog?.remarks?.month_buckets
+        || splitDaysByMonth(leave.start_date, leave.end_date, leave.duration);
+
+      for (const bucket of monthBuckets) {
+        await _reverseBalanceDeduction({
+          user_id:    leave.user_id,
+          leave_type: leave.leave_type,
+          days:       bucket.days,
+          month:      bucket.month,
+          year:       bucket.year,
+          t,
+        });
+      }
+
+      const sandwichBuckets = approvalLog?.remarks?.sandwich_buckets || [];
+      for (const bucket of sandwichBuckets) {
+        if (bucket.days <= 0) continue;
+        await _reverseBalanceDeduction({
+          user_id:    leave.user_id,
+          leave_type: LEAVE_TYPES.UNPAID,
+          days:       bucket.days,
+          month:      bucket.month,
+          year:       bucket.year,
+          t,
+        });
+      }
+
+      if (leave.leave_type === LEAVE_TYPES.EXCHANGE && leave.worked_saturday_id) {
+        await WorkedSaturday.update(
+          { is_exchanged: false },
+          { where: { id: leave.worked_saturday_id }, transaction: t }
+        );
+      }
+
+      await leave.update({ status: LEAVE_STATUS.CANCELLED }, { transaction: t });
+
+      await LeaveLog.create({
+        leave_request_id: leave.id,
+        user_id,
+        action: 'cancelled',
+        remarks: {
+          cancelled_by:    'employee',
+          was_approved:    true,
+          reason:          reason?.trim() || null,
+          undone_buckets:  monthBuckets,
+          undone_sandwich: sandwichBuckets,
+        },
+      }, { transaction: t });
+
+      await t.commit();
+
+      const io = req.app.get('io');
+      const leaveDays = await countLeaveDays(leave.start_date, leave.end_date, leave.duration);
+
+      // Notify admins — flag that this was an approved leave cancellation
+      const admins = await User.findAll({ where: { is_admin: true }, attributes: ['id'] });
+      for (const admin of admins) {
+        await createNotification(io, {
+          user_id: admin.id,
+          type:    'LEAVE_CANCELLED',
+          title:   'Approved Leave Cancelled by Employee',
+          message: `${leave.employee.name} cancelled their approved leave (${leave.display_id}) — balance restored.`,
+          data:    { leave_id: leave.id, display_id: leave.display_id },
+        });
+      }
+      io.to('user:admins_room').emit('LEAVE_UPDATED', { id: leave.id, status: 'cancelled' });
+
+    sendLeaveCancelledEmail({ employee: leave.employee, leave, leaveDays })
+  .catch(err => console.error('Leave cancellation email (admin) failed:', err));
+
+// Confirm to employee that balance was restored
+sendApprovedLeaveCancelledEmail({ employee: leave.employee, leave, leaveDays })
+  .catch(err => console.error('Leave cancellation email (employee) failed:', err));
+
+      return res.status(200).json({
+        message: 'Approved leave cancelled and balance restored.',
+      });
+    }
+
+    // Any other status
+    await t.rollback();
+    return res.status(400).json({
+      message: `Leave with status '${leave.status}' cannot be cancelled.`,
+    });
+
+  } catch (error) {
+    if (t.finished !== 'commit') await t.rollback();
     return res.status(500).json({ message: error.message });
   }
-}
+};
 
   
 const getAllLeaves = async (req, res) => {
@@ -591,64 +658,63 @@ const approveLeave = async (req, res) => {
     }, { transaction: t });
 
     // ── 4. Update leave balance ──
-    const month = new Date(leave.start_date).getMonth() + 1; // 1–12
-    const year  = new Date(leave.start_date).getFullYear();
+  // ── 4. Split leave days by month and update balance ──
+    const monthBuckets = splitDaysByMonth(
+      leave.start_date,
+      leave.end_date,
+      leave.duration
+    );
 
-    // get or create balance record for this employee this month
-    const [balance] = await LeaveBalance.findOrCreate({
-      where: { user_id: leave.user_id, month, year },
-      defaults: {
-        entitled_paid:  2,
-        used_paid:      0,
-        used_unpaid:    0,
-        used_exchange:  0,
+    for (const bucket of monthBuckets) {
+      await _applyBalanceDeduction({
+        user_id:    leave.user_id,
+        leave_type: leave.leave_type,
+        days:       bucket.days,
+        month:      bucket.month,
+        year:       bucket.year,
+        t,
+      });
+    }
+
+    // ── 5. Sandwich day detection ──
+    const sandwichBuckets = await computeSandwichDays({
+      user_id: leave.user_id,
+      newLeave: {
+        id:         leave.id,
+        start_date: leave.start_date,
+        end_date:   leave.end_date,
+        duration:   leave.duration,
       },
-      transaction: t,
+      saturday_group: leave.employee.saturday_group,
     });
 
-let addToPaid   = 0;
-let addToUnpaid = 0;
+    for (const bucket of sandwichBuckets) {
+      if (bucket.days <= 0) continue;
+      await _applyBalanceDeduction({
+        user_id:    leave.user_id,
+        leave_type: LEAVE_TYPES.UNPAID,
+        days:       bucket.days,
+        month:      bucket.month,
+        year:       bucket.year,
+        t,
+      });
+    }
 
-if (leave.leave_type === LEAVE_TYPES.EXCHANGE) {
-  await balance.update({
-    used_exchange: parseFloat(balance.used_exchange) + leaveDays,
-  }, { transaction: t });
-} else {
-  const remainingPaid = parseFloat(balance.entitled_paid) - parseFloat(balance.used_paid);
-
-  if (remainingPaid <= 0) {
-    addToUnpaid = leaveDays;
-  } else if (remainingPaid >= leaveDays) {
-    addToPaid = leaveDays;
-  } else {
-    addToPaid   = remainingPaid;
-    addToUnpaid = leaveDays - remainingPaid;
-  }
-
-  await balance.update({
-    used_paid:   parseFloat(balance.used_paid)   + addToPaid,
-    used_unpaid: parseFloat(balance.used_unpaid) + addToUnpaid,
-  }, { transaction: t });
-}
-
-// ── Now finalLeaveType is safe — addToPaid/addToUnpaid are defined ──
-let finalLeaveType = leave.leave_type;
-if (leave.leave_type !== LEAVE_TYPES.EXCHANGE) {
-  finalLeaveType = addToUnpaid > 0 ? LEAVE_TYPES.UNPAID : LEAVE_TYPES.PAID;
-}
-
+    const totalSandwichDays = sandwichBuckets.reduce((sum, b) => sum + b.days, 0);
 // Update leave_type on the record
 await leave.update({ leave_type: finalLeaveType }, { transaction: t });
-    // ── 5. Leave log ──
-    await LeaveLog.create({
+    // ── 6. Leave log ──
+  await LeaveLog.create({
       leave_request_id: leave.id,
       user_id:          admin_id,
       action:           'approved',
       remarks: {
-        leave_days: leaveDays,
+        leave_days:       leaveDays,
+        month_buckets:    monthBuckets,
+        sandwich_days:    totalSandwichDays,
+        sandwich_buckets: sandwichBuckets,
       },
     }, { transaction: t });
-
     // ── 6. Notify employee ──
     const io = req.app.get('io');
 
@@ -663,7 +729,7 @@ await leave.update({ leave_type: finalLeaveType }, { transaction: t });
     await notifyAdmins(io, {
   type:    'LEAVE_APPROVED',
   title:   'Leave Approved',
-  message: `You approved ${leave.employee.name}'s leave request (${leave.display_id}) — ${leaveDays} day(s).`,
+    message: `You approved ${leave.employee.name}'s leave request (${leave.display_id}) — ${leaveDays} day(s)${totalSandwichDays > 0 ? ` + ${totalSandwichDays} sandwich day(s)` : ""}.`,
   data:    { leave_id: leave.id, display_id: leave.display_id },
 });
 
@@ -695,7 +761,7 @@ await leave.update({ leave_type: finalLeaveType }, { transaction: t });
     return res.status(200).json({
       message: 'Leave request approved.',
       leave_days: leaveDays,
-       leave_type: finalLeaveType,
+ sandwich_days: totalSandwichDays,
     });
 
   } catch (err) {
@@ -1295,6 +1361,299 @@ const uploadLeaveDocument = async (req, res) => {
 
 // ─────────────────────────────────────────────
 
+
+// ─────────────────────────────────────────────
+// PRIVATE HELPERS — Balance deduction/reversal
+// ─────────────────────────────────────────────
+
+const _applyBalanceDeduction = async ({ user_id, leave_type, days, month, year, t }) => {
+  const [balance] = await LeaveBalance.findOrCreate({
+    where: { user_id, month, year },
+    defaults: { entitled_paid: 2, used_paid: 0, used_unpaid: 0, used_exchange: 0 },
+    transaction: t,
+  });
+
+  if (leave_type === LEAVE_TYPES.EXCHANGE) {
+    await balance.update(
+      { used_exchange: parseFloat(balance.used_exchange) + days },
+      { transaction: t }
+    );
+    return;
+  }
+
+  if (leave_type === LEAVE_TYPES.UNPAID) {
+    await balance.update(
+      { used_unpaid: parseFloat(balance.used_unpaid) + days },
+      { transaction: t }
+    );
+    return;
+  }
+
+  // PAID — consume paid first, overflow to unpaid
+  const remainingPaid = parseFloat(balance.entitled_paid) - parseFloat(balance.used_paid);
+  let addToPaid = 0;
+  let addToUnpaid = 0;
+  if (remainingPaid <= 0) {
+    addToUnpaid = days;
+  } else if (remainingPaid >= days) {
+    addToPaid = days;
+  } else {
+    addToPaid = remainingPaid;
+    addToUnpaid = days - remainingPaid;
+  }
+  await balance.update(
+    {
+      used_paid:   parseFloat(balance.used_paid)   + addToPaid,
+      used_unpaid: parseFloat(balance.used_unpaid) + addToUnpaid,
+    },
+    { transaction: t }
+  );
+};
+
+const _reverseBalanceDeduction = async ({ user_id, leave_type, days, month, year, t }) => {
+  const balance = await LeaveBalance.findOne({ where: { user_id, month, year }, transaction: t });
+  if (!balance) return;
+
+  if (leave_type === LEAVE_TYPES.EXCHANGE) {
+    await balance.update(
+      { used_exchange: Math.max(0, parseFloat(balance.used_exchange) - days) },
+      { transaction: t }
+    );
+    return;
+  }
+
+  if (leave_type === LEAVE_TYPES.UNPAID) {
+    await balance.update(
+      { used_unpaid: Math.max(0, parseFloat(balance.used_unpaid) - days) },
+      { transaction: t }
+    );
+    return;
+  }
+
+  // PAID — restore paid first, then unpaid overflow
+  const toRestorePaid = Math.min(days, parseFloat(balance.used_paid));
+  const toRestoreUnpaid = Math.max(0, days - toRestorePaid);
+  await balance.update(
+    {
+      used_paid:   Math.max(0, parseFloat(balance.used_paid)   - toRestorePaid),
+      used_unpaid: Math.max(0, parseFloat(balance.used_unpaid) - toRestoreUnpaid),
+    },
+    { transaction: t }
+  );
+};
+
+// ─────────────────────────────────────────────
+// GET /api/leaves/adjacent-check
+// Employee — checks if selected dates create a sandwich with existing approved leaves
+// ─────────────────────────────────────────────
+
+const checkAdjacentLeaves = async (req, res) => {
+  try {
+    const { start_date, end_date, duration } = req.query;
+    const user_id = req.user.id;
+
+    if (!start_date || !end_date || !duration) {
+      return res.status(400).json({ message: 'start_date, end_date, duration are required.' });
+    }
+
+    const ABSENT_UNTIL_EOD = ['full_day', 'second_half'];
+    const ABSENT_FROM_SOD  = ['full_day', 'first_half'];
+
+    const dayBefore = new Date(start_date);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    const dayAfter = new Date(end_date);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+
+    const [leftLeave, rightLeave] = await Promise.all([
+      LeaveRequest.findOne({
+        where: {
+          user_id,
+          status: LEAVE_STATUS.APPROVED,
+          end_date: { [Op.lte]: dayBefore.toISOString().split('T')[0] },
+        },
+        order: [['end_date', 'DESC']],
+        attributes: ['id', 'display_id', 'end_date', 'duration'],
+      }),
+      LeaveRequest.findOne({
+        where: {
+          user_id,
+          status: LEAVE_STATUS.APPROVED,
+          start_date: { [Op.gte]: dayAfter.toISOString().split('T')[0] },
+        },
+        order: [['start_date', 'ASC']],
+        attributes: ['id', 'display_id', 'start_date', 'duration'],
+      }),
+    ]);
+
+    const employee = await User.findByPk(user_id, { attributes: ['saturday_group'] });
+    const warnings = [];
+
+    if (
+      leftLeave &&
+      ABSENT_UNTIL_EOD.includes(leftLeave.duration) &&
+      ABSENT_FROM_SOD.includes(duration)
+    ) {
+      const gapStart = new Date(leftLeave.end_date);
+      gapStart.setDate(gapStart.getDate() + 1);
+      const gapEnd = new Date(start_date);
+      gapEnd.setDate(gapEnd.getDate() - 1);
+      if (gapStart <= gapEnd) {
+        const offDays = await getOffDaysInRange(
+          gapStart.toISOString().split('T')[0],
+          gapEnd.toISOString().split('T')[0],
+          employee.saturday_group
+        );
+        if (offDays.size > 0) {
+          warnings.push({
+            side: 'left',
+            adjacent_leave_id: leftLeave.display_id,
+            sandwich_days: offDays.size,
+            message: `${offDays.size} off-day(s) between your existing leave (${leftLeave.display_id}) and this request will be counted as leave days (sandwich rule).`,
+          });
+        }
+      }
+    }
+
+    if (
+      rightLeave &&
+      ABSENT_UNTIL_EOD.includes(duration) &&
+      ABSENT_FROM_SOD.includes(rightLeave.duration)
+    ) {
+      const gapStart = new Date(end_date);
+      gapStart.setDate(gapStart.getDate() + 1);
+      const gapEnd = new Date(rightLeave.start_date);
+      gapEnd.setDate(gapEnd.getDate() - 1);
+      if (gapStart <= gapEnd) {
+        const offDays = await getOffDaysInRange(
+          gapStart.toISOString().split('T')[0],
+          gapEnd.toISOString().split('T')[0],
+          employee.saturday_group
+        );
+        if (offDays.size > 0) {
+          warnings.push({
+            side: 'right',
+            adjacent_leave_id: rightLeave.display_id,
+            sandwich_days: offDays.size,
+            message: `${offDays.size} off-day(s) between this request and your existing leave (${rightLeave.display_id}) will be counted as leave days (sandwich rule).`,
+          });
+        }
+      }
+    }
+
+    return res.status(200).json({ has_warning: warnings.length > 0, warnings });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// PATCH /api/leaves/:id/reverse  (admin only)
+// Reverses an approved leave and restores balance precisely
+// ─────────────────────────────────────────────
+
+const reverseLeave = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const admin_id = req.user.id;
+    const { id }   = req.params;
+    const { reason } = req.body;
+
+    if (!reason?.trim()) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Reversal reason is required.' });
+    }
+
+    const leave = await LeaveRequest.findByPk(id, {
+      include: [{ model: User, as: 'employee', attributes: ['id', 'name', 'saturday_group'] }],
+    });
+
+    if (!leave) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Leave request not found.' });
+    }
+
+    if (leave.status !== LEAVE_STATUS.APPROVED) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Only approved leaves can be reversed.' });
+    }
+
+    // Read the approval log for exact bucket breakdown
+    const approvalLog = await LeaveLog.findOne({
+      where: { leave_request_id: id, action: 'approved' },
+      order: [['created_at', 'DESC']],
+    });
+
+    const monthBuckets = approvalLog?.remarks?.month_buckets
+      || splitDaysByMonth(leave.start_date, leave.end_date, leave.duration);
+
+    for (const bucket of monthBuckets) {
+      await _reverseBalanceDeduction({
+        user_id:    leave.user_id,
+        leave_type: leave.leave_type,
+        days:       bucket.days,
+        month:      bucket.month,
+        year:       bucket.year,
+        t,
+      });
+    }
+
+    const sandwichBuckets = approvalLog?.remarks?.sandwich_buckets || [];
+    for (const bucket of sandwichBuckets) {
+      if (bucket.days <= 0) continue;
+      await _reverseBalanceDeduction({
+        user_id:    leave.user_id,
+        leave_type: LEAVE_TYPES.UNPAID,
+        days:       bucket.days,
+        month:      bucket.month,
+        year:       bucket.year,
+        t,
+      });
+    }
+
+    if (leave.leave_type === LEAVE_TYPES.EXCHANGE && leave.worked_saturday_id) {
+      await WorkedSaturday.update(
+        { is_exchanged: false },
+        { where: { id: leave.worked_saturday_id }, transaction: t }
+      );
+    }
+
+    await leave.update({ status: LEAVE_STATUS.CANCELLED }, { transaction: t });
+
+    await LeaveLog.create(
+      {
+        leave_request_id: leave.id,
+        user_id:          admin_id,
+        action:           'reversed',
+        remarks: {
+          reason:          reason.trim(),
+          undone_buckets:  monthBuckets,
+          undone_sandwich: sandwichBuckets,
+        },
+      },
+      { transaction: t }
+    );
+
+    await t.commit();
+
+    const io = req.app.get('io');
+    await createNotification(io, {
+      user_id: leave.user_id,
+      type:    'LEAVE_REJECTED',
+      title:   'Leave Approval Reversed',
+      message: `Your approved leave (${leave.display_id}) has been reversed by admin.`,
+      data:    { leave_id: leave.id, display_id: leave.display_id },
+    });
+    io.to(`user:${leave.user_id}`).emit('LEAVE_UPDATED', { id: leave.id, status: 'cancelled' });
+
+    return res.status(200).json({ message: 'Leave reversed and balance restored.' });
+  } catch (err) {
+    if (t.finished !== 'commit') await t.rollback();
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+
+
 module.exports.leaveController = {
   createLeave,
   getMyLeaves,
@@ -1308,6 +1667,8 @@ module.exports.leaveController = {
     getCompanySettings,
   updateCompanySettings,
    getLeaveCalculation,
-   uploadLeaveDocument
+   uploadLeaveDocument,
+     checkAdjacentLeaves,  
+  reverseLeave,       
 
 }

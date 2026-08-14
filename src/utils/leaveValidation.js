@@ -2,7 +2,8 @@ const { Op } = require("sequelize");
 const {
   LeaveRequest,
   CompanySettings,
-  PublicHoliday, WorkedSaturday
+  PublicHoliday,
+  WorkedSaturday,
 } = require("../models");
 
 const {
@@ -12,226 +13,255 @@ const {
   LEAVE_STATUS,
 } = require("../constants/leaveConstants");
 
-/**
- * Validate leave dates
- */
-const validateLeaveDates = ({
-  start_date,
-  end_date,
-  exchange_date,
-}) => {
+const validateLeaveDates = ({ start_date, end_date, exchange_date }) => {
   const start = new Date(start_date);
   const end = new Date(end_date);
-
-  if (isNaN(start) || isNaN(end)) {
-    throw new Error("Invalid leave dates.");
-  }
-
-  if (start > end) {
-    throw new Error("Start date cannot be after end date.");
-  }
-
+  if (isNaN(start) || isNaN(end)) throw new Error("Invalid leave dates.");
+  if (start > end) throw new Error("Start date cannot be after end date.");
   if (exchange_date) {
     const exchange = new Date(exchange_date);
-
-    if (isNaN(exchange)) {
-      throw new Error("Invalid exchange date.");
-    }
-
-    if (exchange.toDateString() === start.toDateString()) {
+    if (isNaN(exchange)) throw new Error("Invalid exchange date.");
+    if (exchange.toDateString() === start.toDateString())
       throw new Error("Exchange date cannot be the same as leave date.");
-    }
   }
 };
 
-/**
- * Prevent overlapping leave requests.
- * Pending and Approved leaves block new requests.
- */
+// ── Half-day aware duplicate check ──
+// Conflict matrix:
+//   full_day vs anything on overlapping dates → conflict
+//   first_half + first_half same day → conflict
+//   second_half + second_half same day → conflict
+//   first_half + second_half same day → ALLOWED
 const validateDuplicateLeave = async ({
   user_id,
   start_date,
   end_date,
+  duration,
+  exclude_id = null,
 }) => {
-  const existing = await LeaveRequest.findOne({
+  const activeStatuses = [LEAVE_STATUS.PENDING, LEAVE_STATUS.APPROVED];
+
+  // Query 1: full_day conflicts (date range overlap with any full_day, or new request is full_day)
+  const fullDayConflict = await LeaveRequest.findOne({
     where: {
       user_id,
-      status: {
-        [Op.in]: [
-          LEAVE_STATUS.PENDING,
-          LEAVE_STATUS.APPROVED,
-        ],
-      },
-
+      status: { [Op.in]: activeStatuses },
+      ...(exclude_id && { id: { [Op.ne]: exclude_id } }),
       [Op.and]: [
-        {
-          start_date: {
-            [Op.lte]: end_date,
-          },
-        },
-        {
-          end_date: {
-            [Op.gte]: start_date,
-          },
-        },
+        { start_date: { [Op.lte]: new Date(end_date) } },
+        { end_date: { [Op.gte]: new Date(start_date) } },
+      ],
+      [Op.or]: [
+        { duration: LEAVE_DURATION.FULL_DAY },
+        ...(duration === LEAVE_DURATION.FULL_DAY
+          ? [{ duration: { [Op.ne]: null } }]
+          : []),
       ],
     },
   });
 
-  if (existing) {
+  if (fullDayConflict) {
     throw new Error(
-      `You already have a leave request (${existing.display_id}) for the selected dates.`
+      `You already have a leave request (${fullDayConflict.display_id}) that conflicts with the selected dates.`
     );
+  }
+
+  // Query 2: same-day half-day conflicts (only when new request is half-day)
+  if (
+    duration === LEAVE_DURATION.FIRST_HALF ||
+    duration === LEAVE_DURATION.SECOND_HALF
+  ) {
+    const complementaryHalf =
+      duration === LEAVE_DURATION.FIRST_HALF
+        ? LEAVE_DURATION.SECOND_HALF
+        : LEAVE_DURATION.FIRST_HALF;
+
+    const halfDayConflict = await LeaveRequest.findOne({
+      where: {
+        user_id,
+        status: { [Op.in]: activeStatuses },
+        ...(exclude_id && { id: { [Op.ne]: exclude_id } }),
+        start_date: new Date(start_date),
+        duration: {
+          [Op.notIn]: [LEAVE_DURATION.FULL_DAY, complementaryHalf],
+        },
+      },
+    });
+
+    if (halfDayConflict) {
+      throw new Error(
+        `You already have a ${halfDayConflict.duration} leave request (${halfDayConflict.display_id}) on this day.`
+      );
+    }
   }
 };
 
-/**
- * Validate notice period.
- *
- * Full Day  -> 36 Hours
- * Half Day  -> 16 Hours
- * Emergency -> Skip validation
- */
 const validateNoticePeriod = async ({ reason_type, duration, start_date }) => {
   if (reason_type === LEAVE_REASONS.EMERGENCY) return;
-
   const settings = await CompanySettings.findOne();
   if (!settings) throw new Error("Company settings not configured.");
-
-  const officeTime = settings.office_start_time; // "09:00:00"
+  const officeTime = settings.office_start_time;
   const officeHour = Number(officeTime.split(":")[0]);
   const officeMinute = Number(officeTime.split(":")[1]);
-
-  // Parse date parts directly to avoid UTC shift
   const [year, month, day] = start_date.split("T")[0].split("-").map(Number);
-
-  // Build leave start as IST (UTC+5:30)
-  // IST offset = 5.5 hours = 330 minutes
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
-  // Office start time on leave date in IST, converted to UTC ms
   const leaveStartUTC =
     Date.UTC(year, month - 1, day, officeHour, officeMinute, 0, 0) - IST_OFFSET_MS;
-
   const noticeHours =
     duration === LEAVE_DURATION.FULL_DAY
       ? settings.full_day_notice_hours
       : settings.half_day_notice_hours;
-
   const deadlineUTC = leaveStartUTC - noticeHours * 60 * 60 * 1000;
-
-  const nowUTC = Date.now();
-
-  if (nowUTC > deadlineUTC) {
+  if (Date.now() > deadlineUTC) {
     throw new Error(
       `Leave request must be submitted at least ${noticeHours} hours before office start time.`
     );
   }
 };
 
-/**
- * Exchange leave validation
- */
 const validateExchangeLeave = async ({ leave_type, worked_saturday_id, user_id }) => {
   if (leave_type !== LEAVE_TYPES.EXCHANGE) return;
-
-  if (!worked_saturday_id) {
+  if (!worked_saturday_id)
     throw new Error("You must select a worked Saturday to exchange.");
-  }
-
   const workedSaturday = await WorkedSaturday.findOne({
-    where: {
-      id: worked_saturday_id,
-      user_id,
-      is_exchanged: false,   // not already used
-    },
+    where: { id: worked_saturday_id, user_id, is_exchanged: false },
   });
-
-  if (!workedSaturday) {
+  if (!workedSaturday)
     throw new Error("Selected Saturday is not available for exchange.");
-  }
 };
-
-
 
 const getOffDaysInRange = async (start_date, end_date, saturday_group) => {
   const offDays = new Set();
-
-  const start = new Date(start_date);
-  const end   = new Date(end_date);
-
-  // fetch public holidays in range
   const holidays = await PublicHoliday.findAll({
-    where: {
-      date: {
-        [Op.between]: [start_date, end_date],
-      },
-    },
-    attributes: ['date'],
+    where: { date: { [Op.between]: [start_date, end_date] } },
+    attributes: ["date"],
   });
-
   holidays.forEach((h) => offDays.add(h.date));
 
-  // loop every day in range
-  const current = new Date(start);
+  const current = new Date(start_date);
+  const end = new Date(end_date);
   while (current <= end) {
-    const dayOfWeek = current.getDay(); // 0=Sun, 6=Sat
-    const dateStr   = current.toISOString().split('T')[0];
-    const weekOfMonth = Math.ceil(current.getDate() / 7); // 1–5
-
-    // Sunday — always off
-    if (dayOfWeek === 0) {
-      offDays.add(dateStr);
-    }
-
-    // Saturday — check if it's off based on group
+    const dayOfWeek = current.getDay();
+    const dateStr = current.toISOString().split("T")[0];
+    const weekOfMonth = Math.ceil(current.getDate() / 7);
+    if (dayOfWeek === 0) offDays.add(dateStr);
     if (dayOfWeek === 6) {
-      if (saturday_group === 'A') {
-        // Group A works 1st and 3rd — off on 2nd, 4th, 5th
-        if (weekOfMonth !== 1 && weekOfMonth !== 3) {
-          offDays.add(dateStr);
-        }
-      } else if (saturday_group === 'B') {
-        // Group B works 2nd and 4th — off on 1st, 3rd, 5th
-        if (weekOfMonth !== 2 && weekOfMonth !== 4) {
-          offDays.add(dateStr);
-        }
+      if (saturday_group === "A") {
+        if (weekOfMonth !== 1 && weekOfMonth !== 3) offDays.add(dateStr);
+      } else if (saturday_group === "B") {
+        if (weekOfMonth !== 2 && weekOfMonth !== 4) offDays.add(dateStr);
       } else {
-        // null group — treat all Saturdays as off
         offDays.add(dateStr);
       }
     }
-
     current.setDate(current.getDate() + 1);
   }
-
   return offDays;
 };
 
-/**
- * Count leave days with sandwich rule applied.
- *
- * Sandwich rule:
- *   Any off day (Sunday, off Saturday, public holiday)
- *   that falls BETWEEN two leave days is counted as a leave day.
- *   Since start_date and end_date are the actual leave days,
- *   everything in between is automatically counted — including off days.
- *
- * Half day = 0.5 days always.
- */
-const countLeaveDays = async (start_date, end_date, duration, saturday_group) => {
-  if (duration === 'first_half' || duration === 'second_half') {
+const countLeaveDays = async (start_date, end_date, duration) => {
+  if (
+    duration === LEAVE_DURATION.FIRST_HALF ||
+    duration === LEAVE_DURATION.SECOND_HALF
+  )
     return 0.5;
+  const start = new Date(start_date);
+  const end = new Date(end_date);
+  const diffMs = end - start;
+  return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+};
+
+// Splits leave days into per-month buckets for cross-month balance updates
+const splitDaysByMonth = (start_date, end_date, duration) => {
+  if (
+    duration === LEAVE_DURATION.FIRST_HALF ||
+    duration === LEAVE_DURATION.SECOND_HALF
+  ) {
+    const d = new Date(start_date);
+    return [{ month: d.getMonth() + 1, year: d.getFullYear(), days: 0.5 }];
+  }
+  const result = {};
+  const current = new Date(start_date);
+  const end = new Date(end_date);
+  while (current <= end) {
+    const month = current.getMonth() + 1;
+    const year = current.getFullYear();
+    const key = `${year}-${month}`;
+    if (!result[key]) result[key] = { month, year, days: 0 };
+    result[key].days += 1;
+    current.setDate(current.getDate() + 1);
+  }
+  return Object.values(result);
+};
+
+// Sandwich rule constants
+const ABSENT_UNTIL_EOD = [LEAVE_DURATION.FULL_DAY, LEAVE_DURATION.SECOND_HALF];
+const ABSENT_FROM_SOD = [LEAVE_DURATION.FULL_DAY, LEAVE_DURATION.FIRST_HALF];
+
+// Detects off-days sandwiched between the newly approved leave and adjacent approved leaves.
+// Returns [{ month, year, days }] — extra days to charge as unpaid.
+const computeSandwichDays = async ({ user_id, newLeave, saturday_group }) => {
+  const sandwichBuckets = {};
+
+  const addDayToBucket = (dateStr) => {
+    const d = new Date(dateStr);
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    const key = `${year}-${month}`;
+    if (!sandwichBuckets[key]) sandwichBuckets[key] = { month, year, days: 0 };
+    sandwichBuckets[key].days += 1;
+  };
+
+  const approvedLeaves = await LeaveRequest.findAll({
+    where: {
+      user_id,
+      status: LEAVE_STATUS.APPROVED,
+      id: { [Op.ne]: newLeave.id },
+    },
+    order: [["start_date", "ASC"]],
+    attributes: ["id", "start_date", "end_date", "duration"],
+  });
+
+  const allLeaves = [
+    ...approvedLeaves.map((l) => ({
+      id: l.id,
+      start_date: new Date(l.start_date),
+      end_date: new Date(l.end_date),
+      duration: l.duration,
+    })),
+    {
+      id: newLeave.id,
+      start_date: new Date(newLeave.start_date),
+      end_date: new Date(newLeave.end_date),
+      duration: newLeave.duration,
+    },
+  ].sort((a, b) => a.start_date - b.start_date);
+
+  for (let i = 0; i < allLeaves.length - 1; i++) {
+    const left = allLeaves[i];
+    const right = allLeaves[i + 1];
+
+    const involvesNewLeave =
+      left.id === newLeave.id || right.id === newLeave.id;
+    if (!involvesNewLeave) continue;
+
+    const gapStart = new Date(left.end_date);
+    gapStart.setDate(gapStart.getDate() + 1);
+    const gapEnd = new Date(right.start_date);
+    gapEnd.setDate(gapEnd.getDate() - 1);
+    if (gapStart > gapEnd) continue;
+
+    const leftClosesGap = ABSENT_UNTIL_EOD.includes(left.duration);
+    const rightClosesGap = ABSENT_FROM_SOD.includes(right.duration);
+    if (!leftClosesGap || !rightClosesGap) continue;
+
+    const gapStartStr = gapStart.toISOString().split("T")[0];
+    const gapEndStr = gapEnd.toISOString().split("T")[0];
+    const offDays = await getOffDaysInRange(gapStartStr, gapEndStr, saturday_group);
+    offDays.forEach((dateStr) => addDayToBucket(dateStr));
   }
 
-  const start = new Date(start_date);
-  const end   = new Date(end_date);
-
-  // total calendar days from start to end inclusive
-  const diffMs = end - start;
-  const days   = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
-
-  return days;
+  return Object.values(sandwichBuckets);
 };
 
 module.exports = {
@@ -239,5 +269,8 @@ module.exports = {
   validateDuplicateLeave,
   validateNoticePeriod,
   validateExchangeLeave,
-   countLeaveDays,
+  getOffDaysInRange,
+  countLeaveDays,
+  splitDaysByMonth,
+  computeSandwichDays,
 };

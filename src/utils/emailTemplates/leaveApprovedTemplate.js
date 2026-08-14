@@ -2,7 +2,7 @@ const leaveApprovedTemplate = ({
   employee,
   leave,
   approvedBy,
-  leaveDays,
+  leaveDays, 
 }) => {
   const isEmergency = leave.reason_type?.toLowerCase() === "emergency";
 
