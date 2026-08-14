@@ -59,6 +59,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    is_announced: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
+},
   }, {
     tableName: 'events',
     underscored: true,

@@ -84,21 +84,25 @@ const buildCardHTML = (event, aiConfig = null) => {
           ${e.message || "May this special day bring you lots of joy. You are an amazing part of our team!"}
         </p>
       </div>`,
+promotion_1: (e) => `
+      <div style="width:800px;height:500px;background:linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <!-- Subtle Radial Ambient Glow -->
+        <div style="position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:400px;height:400px;background:radial-gradient(circle, rgba(251,191,36,0.15) 0%, rgba(15,23,42,0) 70%);pointer-events:none;"></div>
 
-    promotion_1: (e) => `
-      <div style="width:800px;height:500px;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
-        <!-- Elegant Grid Overlay -->
-        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.05;" xmlns="http://www.w3.org/2000/svg">
+        <!-- Elegant Grid & Sparkle Overlay -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.08;" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <pattern id="grid_p1" width="40" height="40" patternUnits="userSpaceOnUse">
               <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-width="1"/>
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#grid)"/>
+          <rect width="100%" height="100%" fill="url(#grid_p1)"/>
+          <path d="M 120 100 L 123 109 L 132 112 L 123 115 L 120 124 L 117 115 L 108 112 L 117 109 Z" fill="#fbbf24"/>
+          <path d="M 680 380 L 683 389 L 692 392 L 683 395 L 680 404 L 677 395 L 668 392 L 677 389 Z" fill="#fbbf24"/>
         </svg>
 
-        <!-- Trophy SVG Illustration -->
-        <div style="background:#1e293b;border:1px solid #334155;padding:16px;border-radius:16px;margin-bottom:16px;">
+        <!-- Golden Trophy Badge -->
+        <div style="position:relative;z-index:2;background:rgba(30, 41, 59, 0.8);border:1px solid rgba(251,191,36,0.3);padding:18px;border-radius:50%;margin-bottom:16px;box-shadow:0 0 25px rgba(251,191,36,0.2);">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-4"/>
@@ -109,23 +113,28 @@ const buildCardHTML = (event, aiConfig = null) => {
           </svg>
         </div>
 
-        <span style="color:#fbbf24;font-size:12px;font-weight:800;letter-spacing:4px;text-transform:uppercase;margin-bottom:8px;">Congratulations</span>
-        <h1 style="color:#ffffff;font-size:40px;font-weight:900;margin:0 0 6px;text-align:center;">${e.employee_name}</h1>
-        <p style="color:#94a3b8;font-size:14px;letter-spacing:2px;text-transform:uppercase;margin:0 0 20px;">On Your Promotion</p>
-        <p style="color:#cbd5e1;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+        <span style="position:relative;z-index:2;color:#fde68a;font-size:13px;font-weight:800;letter-spacing:4px;text-transform:uppercase;margin-bottom:8px;">Congratulations</span>
+        <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 6px;text-align:center;">${e.employee_name}</h1>
+        <p style="position:relative;z-index:2;color:#94a3b8;font-size:14px;letter-spacing:2px;text-transform:uppercase;margin:0 0 16px;">On Your Promotion</p>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:#fbbf24;border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:#cbd5e1;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${e.message || "Your hard work and dedication have truly paid off. We are proud to have you on our team!"}
         </p>
       </div>`,
 
     promotion_2: (e) => `
-      <div style="width:800px;height:500px;background:#065f46;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
-        <!-- Wave Graphic SVG Bottom -->
-        <svg style="position:absolute;bottom:0;left:0;width:100%;height:120px;opacity:0.15;" viewBox="0 0 800 120" fill="#ffffff">
+      <div style="width:800px;height:500px;background:linear-gradient(135deg, #064e3b 0%, #022c22 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <!-- Glowing Ring Background Effect -->
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:550px;height:550px;border:1px solid stroke="#34d399";border-radius:50%;opacity:0.1;"></div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;border:1px stroke="#34d399";border-radius:50%;opacity:0.15;"></div>
+
+        <!-- Dynamic Bottom Wave Graphic -->
+        <svg style="position:absolute;bottom:0;left:0;width:100%;height:130px;opacity:0.12;" viewBox="0 0 800 120" fill="#34d399">
           <path d="M0,32L48,42.7C96,53,192,75,288,80C384,85,480,75,576,58.7C672,43,768,21,816,10.7L864,0L864,120L816,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"></path>
         </svg>
 
-        <!-- Rocket Target SVG Icon -->
-        <div style="background:#047857;padding:18px;border-radius:50%;margin-bottom:16px;">
+        <!-- Rocket Icon Badge -->
+        <div style="position:relative;z-index:2;background:rgba(4, 120, 87, 0.6);border:1px solid #34d399;padding:18px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 20px rgba(0,0,0,0.3);">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.63-2.32L4.5 16.5z"/>
             <path d="M12 15l-3-3 5.5-5.5a2.121 2.121 0 0 1 3 3L12 15z"/>
@@ -134,16 +143,25 @@ const buildCardHTML = (event, aiConfig = null) => {
           </svg>
         </div>
 
-        <h1 style="color:#ffffff;font-size:38px;font-weight:900;margin:0 0 8px;text-align:center;">Well Deserved!</h1>
-        <h2 style="color:#a7f3d0;font-size:24px;font-weight:700;margin:0 0 18px;">Congratulations, ${e.employee_name}!</h2>
-        <p style="color:#ecfdf5;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+        <span style="position:relative;z-index:2;color:#6ee7b7;font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Well Deserved</span>
+        <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 6px;text-align:center;">Congratulations, ${e.employee_name}!</h1>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:#34d399;border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:#ecfdf5;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${e.message || "Your promotion is a reflection of your talent and commitment. Keep soaring high!"}
         </p>
       </div>`,
 
     office_1: (e) => `
-      <div style="width:800px;height:500px;background:#1e293b;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;">
-        <div style="background:#334155;padding:16px;border-radius:16px;margin-bottom:16px;">
+      <div style="width:800px;height:500px;background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <!-- Geometric Accent Lines -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.1;" viewBox="0 0 800 500" fill="none" stroke="#38bdf8">
+          <circle cx="80" cy="80" r="160" stroke-width="2"/>
+          <circle cx="720" cy="420" r="200" stroke-width="2"/>
+          <line x1="0" y1="250" x2="800" y2="250" stroke-width="1" stroke-dasharray="8 8"/>
+        </svg>
+
+        <!-- Building Badge -->
+        <div style="position:relative;z-index:2;background:rgba(51, 65, 85, 0.8);border:1px solid #38bdf8;padding:18px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 20px rgba(0,0,0,0.3);">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
             <path d="M9 22v-4h6v4"/>
@@ -152,83 +170,134 @@ const buildCardHTML = (event, aiConfig = null) => {
             <path d="M8 14h.01"/><path d="M16 14h.01"/>
           </svg>
         </div>
-        <span style="color:#38bdf8;font-size:12px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Office Event</span>
-        <h1 style="color:#ffffff;font-size:38px;font-weight:900;margin:0 0 8px;text-align:center;">${e.employee_name}</h1>
-        <p style="color:#94a3b8;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+
+        <span style="position:relative;z-index:2;color:#7dd3fc;font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Office Event</span>
+        <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 8px;text-align:center;">${e.employee_name}</h1>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:#38bdf8;border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:#cbd5e1;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${e.message || "Join us for this special occasion. Looking forward to seeing everyone!"}
         </p>
       </div>`,
 
     office_2: (e) => `
-      <div style="width:800px;height:500px;background:#f8fafc;border:2px solid #e2e8f0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;">
-        <div style="background:#e0f2fe;padding:16px;border-radius:50%;margin-bottom:16px;">
+      <div style="width:800px;height:500px;background:linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);border:1px solid #cbd5e1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <!-- Clean Modern Background Dots -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.3;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="dots_o2" width="20" height="20" patternUnits="userSpaceOnUse">
+              <circle cx="2" cy="2" r="1.5" fill="#0284c7"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#dots_o2)"/>
+        </svg>
+
+        <!-- Notification Bell Badge -->
+        <div style="position:relative;z-index:2;background:#ffffff;padding:18px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 25px -5px rgba(2, 132, 199, 0.25);">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
           </svg>
         </div>
-        <h1 style="color:#0f172a;font-size:36px;font-weight:900;margin:0 0 8px;text-align:center;">Announcement</h1>
-        <h2 style="color:#0284c7;font-size:22px;font-weight:700;margin:0 0 16px;">${e.employee_name}</h2>
-        <p style="color:#475569;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+
+        <span style="position:relative;z-index:2;color:#0284c7;font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Announcement</span>
+        <h1 style="position:relative;z-index:2;color:#0f172a;font-size:42px;font-weight:900;margin:0 0 8px;text-align:center;">${e.employee_name}</h1>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:#0284c7;border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:#475569;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${e.message || "We have exciting news to share. Stay tuned for more details!"}
         </p>
       </div>`,
 
     trip_1: (e) => `
-      <div style="width:800px;height:500px;background:#0284c7;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
-        <!-- Airplane Flight Path SVG Accent -->
-        <svg style="position:absolute;top:30px;right:40px;width:180px;height:120px;opacity:0.25;" viewBox="0 0 200 120" fill="none" stroke="#ffffff" stroke-width="2">
-          <path d="M10,100 C50,20 120,40 180,10" stroke-dasharray="6,6"/>
+      <div style="width:800px;height:500px;background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <!-- Dynamic Flight Path & Nodes -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.2;" viewBox="0 0 800 500" fill="none" stroke="#ffffff" stroke-width="2">
+          <path d="M-50,400 C 200,100, 500,450, 850,100" stroke-dasharray="8 8"/>
+          <circle cx="210" cy="225" r="5" fill="#ffffff"/>
+          <circle cx="560" cy="300" r="5" fill="#ffffff"/>
         </svg>
 
-        <div style="background:#0369a1;padding:18px;border-radius:50%;margin-bottom:16px;">
+        <!-- Airplane Icon Badge -->
+        <div style="position:relative;z-index:2;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);padding:18px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 20px rgba(0,0,0,0.2);">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.7 5.2c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1z"/>
           </svg>
         </div>
 
-        <h1 style="color:#ffffff;font-size:40px;font-weight:900;margin:0 0 8px;text-align:center;">Company Trip!</h1>
-        <h2 style="color:#bae6fd;font-size:24px;font-weight:700;margin:0 0 16px;">${e.employee_name}</h2>
-        <p style="color:#e0f2fe;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+        <span style="position:relative;z-index:2;color:#bae6fd;font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Company Trip</span>
+        <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 6px;text-align:center;">${e.employee_name}</h1>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:#38bdf8;border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:#e0f2fe;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${e.message || "Get ready for an amazing adventure together. Pack your bags!"}
         </p>
       </div>`,
 
     trip_2: (e) => `
-      <div style="width:800px;height:500px;background:#0d9488;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;">
-        <div style="background:#115e59;padding:16px;border-radius:16px;margin-bottom:16px;">
+      <div style="width:800px;height:500px;background:linear-gradient(135deg, #0d9488 0%, #115e59 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <!-- Topo / Contour Line Pattern -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.12;" viewBox="0 0 800 500" fill="none" stroke="#ffffff" stroke-width="2">
+          <path d="M 0 100 Q 200 50 400 200 T 800 150"/>
+          <path d="M 0 200 Q 300 150 500 350 T 800 300"/>
+          <path d="M 0 350 Q 200 250 600 450 T 800 400"/>
+        </svg>
+
+        <!-- Compass / Map Badge -->
+        <div style="position:relative;z-index:2;background:rgba(17, 94, 89, 0.7);border:1px solid #2dd4bf;padding:18px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 20px rgba(0,0,0,0.25);">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/>
             <line x1="9" y1="3" x2="9" y2="18"/>
             <line x1="15" y1="6" x2="15" y2="21"/>
           </svg>
         </div>
-        <h1 style="color:#ffffff;font-size:40px;font-weight:900;margin:0 0 8px;text-align:center;">Adventure Awaits!</h1>
-        <h2 style="color:#99f6e4;font-size:24px;font-weight:700;margin:0 0 16px;">${e.employee_name}</h2>
-        <p style="color:#ccfbf1;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+
+        <span style="position:relative;z-index:2;color:#99f6e4;font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Adventure Awaits</span>
+        <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 6px;text-align:center;">${e.employee_name}</h1>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:#2dd4bf;border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:#ccfbf1;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${e.message || "An exciting journey awaits us all. Let's make memories together!"}
         </p>
       </div>`,
 
     fun_game_1: (e) => `
-      <div style="width:800px;height:500px;background:#d97706;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;">
-        <div style="background:#b45309;padding:16px;border-radius:16px;margin-bottom:16px;">
+      <div style="width:800px;height:500px;background:linear-gradient(135deg, #d97706 0%, #92400e 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <!-- Energetic Diagonal Cross Pattern -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.1;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="crosses_fg1" width="30" height="30" patternUnits="userSpaceOnUse">
+              <path d="M 0 0 L 30 30 M 30 0 L 0 30" stroke="#ffffff" stroke-width="1.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#crosses_fg1)"/>
+        </svg>
+
+        <!-- Game Controller Badge -->
+        <div style="position:relative;z-index:2;background:rgba(180, 83, 9, 0.7);border:1px solid #fef3c7;padding:18px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 20px rgba(0,0,0,0.25);">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#fef3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/>
             <circle cx="15" cy="11" r="1" fill="#fef3c7"/><circle cx="17" cy="13" r="1" fill="#fef3c7"/>
             <rect x="2" y="6" width="20" height="12" rx="6"/>
           </svg>
         </div>
-        <h1 style="color:#ffffff;font-size:40px;font-weight:900;margin:0 0 8px;text-align:center;">Game On!</h1>
-        <h2 style="color:#fef3c7;font-size:24px;font-weight:700;margin:0 0 16px;">${e.employee_name}</h2>
-        <p style="color:#fffbeb;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+
+        <span style="position:relative;z-index:2;color:#fef3c7;font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Game On!</span>
+        <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 6px;text-align:center;">${e.employee_name}</h1>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:#fde047;border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:#fffbeb;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${e.message || "Time to have some fun! Join us for games and great times together."}
         </p>
       </div>`,
 
     fun_game_2: (e) => `
-      <div style="width:800px;height:500px;background:#7c3aed;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;">
-        <div style="background:#6d28d9;padding:16px;border-radius:50%;margin-bottom:16px;">
+      <div style="width:800px;height:500px;background:linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <!-- Playful Bubbles / Floating Circles -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.15;" viewBox="0 0 800 500" fill="#ffffff">
+          <circle cx="100" cy="120" r="40"/>
+          <circle cx="700" cy="100" r="25"/>
+          <circle cx="680" cy="380" r="55"/>
+          <circle cx="120" cy="400" r="20"/>
+        </svg>
+
+        <!-- Party Emoji / Smiley Badge -->
+        <div style="position:relative;z-index:2;background:rgba(109, 40, 217, 0.7);border:1px solid #ddd6fe;padding:18px;border-radius:50%;margin-bottom:16px;box-shadow:0 10px 20px rgba(0,0,0,0.25);">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ddd6fe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
@@ -236,9 +305,11 @@ const buildCardHTML = (event, aiConfig = null) => {
             <line x1="15" y1="9" x2="15.01" y2="9"/>
           </svg>
         </div>
-        <h1 style="color:#ffffff;font-size:40px;font-weight:900;margin:0 0 8px;text-align:center;">Fun Time!</h1>
-        <h2 style="color:#ddd6fe;font-size:24px;font-weight:700;margin:0 0 16px;">${e.employee_name}</h2>
-        <p style="color:#f5f3ff;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+
+        <span style="position:relative;z-index:2;color:#ddd6fe;font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">Fun Time!</span>
+        <h1 style="position:relative;z-index:2;color:#ffffff;font-size:42px;font-weight:900;margin:0 0 6px;text-align:center;">${e.employee_name}</h1>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:#c084fc;border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:#f5f3ff;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${e.message || "Let's take a break and enjoy some fun activities together as a team!"}
         </p>
       </div>`,
@@ -252,11 +323,15 @@ const buildCardHTML = (event, aiConfig = null) => {
     const accent = colors?.accent || "#c7d2fe";
 
     return `
-      <div style="width:800px;height:500px;background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;">
-        <span style="color:${accent};font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">${subtitle || "Announcement"}</span>
-        <h1 style="color:${text};font-size:40px;font-weight:900;margin:0 0 8px;text-align:center;">${title}</h1>
-        <h2 style="color:${text};opacity:0.9;font-size:24px;font-weight:700;margin:0 0 16px;">${event.employee_name}</h2>
-        <p style="color:${text};opacity:0.85;font-size:15px;text-align:center;max-width:500px;line-height:1.6;margin:0;">
+      <div style="width:800px;height:500px;background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.1;" viewBox="0 0 800 500" fill="none">
+          <circle cx="400" cy="250" r="300" stroke="${text}" stroke-width="2"/>
+        </svg>
+        <span style="position:relative;z-index:2;color:${accent};font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">${subtitle || "Announcement"}</span>
+        <h1 style="position:relative;z-index:2;color:${text};font-size:42px;font-weight:900;margin:0 0 6px;text-align:center;">${title}</h1>
+        <h2 style="position:relative;z-index:2;color:${text};opacity:0.9;font-size:22px;font-weight:700;margin:0 0 16px;">${event.employee_name}</h2>
+        <div style="position:relative;z-index:2;width:60px;height:4px;background:${accent};border-radius:2px;margin-bottom:20px;"></div>
+        <p style="position:relative;z-index:2;color:${text};opacity:0.85;font-size:15px;text-align:center;max-width:520px;line-height:1.6;margin:0;">
           ${message || event.message}
         </p>
       </div>`;
@@ -517,7 +592,37 @@ const previewAICard = async (req, res) => {
   }
 };
 
+const announceEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const event = await Event.findByPk(id, {
+      include: [creatorInclude],
+    });
+
+    if (!event) return res.status(404).json({ message: "Event not found." });
+
+    await event.update({ is_announced: true });
+
+    // Emit to ALL connected employees instantly
+    const io = req.app.get("io");
+    io.emit("EVENT_ANNOUNCED", {
+      id:            event.id,
+      display_id:    event.display_id,
+      event_type:    event.event_type,
+      employee_name: event.employee_name,
+      message:       event.message,
+      card_html:     event.card_html,
+      event_date:    event.event_date,
+    });
+
+    return res.status(200).json({ message: "Event announced successfully.", event });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 
 module.exports = {
-    createEvent, getAllEvents, getEmployeeEvents, getEventById, deleteEvent, exportCardPNG, previewAICard, 
+    createEvent, getAllEvents, getEmployeeEvents, getEventById, deleteEvent, exportCardPNG, previewAICard, announceEvent
 }
