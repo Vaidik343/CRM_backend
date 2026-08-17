@@ -565,8 +565,7 @@ const getInternById = async (req, res) => {
     const intern = await Intern.findByPk(id, {
       include: internIncludes,
     });
-    console.log("🚀 ~ getInternById ~ intern:", intern)
-    console.log("🚀 ~ getInternById ~ intern:", intern)
+   
 
     if (!intern) {
       return res.status(404).json({ message: 'Intern not found.' });

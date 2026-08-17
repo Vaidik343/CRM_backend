@@ -69,7 +69,7 @@ authenticate, requireAdmin,
 
 
 router.get('/leaves/adjacent-check', authenticate, leaveController.checkAdjacentLeaves);
-router.patch('/leaves/:id/reverse', requireAdmin, leaveController.reverseLeave);
+router.patch('/leaves/:id/reverse', authenticate, leaveController.reverseLeave);
 
 // GET /api/leave/saturday/:user_id
 // Params: user_id (UUID)

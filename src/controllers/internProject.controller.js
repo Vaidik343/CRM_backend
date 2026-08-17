@@ -36,11 +36,13 @@ const attachProjectMentors = async (project) => {
 // ─────────────────────────────────────────────
 
 
+  
 const createProject = async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const intern_id = req.intern.id;
     const { name, description, tech_details, mentor_ids } = req.body;
+    console.log("project", req.body);
 
     if (!name || !name.trim()) {
       await t.rollback();
@@ -86,6 +88,7 @@ const createProject = async (req, res) => {
     });
 
   } catch (err) {
+    console.log("🚀 ~ createProject ~ err:", err)
     await t.rollback();
     return res.status(500).json({ message: err.message });
   }
@@ -165,12 +168,71 @@ const getInternProject = async (req, res) => {
   }
 };
 
-// admin update intern's project (mentor only)
 
+// ── ADMIN — Create Project ──
+const adminCreateProject = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { intern_id } = req.params;
+    const { title, name, description, tech_details, tech_stack, mentor_ids } = req.body;
+
+    const projectName = title || name;
+    const projectTech = tech_details || tech_stack || {};
+
+    const intern = await Intern.findByPk(intern_id);
+    if (!intern) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Intern not found.' });
+    }
+
+    const existing = await InternProject.findOne({ where: { intern_id } });
+    if (existing) {
+      await t.rollback();
+      return res.status(409).json({ message: 'Project already exists for this intern. Use update instead.' });
+    }
+
+    if (!projectName || !projectName.trim()) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Project name/title is required.' });
+    }
+
+    if (mentor_ids && Array.isArray(mentor_ids) && mentor_ids.length > 0) {
+      const mentors = await User.findAll({ where: { id: mentor_ids } });
+      if (mentors.length !== mentor_ids.length) {
+        await t.rollback();
+        return res.status(404).json({ message: 'One or more mentors not found.' });
+      }
+    }
+
+    const display_id = generateDisplayId({
+      prefix: 'IP',
+      employeeId: intern.enrollment_no,
+    });
+
+    const project = await InternProject.create({
+      intern_id,
+      display_id,
+      name: projectName.trim(),
+      description: description?.trim() || null,
+      tech_details: projectTech,
+      mentor_ids: mentor_ids || [],
+    }, { transaction: t });
+
+    await t.commit();
+
+    const projectWithMentors = await attachProjectMentors(project);
+    return res.status(201).json({ message: 'Project created successfully.', project: projectWithMentors });
+  } catch (err) {
+    await t.rollback();
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// ── ADMIN — Update Project ──
 const adminUpdateProject = async (req, res) => {
   try {
     const { intern_id } = req.params;
-    const { mentor_ids } = req.body;
+    const { mentor_ids, title, name, description, tech_details, tech_stack } = req.body;
 
     const project = await InternProject.findOne({ where: { intern_id } });
     if (!project) {
@@ -184,22 +246,22 @@ const adminUpdateProject = async (req, res) => {
       }
     }
 
+    const projectName = title || name;
+    const projectTech = tech_details !== undefined ? tech_details : tech_stack;
+
     await project.update({
-      mentor_ids: mentor_ids !== undefined ? mentor_ids : project.mentor_ids,
+      ...(mentor_ids !== undefined && { mentor_ids }),
+      ...(projectName !== undefined && { name: projectName.trim() }),
+      ...(description !== undefined && { description: description?.trim() || null }),
+      ...(projectTech !== undefined && { tech_details: projectTech }),
     });
 
     const projectWithMentors = await attachProjectMentors(project);
-
-    return res.status(200).json({
-      message: 'Project updated.',
-      project: projectWithMentors,
-    });
-
+    return res.status(200).json({ message: 'Project updated.', project: projectWithMentors });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
-
 
 module.exports = {
   createProject,
@@ -207,4 +269,5 @@ module.exports = {
   updateProject,
   getInternProject,
   adminUpdateProject,
+  adminCreateProject
 };

@@ -25,6 +25,7 @@ const {
   updateProject,
   getInternProject,
   adminUpdateProject,
+  adminCreateProject
 } = require('../controllers/internProject.controller');
 
 
@@ -384,7 +385,8 @@ router.patch('/intern/worklogs/:id',  authenticateIntern, updateWorkLog);
 // GET    /api/admin/interns/:intern_id/project       → get intern's project
 // PATCH  /api/admin/interns/:intern_id/project       → update mentor
 router.get('/admin/interns/:intern_id/project',   authenticate, requireAdmin, getInternProject);
-router.patch('/admin/interns/:intern_id/project', authenticate, requireAdmin, adminUpdateProject);
+router.put('/admin/interns/:intern_id/project', authenticate, requireAdmin, adminUpdateProject);
+router.post('/admin/interns/:intern_id/project', authenticate, requireAdmin, adminCreateProject)
 
 // ─────────────────────────────────────────────
 // ADMIN — Task Routes

@@ -230,13 +230,18 @@ const sendApprovedLeaveCancelledEmail = async ({
   })
   console.log("🚀 ~ sendApprovedLeaveCancelledEmail ~ html:", html)
 
-  return await sendMail({
+  const info = await sendMail({
     to: employee.email,
     cc: process.env.OWNER_EMAIL,
     subject,
     html,
   });
+  console.log("🚀 ~ sendApprovedLeaveCancelledEmail ~ info:", info);
+
+  return info;
 };
+
+
 module.exports = {
   
   sendLeaveRequestEmail,

@@ -1,3 +1,4 @@
+
 const jwt = require("jsonwebtoken");
 const { User, Role } = require("../models");
 
@@ -30,6 +31,7 @@ const user = await User.findByPk(payload.sub, {
 
     next();
   } catch (err) {
+      console.log("🚀 ~ authenticate ~ err:", err)
     return res.status(401).json({ message: "Unauthorized" });
   }
 }

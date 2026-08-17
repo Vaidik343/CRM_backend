@@ -362,8 +362,8 @@ const cancelLeave = async (req, res) => {
   try {
     const user_id = req.user.id;
     const { id } = req.params;
-    const { reason } = req.body; // optional reason for approved leave cancellation
- console.log(req.body)
+    const { reason } = req.body  || {} ; // optional reason for approved leave cancellation
+
     const leave = await LeaveRequest.findOne({
       where: { id, user_id },
       include: [
@@ -640,6 +640,20 @@ const approveLeave = async (req, res) => {
       return res.status(400).json({ message: `Leave is already ${leave.status}.` });
     }
 
+    // Guard against double-charging — check if approval log already exists
+const existingApprovalLog = await LeaveLog.findOne({
+  where: { leave_request_id: id, action: 'approved' },
+});
+
+if (existingApprovalLog) {
+  await t.rollback();
+  return res.status(400).json({ 
+    message: 'This leave has already been processed. Use reverse if correction is needed.' 
+  });
+}
+
+
+
     // ── 2. Calculate leave days ──
     const leaveDays = await countLeaveDays(
       leave.start_date,
@@ -664,6 +678,31 @@ const approveLeave = async (req, res) => {
       leave.end_date,
       leave.duration
     );
+
+
+    let finalLeaveType = leave.leave_type;
+
+if (leave.leave_type !== LEAVE_TYPES.EXCHANGE) {
+  // Read balance BEFORE deduction to determine what this leave will consume
+  const firstBucket = monthBuckets[0];
+  const existingBalance = await LeaveBalance.findOne({
+    where: {
+      user_id: leave.user_id,
+      month:   firstBucket.month,
+      year:    firstBucket.year,
+    },
+    transaction: t,
+  });
+
+  const entitled     = parseFloat(existingBalance?.entitled_paid || 2);
+  const usedPaid     = parseFloat(existingBalance?.used_paid     || 0);
+  const remainingPaid = entitled - usedPaid;
+
+  finalLeaveType = remainingPaid <= 0
+    ? LEAVE_TYPES.UNPAID
+    : LEAVE_TYPES.PAID;
+}
+
 
     for (const bucket of monthBuckets) {
       await _applyBalanceDeduction({
@@ -765,7 +804,9 @@ await leave.update({ leave_type: finalLeaveType }, { transaction: t });
     });
 
   } catch (err) {
+     if (t.finished !== "commit") {
     await t.rollback();
+  }
     return res.status(500).json({ message: err.message });
   }
 };
@@ -1410,6 +1451,8 @@ const _applyBalanceDeduction = async ({ user_id, leave_type, days, month, year, 
   );
 };
 
+
+
 const _reverseBalanceDeduction = async ({ user_id, leave_type, days, month, year, t }) => {
   const balance = await LeaveBalance.findOne({ where: { user_id, month, year }, transaction: t });
   if (!balance) return;
@@ -1644,6 +1687,31 @@ const reverseLeave = async (req, res) => {
       data:    { leave_id: leave.id, display_id: leave.display_id },
     });
     io.to(`user:${leave.user_id}`).emit('LEAVE_UPDATED', { id: leave.id, status: 'cancelled' });
+
+
+    // ── Email — fire and forget ──
+    const leaveDays = await countLeaveDays(
+  leave.start_date,
+  leave.end_date,
+  leave.duration
+);
+    console.log("🚀 ~ reverseLeave ~ leaveDays:", leaveDays)
+
+// To employee — balance restored confirmation
+sendApprovedLeaveCancelledEmail({
+  employee: leave.employee,
+  leave,
+  leaveDays,
+}).catch(err => console.error('Reverse leave email (employee) failed:', err));
+
+// To admins — audit trail
+sendLeaveCancelledEmail({
+  employee: leave.employee,
+  leave,
+  leaveDays,
+}).catch(err => console.error('Reverse leave email (admin) failed:', err));
+
+
 
     return res.status(200).json({ message: 'Leave reversed and balance restored.' });
   } catch (err) {
