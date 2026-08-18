@@ -26,12 +26,6 @@ const validateLeaveDates = ({ start_date, end_date, exchange_date }) => {
   }
 };
 
-// ── Half-day aware duplicate check ──
-// Conflict matrix:
-//   full_day vs anything on overlapping dates → conflict
-//   first_half + first_half same day → conflict
-//   second_half + second_half same day → conflict
-//   first_half + second_half same day → ALLOWED
 const validateDuplicateLeave = async ({
   user_id,
   start_date,
@@ -41,7 +35,6 @@ const validateDuplicateLeave = async ({
 }) => {
   const activeStatuses = [LEAVE_STATUS.PENDING, LEAVE_STATUS.APPROVED];
 
-  // Query 1: full_day conflicts (date range overlap with any full_day, or new request is full_day)
   const fullDayConflict = await LeaveRequest.findOne({
     where: {
       user_id,
@@ -66,7 +59,6 @@ const validateDuplicateLeave = async ({
     );
   }
 
-  // Query 2: same-day half-day conflicts (only when new request is half-day)
   if (
     duration === LEAVE_DURATION.FIRST_HALF ||
     duration === LEAVE_DURATION.SECOND_HALF
@@ -144,15 +136,14 @@ const getOffDaysInRange = async (start_date, end_date, saturday_group) => {
     const dayOfWeek = current.getDay();
     const dateStr = current.toISOString().split("T")[0];
     const weekOfMonth = Math.ceil(current.getDate() / 7);
-    if (dayOfWeek === 0) offDays.add(dateStr);
+    if (dayOfWeek === 0) offDays.add(dateStr); // Sunday always off
     if (dayOfWeek === 6) {
       if (saturday_group === "A") {
         if (weekOfMonth !== 1 && weekOfMonth !== 3) offDays.add(dateStr);
       } else if (saturday_group === "B") {
         if (weekOfMonth !== 2 && weekOfMonth !== 4) offDays.add(dateStr);
-      } else {
-        offDays.add(dateStr);
       }
+      // null group — Saturdays are NOT counted as off-days (exchange system handles it)
     }
     current.setDate(current.getDate() + 1);
   }
@@ -171,7 +162,6 @@ const countLeaveDays = async (start_date, end_date, duration) => {
   return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
 };
 
-// Splits leave days into per-month buckets for cross-month balance updates
 const splitDaysByMonth = (start_date, end_date, duration) => {
   if (
     duration === LEAVE_DURATION.FIRST_HALF ||
@@ -194,12 +184,16 @@ const splitDaysByMonth = (start_date, end_date, duration) => {
   return Object.values(result);
 };
 
-// Sandwich rule constants
 const ABSENT_UNTIL_EOD = [LEAVE_DURATION.FULL_DAY, LEAVE_DURATION.SECOND_HALF];
 const ABSENT_FROM_SOD = [LEAVE_DURATION.FULL_DAY, LEAVE_DURATION.FIRST_HALF];
 
-// Detects off-days sandwiched between the newly approved leave and adjacent approved leaves.
-// Returns [{ month, year, days }] — extra days to charge as unpaid.
+// ── Helper: count total calendar days in a range ──
+const totalDaysInRange = (startStr, endStr) => {
+  const s = new Date(startStr);
+  const e = new Date(endStr);
+  return Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+};
+
 const computeSandwichDays = async ({ user_id, newLeave, saturday_group }) => {
   const sandwichBuckets = {};
 
@@ -217,6 +211,7 @@ const computeSandwichDays = async ({ user_id, newLeave, saturday_group }) => {
       user_id,
       status: LEAVE_STATUS.APPROVED,
       id: { [Op.ne]: newLeave.id },
+      leave_type: { [Op.ne]: 'exchange' },
     },
     order: [["start_date", "ASC"]],
     attributes: ["id", "start_date", "end_date", "duration"],
@@ -241,8 +236,7 @@ const computeSandwichDays = async ({ user_id, newLeave, saturday_group }) => {
     const left = allLeaves[i];
     const right = allLeaves[i + 1];
 
-    const involvesNewLeave =
-      left.id === newLeave.id || right.id === newLeave.id;
+    const involvesNewLeave = left.id === newLeave.id || right.id === newLeave.id;
     if (!involvesNewLeave) continue;
 
     const gapStart = new Date(left.end_date);
@@ -257,11 +251,44 @@ const computeSandwichDays = async ({ user_id, newLeave, saturday_group }) => {
 
     const gapStartStr = gapStart.toISOString().split("T")[0];
     const gapEndStr = gapEnd.toISOString().split("T")[0];
+
     const offDays = await getOffDaysInRange(gapStartStr, gapEndStr, saturday_group);
+    const totalGap = totalDaysInRange(gapStartStr, gapEndStr);
+
+    // ── Sandwich only applies if EVERY day in the gap is an off-day ──
+    if (offDays.size < totalGap) continue;
+
     offDays.forEach((dateStr) => addDayToBucket(dateStr));
   }
 
   return Object.values(sandwichBuckets);
+};
+
+const getApprovedLeaveDatesInRange = async (user_id, start_date, end_date) => {
+  const coveredDates = new Set();
+
+  const leavesInGap = await LeaveRequest.findAll({
+    where: {
+      user_id,
+      status: LEAVE_STATUS.APPROVED,
+      [Op.and]: [
+        { start_date: { [Op.lte]: end_date } },
+        { end_date:   { [Op.gte]: start_date } },
+      ],
+    },
+    attributes: ['start_date', 'end_date', 'duration'],
+  });
+
+  for (const leave of leavesInGap) {
+    const current = new Date(leave.start_date);
+    const end = new Date(leave.end_date);
+    while (current <= end) {
+      coveredDates.add(current.toISOString().split('T')[0]);
+      current.setDate(current.getDate() + 1);
+    }
+  }
+
+  return coveredDates;
 };
 
 module.exports = {
@@ -273,4 +300,5 @@ module.exports = {
   countLeaveDays,
   splitDaysByMonth,
   computeSandwichDays,
+  getApprovedLeaveDatesInRange,
 };

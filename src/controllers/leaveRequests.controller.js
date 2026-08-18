@@ -155,7 +155,8 @@ const user_id = req.user.id;
     await validateNoticePeriod({ reason_type, duration, start_date });
 
     // ── 6. Exchange validation ──
-    await validateExchangeLeave({ leave_type, worked_saturday_id, user_id });
+    await validateExchangeLeave({ leave_type, worked_saturday_id, user_id , start_date,
+  end_date,});
 
 console.log("req.file:", req.file);
 console.log("req.body:", req.body);
@@ -715,8 +716,13 @@ if (leave.leave_type !== LEAVE_TYPES.EXCHANGE) {
       });
     }
 
+    
+
     // ── 5. Sandwich day detection ──
-    const sandwichBuckets = await computeSandwichDays({
+    // In approveLeave controller, before calling computeSandwichDays:
+const sandwichBuckets = leave.leave_type === LEAVE_TYPES.EXCHANGE
+  ? []
+  : await computeSandwichDays({
       user_id: leave.user_id,
       newLeave: {
         id:         leave.id,
@@ -726,7 +732,6 @@ if (leave.leave_type !== LEAVE_TYPES.EXCHANGE) {
       },
       saturday_group: leave.employee.saturday_group,
     });
-
     for (const bucket of sandwichBuckets) {
       if (bucket.days <= 0) continue;
       await _applyBalanceDeduction({
@@ -1008,26 +1013,32 @@ if (date.getDay() !== 6) {
 // ADMIN — Get Available Saturdays for Employee
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+// GET AVAILABLE WORKED SATURDAYS FOR EMPLOYEE
+// Location: leaveRequests.controller.js
+// ─────────────────────────────────────────────
 const getWorkedSaturdays = async (req, res) => {
   try {
-    const { user_id } = req.params;
+    const user_id = req.params.user_id || req.user?.id;
 
+    if (!user_id) {
+      return res.status(400).json({ message: "User ID is required." });
+    }
+
+    // Return ALL worked Saturdays for this user that haven't been exchanged yet
     const saturdays = await WorkedSaturday.findAll({
       where: {
         user_id,
         is_exchanged: false,
       },
-      order: [['saturday_date', 'ASC']],
+      order: [["saturday_date", "ASC"]],
     });
 
     return res.status(200).json({ saturdays });
-
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
-
-
 // ─────────────────────────────────────────────
 // GET LEAVE LOGS — Admin + Employee (own only)
 // ─────────────────────────────────────────────
@@ -1512,6 +1523,7 @@ const checkAdjacentLeaves = async (req, res) => {
         where: {
           user_id,
           status: LEAVE_STATUS.APPROVED,
+          leave_type: { [Op.ne]: 'exchange' },
           end_date: { [Op.lte]: dayBefore.toISOString().split('T')[0] },
         },
         order: [['end_date', 'DESC']],
@@ -1521,6 +1533,7 @@ const checkAdjacentLeaves = async (req, res) => {
         where: {
           user_id,
           status: LEAVE_STATUS.APPROVED,
+          leave_type: { [Op.ne]: 'exchange' },
           start_date: { [Op.gte]: dayAfter.toISOString().split('T')[0] },
         },
         order: [['start_date', 'ASC']],
@@ -1540,13 +1553,15 @@ const checkAdjacentLeaves = async (req, res) => {
       gapStart.setDate(gapStart.getDate() + 1);
       const gapEnd = new Date(start_date);
       gapEnd.setDate(gapEnd.getDate() - 1);
+
       if (gapStart <= gapEnd) {
-        const offDays = await getOffDaysInRange(
-          gapStart.toISOString().split('T')[0],
-          gapEnd.toISOString().split('T')[0],
-          employee.saturday_group
-        );
-        if (offDays.size > 0) {
+        const gapStartStr = gapStart.toISOString().split('T')[0];
+        const gapEndStr   = gapEnd.toISOString().split('T')[0];
+        const offDays     = await getOffDaysInRange(gapStartStr, gapEndStr, employee.saturday_group);
+        const totalGap    = Math.round((gapEnd - gapStart) / (1000 * 60 * 60 * 24)) + 1;
+
+        // Sandwich only if every day in the gap is an off-day
+        if (offDays.size === totalGap) {
           warnings.push({
             side: 'left',
             adjacent_leave_id: leftLeave.display_id,
@@ -1566,13 +1581,15 @@ const checkAdjacentLeaves = async (req, res) => {
       gapStart.setDate(gapStart.getDate() + 1);
       const gapEnd = new Date(rightLeave.start_date);
       gapEnd.setDate(gapEnd.getDate() - 1);
+
       if (gapStart <= gapEnd) {
-        const offDays = await getOffDaysInRange(
-          gapStart.toISOString().split('T')[0],
-          gapEnd.toISOString().split('T')[0],
-          employee.saturday_group
-        );
-        if (offDays.size > 0) {
+        const gapStartStr = gapStart.toISOString().split('T')[0];
+        const gapEndStr   = gapEnd.toISOString().split('T')[0];
+        const offDays     = await getOffDaysInRange(gapStartStr, gapEndStr, employee.saturday_group);
+        const totalGap    = Math.round((gapEnd - gapStart) / (1000 * 60 * 60 * 24)) + 1;
+
+        // Sandwich only if every day in the gap is an off-day
+        if (offDays.size === totalGap) {
           warnings.push({
             side: 'right',
             adjacent_leave_id: rightLeave.display_id,
@@ -1588,7 +1605,6 @@ const checkAdjacentLeaves = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
-
 // ─────────────────────────────────────────────
 // PATCH /api/leaves/:id/reverse  (admin only)
 // Reverses an approved leave and restores balance precisely

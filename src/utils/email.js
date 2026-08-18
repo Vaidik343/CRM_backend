@@ -57,7 +57,10 @@ const sendLeaveRequestEmail = async ({ employee, leave,  documentPath = null }) 
     leave.duration
   );
 
-  const subject = `Leave Request from ${employee.name} for ${totalDays} Days - ${leave.reason_type}`;
+const isExchange = leave.leave_type === 'exchange';
+const subject = isExchange
+  ? `Exchange Request from ${employee.name} - ${leave.display_id}`
+  : `Leave Request from ${employee.name} for ${totalDays} Days - ${leave.reason_type}`;
  
   const attachments = [];
   if (documentPath) {
@@ -95,9 +98,10 @@ const sendLeaveApprovedEmail = async ({
   });
   console.log("🚀 ~ sendLeaveApprovedEmail ~ html:", html)
 
-  const subject = `Leave Approved for ${employee.name} - ${leaveDays} ${
-    leaveDays === 1 ? "Day" : "Days"
-  }`;
+   const isExchange = leave.leave_type === 'exchange';
+  const subject = isExchange
+    ? `Exchange  Approved for ${employee.name} - ${leave.display_id}`
+    : `Leave Approved for ${employee.name} - ${leaveDays} ${leaveDays === 1 ? 'Day' : 'Days'}`;
 
 const info = await sendMail({
   to: employee.email,
@@ -129,9 +133,10 @@ const sendLeaveRejectedEmail = async ({
   });
   console.log("🚀 ~ sendLeaveRejectedEmail ~ html:", html)
 
-  const subject = `Leave Rejected - ${leave.reason_type} Leave (${leaveDays} ${
-    leaveDays === 1 ? "Day" : "Days"
-  })`;
+const isExchange = leave.leave_type === 'exchange';
+  const subject = isExchange
+    ? `Exchange Day Rejected - ${leave.display_id} (${employee.name})`
+    : `Leave Rejected - ${leave.reason_type} Leave (${leaveDays} ${leaveDays === 1 ? 'Day' : 'Days'})`;
   console.log("🚀 ~ sendLeaveRejectedEmail ~ subject:", subject)
 
   return await sendMail({
@@ -169,8 +174,11 @@ const sendLeaveCancelledEmail = async ({
         .map(a => a.email)
         .filter(Boolean);
 
-    const subject =
-        `Leave Cancelled by ${employee.name} - ${leave.reason_type} Leave (${leaveDays} ${leaveDays === 1 ? "Day" : "Days"})`;
+     const isExchange = leave.leave_type === 'exchange';
+  const subject = isExchange
+    ? `Exchange Day Cancelled by ${employee.name} - ${leave.display_id}`
+    : `Leave Cancelled by ${employee.name} - ${leave.reason_type} Leave (${leaveDays} ${leaveDays === 1 ? 'Day' : 'Days'})`;
+js
 
     return await sendMail({
         to: adminEmails,
@@ -221,8 +229,10 @@ const sendApprovedLeaveCancelledEmail = async ({
   leave,
   leaveDays,
 }) => {
-  const subject = `Your Approved Leave Has Been Cancelled — Balance Restored`;
-
+ const isExchange = leave.leave_type === 'exchange';
+  const subject = isExchange
+    ? `Your Approved Exchange Day Has Been Cancelled — ${leave.display_id}`
+    : `Your Approved Leave Has Been Cancelled — Balance Restored`;
   const html = approvedLeaveCancelledEmailTemplate({
     employee,
   leave,
