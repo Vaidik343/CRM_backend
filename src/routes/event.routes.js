@@ -8,7 +8,8 @@ const {
   deleteEvent,
   exportCardPNG,
   previewAICard,
-  announceEvent
+  announceEvent,
+  getDesignPreviews 
 } = require("../controllers/event.controller");
 
 const { authenticate } = require('../middlewares/auth.middleware');
@@ -19,6 +20,7 @@ router.get("/events/admin/all", authenticate, requireAdmin, getAllEvents);
 router.delete("/events/:id", authenticate, requireAdmin, deleteEvent);
 router.post("/events/ai-preview", authenticate, requireAdmin, previewAICard);
 router.patch("/events/:id/announce", authenticate, requireAdmin, announceEvent);
+router.get("/events/design-previews", authenticate, requireAdmin, getDesignPreviews);
 
 // Shared
 router.get("/events/shared", authenticate, getEmployeeEvents);

@@ -67,6 +67,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
+      "http://192.168.29.85:5173",
       "http://localhost:7015",
       "http://ewm.bbcspldev.in",
       "http://ewmapi.bbcspldev.in",

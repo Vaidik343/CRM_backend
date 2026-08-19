@@ -115,7 +115,7 @@ const createWorkLog = async (req, res) => {
     await t.commit();
 
     await worklog.reload({ include: worklogIncludes });
-   console.log("🚀 ~ createWorkLog ~ wl:", wl)
+   
 
     return res.status(201).json({
       message: 'Work log created successfully.',

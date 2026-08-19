@@ -623,6 +623,42 @@ const announceEvent = async (req, res) => {
 };
 
 
+const getDesignPreviews = async (req, res) => {
+  try {
+    const { event_type, employee_name, message } = req.query;
+
+    if (!event_type) {
+      return res.status(400).json({ message: "event_type is required." });
+    }
+
+    const DESIGNS_BY_TYPE = {
+      birthday:  ["birthday_1",  "birthday_2"],
+      promotion: ["promotion_1", "promotion_2"],
+      office:    ["office_1",    "office_2"],
+      trip:      ["trip_1",      "trip_2"],
+      fun_game:  ["fun_game_1",  "fun_game_2"],
+    };
+
+    const designs = DESIGNS_BY_TYPE[event_type] || [];
+
+    const previews = designs.map((design_template) => {
+      const html = buildCardHTML(
+        {
+          employee_name: employee_name || "Employee Name",  // ← use real name if provided
+          message:       message       || "Your custom message will appear here.",
+          design_template,
+          mode: "manual",
+        },
+        null
+      );
+      return { design_template, html };
+    });
+
+    return res.status(200).json({ previews });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
 module.exports = {
-    createEvent, getAllEvents, getEmployeeEvents, getEventById, deleteEvent, exportCardPNG, previewAICard, announceEvent
+    createEvent, getAllEvents, getEmployeeEvents, getEventById, deleteEvent, exportCardPNG, previewAICard, announceEvent, getDesignPreviews
 }
