@@ -67,6 +67,8 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'events',
     underscored: true,
     timestamps: true,
+      paranoid:    true,          // ← model option
+  deletedAt:   'deleted_at',
   });
 
  

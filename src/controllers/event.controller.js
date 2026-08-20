@@ -363,7 +363,7 @@ const createEvent = async (req, res) => {
     console.log("🚀 ~ createEvent ~ created_by:", created_by)
 
     if (!event_type || !mode || !employee_name || !event_date) {
-      return res.status(400).json({ message: "event_type, mode, employee_name and event_date are required." });
+      return res.status(400).json({ message: "event_type, mode, name and event_date are required." });
     }
 
     let ai_config = {};
@@ -644,7 +644,7 @@ const getDesignPreviews = async (req, res) => {
     const previews = designs.map((design_template) => {
       const html = buildCardHTML(
         {
-          employee_name: employee_name || "Employee Name",  // ← use real name if provided
+          employee_name: employee_name || "Name",  // ← use real name if provided
           message:       message       || "Your custom message will appear here.",
           design_template,
           mode: "manual",

@@ -53,6 +53,8 @@ const { authenticate } = require('../middlewares/auth.middleware');
 const { requireAdmin }  = require('../middlewares/role.middleware');
 const { authenticateIntern } = require('../middlewares/internAuth.middleware');
 const { internUpload }  = require('../middlewares/multer');
+
+// not require
 const { requirePermission } = require('../middlewares/permission.middleware');
 
 // ─────────────────────────────────────────────

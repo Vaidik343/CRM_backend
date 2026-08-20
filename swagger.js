@@ -15,7 +15,7 @@ const doc = {
       description: "Local Development",
     },
     {
-      url: "http://ewmapi.bbcspldev.in/api",
+      url: "https://ewmapi.bbcspldev.in/api",
       description: "Production",
     },
   ],

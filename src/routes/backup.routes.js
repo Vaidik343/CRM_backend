@@ -9,7 +9,6 @@ const { downloadBackup } = require('../controllers/backup.controller');
 // Change this to any long random string you prefer.
 // To hide this endpoint completely: comment out the line in routeFiles[] in index.js
 // ─────────────────────────────────────────────────────────────────────────────
-const BACKUP_SECRET = 'vdk_ewm_bkp_$xK9mPq7rNz2wL4jT8vB3cY6hD1eA5s';
 
 function verifyBackupKey(req, res, next) {
   const key = req.headers['x-backup-key'];

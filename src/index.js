@@ -21,6 +21,8 @@ const {transporter} = require("./utils/mailer");
 const { scheduleEventNotifications } = require("./utils/scheduleEventNotifications");
 
 
+const { scheduleEventCleanup } = require("./utils/eventCleanup.cron");
+
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -70,7 +72,9 @@ app.use(
       "http://192.168.29.85:5173",
       "http://localhost:7015",
       "http://ewm.bbcspldev.in",
+      "https://ewm.bbcspldev.in",
       "http://ewmapi.bbcspldev.in",
+      "https://ewmapi.bbcspldev.in",
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -231,6 +235,7 @@ const startServer = async () => {
       cleanupOldNotifications();
     });
 
+    scheduleEventCleanup();
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on 0.0.0.0:${PORT}`);
     });

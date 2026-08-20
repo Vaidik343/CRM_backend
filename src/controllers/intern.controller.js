@@ -1020,6 +1020,9 @@ const adminUpdateIntern = async (req, res) => {
  
     // ── Validate mentor_ids ───────────────────────────────────────────────
     if (mentor_ids && Array.isArray(mentor_ids) && mentor_ids.length > 0) {
+      console.log('mentor_ids:', mentor_ids);
+console.log('isArray:', Array.isArray(mentor_ids));
+console.log('mentor_ids types:', mentor_ids?.map(id => typeof id));
       const mentors = await User.findAll({ where: { id: mentor_ids } });
       if (mentors.length !== mentor_ids.length) {
         return res.status(404).json({ message: 'One or more mentors not found.' });
