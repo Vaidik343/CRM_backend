@@ -25,7 +25,7 @@ const taskIncludes = [
   {
     model: User,
     as: 'assigner',
-    attributes: ['id', 'name', 'employee_id'],
+    attributes: ['id', 'name', 'employee_id', 'is_admin'],
   },
 ];
 

@@ -367,7 +367,66 @@ router.post('/intern/tasks',        authenticateIntern, createTask);
 router.get('/intern/tasks',         authenticateIntern, getMyTasks);
 router.patch('/intern/tasks/:id',   authenticateIntern, updateTask);
 router.get('/interns/my-mentored',        authenticate, getMyMentoredInterns);
-router.post('/intern-tasks/mentor-assign', authenticateIntern, mentorAssignTask);
+router.post('/intern-tasks/mentor-assign', authenticate, mentorAssignTask);
+
+
+router.get('/interns/:intern_id/mentor-view', authenticate, async (req, res) => {
+  try {
+    const mentor_id = req.user.id;
+    const { intern_id } = req.params;
+
+    const intern = await Intern.findByPk(intern_id, {
+      include: [{ model: InternDocument, as: 'documents' }],
+    });
+
+    if (!intern) return res.status(404).json({ message: 'Intern not found.' });
+
+    const mentorIds = Array.isArray(intern.mentor_ids) ? intern.mentor_ids : [];
+    if (!mentorIds.includes(mentor_id)) {
+      return res.status(403).json({ message: 'You are not a mentor for this intern.' });
+    }
+
+    const { InternProject } = require('../models');
+    const project = await InternProject.findOne({ where: { intern_id } });
+
+    const plain = intern.toJSON();
+    plain.project = project || null;
+
+    return res.status(200).json({ intern: plain });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/interns/:intern_id/mentor-tasks', authenticate, async (req, res) => {
+  try {
+    const mentor_id = req.user.id;
+    const { intern_id } = req.params;
+
+    const intern = await Intern.findByPk(intern_id, { attributes: ['id', 'mentor_ids'] });
+    if (!intern) return res.status(404).json({ message: 'Intern not found.' });
+
+    const mentorIds = Array.isArray(intern.mentor_ids) ? intern.mentor_ids : [];
+    if (!mentorIds.includes(mentor_id)) {
+      return res.status(403).json({ message: 'You are not a mentor for this intern.' });
+    }
+
+    const { InternTask, InternProject, User } = require('../models');
+    const tasks = await InternTask.findAll({
+      where: { intern_id },
+      include: [
+        { model: InternProject, as: 'project', attributes: ['id', 'display_id', 'name'] },
+        { model: User, as: 'assigner', attributes: ['id', 'name', 'employee_id'] },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    return res.status(200).json({ tasks });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
 
 // ─────────────────────────────────────────────
 // INTERN — WorkLog Routes
