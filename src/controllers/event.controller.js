@@ -465,13 +465,21 @@ const getEmployeeEvents = async (req, res) => {
     const offset = (page - 1) * limit;
 
     const { event_type } = req.query;
-    const where = { is_published: true };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const where = {
+      is_published: true,
+      event_date: { [Op.gte]: today }, // ← only show today and future events
+    };
+
     if (event_type) where.event_type = event_type;
 
     const { count, rows } = await Event.findAndCountAll({
       where,
       include: [creatorInclude],
-      order: [["event_date", "DESC"]],
+      order: [["event_date", "ASC"]], // ← ASC so nearest event shows first
       limit,
       offset,
       distinct: true,

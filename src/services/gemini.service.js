@@ -11,7 +11,7 @@ const EVENT_PROMPTS = {
 };
 
 const generateEventCard = async ({ event_type, employee_name, message, ai_prompt }) => {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
   console.log("🚀 ~ generateEventCard ~ model:", model)
 
   const systemContext = EVENT_PROMPTS[event_type] || "You are designing an event card.";

@@ -1,9 +1,9 @@
 const ExcelJS = require("exceljs");
 const { Call, Task, WorkLog, User, Project, ProjectMember, Role, TaskStatusLog, LeaveRequest, LeaveBalance } = require("../models");
 const { Op } = require("sequelize");
+const PDFDocument = require("pdfkit");
 
-
-
+ 
   const flattenStatusLogs = (logs) => {
   if (!Array.isArray(logs) || logs.length === 0) return "";
   return logs
@@ -934,6 +934,322 @@ workLogsSheet.getColumn(7).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Updated At
 
 
 
+const exportProjectDataAiOnly = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { from, to } = req.query;
+
+    const {
+      Project, User, ProjectMember, Role,
+      Call, Task, WorkLog, TaskStatusLog,
+    } = require('../models');
+
+    const project = await Project.findByPk(projectId, {
+      include: [
+        { model: User, as: "creator", attributes: ["name"] },
+        {
+          model: ProjectMember, as: "members", include: [
+            { model: User, as: "user", attributes: ["name", "employee_id"] },
+            { model: Role, as: "role", attributes: ["name"] },
+          ],
+        },
+      ],
+    });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    // ── Date filter ──────────────────────────────────
+    let dateWhere = {};
+    if (from && to) {
+      const start = new Date(from); start.setHours(0, 0, 0, 0);
+      const end   = new Date(to);   end.setHours(23, 59, 59, 999);
+      dateWhere = { createdAt: { [Op.between]: [start, end] } };
+    }
+
+    // ── Fetch data ───────────────────────────────────
+    const calls = await Call.findAll({
+      where: { ...dateWhere, project_id: projectId },
+      order: [["createdAt", "ASC"]],
+    });
+
+    const tasks = await Task.findAll({
+      where: { ...dateWhere, project_id: projectId },
+      order: [["createdAt", "ASC"]],
+    });
+
+    let wlWhere = { project_id: projectId };
+    if (from && to) {
+      wlWhere.date = { [Op.between]: [from, to] };
+    }
+    const workLogs = await WorkLog.findAll({
+      where: wlWhere,
+      order: [["date", "ASC"]],
+    });
+
+    // ── Status logs for tasks ────────────────────────
+    const taskIds = tasks.map((t) => t.id);
+    const statusLogs = taskIds.length > 0
+      ? await TaskStatusLog.findAll({
+          where: { task_id: { [Op.in]: taskIds } },
+          order: [["changed_at", "ASC"]],
+        })
+      : [];
+
+    const logsByTaskId = {};
+    for (const log of statusLogs) {
+      if (!logsByTaskId[log.task_id]) logsByTaskId[log.task_id] = [];
+      logsByTaskId[log.task_id].push(log);
+    }
+
+    // Map work logs to their respective task (if task_id exists on work logs)
+    const workLogsByTaskId = {};
+    for (const wl of workLogs) {
+      if (wl.task_id) {
+        if (!workLogsByTaskId[wl.task_id]) workLogsByTaskId[wl.task_id] = [];
+        workLogsByTaskId[wl.task_id].push(wl);
+      }
+    }
+
+    // ── Helpers ──────────────────────────────────────
+    const calculateActualWorkingDays = (logs) => {
+      if (!logs || logs.length === 0) return null;
+      let totalMs = 0;
+      let ongoingStart = null;
+      for (const log of logs) {
+        const ts = new Date(log.changed_at).getTime();
+        if (log.to_status === "ongoing") {
+          ongoingStart = ts;
+        } else if ((log.to_status === "hold" || log.to_status === "closed") && ongoingStart !== null) {
+          totalMs += ts - ongoingStart;
+          ongoingStart = null;
+        }
+      }
+      if (ongoingStart !== null) totalMs += Date.now() - ongoingStart;
+      const days = totalMs / (1000 * 60 * 60 * 24);
+      return days > 0 ? days.toFixed(1) : "0";
+    };
+
+    const buildStatusJourney = (logs) => {
+      if (!logs || logs.length === 0) return "No status changes recorded";
+      return logs
+        .map((l) => {
+          let st = l.to_status;
+          if (st === "open" || st === "ongoing") st = "working";
+          return `${st.toUpperCase()}(${new Date(l.changed_at).toLocaleDateString("en-IN")})`;
+        })
+        .join(" → ");
+    };
+
+    const cleanMarkdown = (text) => text
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g,     "$1")
+      .replace(/#{1,6}\s/g,      "")
+      .replace(/`(.+?)`/g,       "$1")
+      .replace(/^>\s/gm,         "")
+      .trim();
+
+    // ── Tech stack string ────────────────────────────
+    const techDetailsStr = Array.isArray(project.tech_details)
+      ? project.tech_details.map((t) => {
+          const dbs = Array.isArray(t.databases) && t.databases.length
+            ? ` [DB: ${t.databases.map((d) => `${d.name}${d.version ? ` v${d.version}` : ""}`).join(", ")}]`
+            : "";
+          return `${t.name || "—"}${t.version ? ` v${t.version}` : ""}${dbs}`;
+        }).join(", ")
+      : (project.tech_details || "—");
+
+    // ── Build prompt data (no employee names) ────────
+
+    // Call type breakdown
+    const callTypeCounts = {};
+    for (const call of calls) {
+      const type = call.call_type || "other";
+      callTypeCounts[type] = (callTypeCounts[type] || 0) + 1;
+    }
+    const callTypeStr = Object.entries(callTypeCounts)
+      .map(([type, count]) => `${type}: ${count}`)
+      .join(", ") || "None";
+
+    const callDates = calls.map((c) => new Date(c.createdAt)).sort((a, b) => a - b);
+    const firstCall = callDates[0]     ? callDates[0].toLocaleDateString("en-IN")     : "—";
+    const lastCall  = callDates.at(-1) ? callDates.at(-1).toLocaleDateString("en-IN") : "—";
+
+    // Combined task counts: merge 'open' and 'ongoing' into 'working'
+    const taskStatusCounts = { working: 0, hold: 0, closed: 0 };
+    let totalWorkDays = 0;
+    let workDayCount  = 0;
+    const taskLines   = [];
+
+    for (const task of tasks) {
+      const logs    = logsByTaskId[task.id] || [];
+      const taskWls = workLogsByTaskId[task.id] || [];
+      const wd      = calculateActualWorkingDays(logs);
+      const journey = buildStatusJourney(logs);
+
+      // Map open/ongoing -> working
+      const mappedStatus = (task.status === "open" || task.status === "ongoing") ? "working" : task.status;
+      taskStatusCounts[mappedStatus] = (taskStatusCounts[mappedStatus] || 0) + 1;
+
+      if (wd !== null) {
+        totalWorkDays += parseFloat(wd);
+        workDayCount++;
+      }
+
+      // Format activity notes (remarks + inline work logs)
+      let taskActivity = [];
+      if (Array.isArray(task.remarks) && task.remarks.length > 0) {
+        taskActivity.push(...task.remarks.map((r) => `[${new Date(r.created_at).toLocaleDateString("en-IN")}] ${r.text}`));
+      }
+      if (taskWls.length > 0) {
+        taskActivity.push(...taskWls.map((w) => `[Work Update ${w.date}] ${w.description || ""}`));
+      }
+
+      const activityStr = taskActivity.length > 0 ? `\n    Updates: ${taskActivity.join("; ")}` : "";
+
+      taskLines.push(
+        `  - [${task.display_id}] "${task.task}" | Due: ${task.due_date || "—"} | Status: ${mappedStatus} | Actual work: ${wd ?? "—"} days | Journey: ${journey}${activityStr}`
+      );
+    }
+
+    const avgWorkDays    = workDayCount > 0 ? (totalWorkDays / workDayCount).toFixed(1) : "—";
+    const taskSummaryStr = taskLines.join("\n") || "  No tasks recorded.";
+
+    // Activity date range
+    const allDates = [
+      ...calls.map((c)    => new Date(c.createdAt)),
+      ...tasks.map((t)    => new Date(t.createdAt)),
+      ...workLogs.map((w) => new Date(w.date)),
+    ].filter(Boolean).sort((a, b) => a - b);
+
+    const projectStart  = allDates[0]
+      ? allDates[0].toLocaleDateString("en-IN")
+      : new Date(project.createdAt).toLocaleDateString("en-IN");
+    const projectLatest = allDates.at(-1)
+      ? allDates.at(-1).toLocaleDateString("en-IN")
+      : "Ongoing";
+
+    const teamSize = (project.members || []).length;
+
+    // ── Prompt ───────────────────────────────────────
+    const prompt = `
+You are a professional project analyst preparing a formal client-facing report.
+Below is complete data for a software project. Write a professional project timeline and analysis report.
+Do NOT mention individual employee or developer names anywhere in the report.
+Do NOT use markdown formatting — no **, no *, no #, no backticks.
+Use plain text only. Use "=== SECTION NAME ===" as section dividers.
+
+=== PROJECT DETAILS ===
+Name: ${project.name}
+Code: ${project.code || "—"}
+Current Status: ${project.development_status}
+Description: ${project.description || "—"}
+Tech Stack: ${techDetailsStr}
+Team Size: ${teamSize} members
+Activity Period: ${projectStart} to ${projectLatest}
+${from && to ? `Filtered Range: ${from} to ${to}` : "Scope: Full project history"}
+
+=== CALL ACTIVITY ===
+Total Calls: ${calls.length}
+Breakdown by type: ${callTypeStr}
+First Call: ${firstCall} | Last Call: ${lastCall}
+
+=== TASK DATA ===
+Total Tasks: ${tasks.length}
+Working: ${taskStatusCounts.working} | Hold: ${taskStatusCounts.hold} | Completed: ${taskStatusCounts.closed}
+Average actual working days per task: ${avgWorkDays} days
+Task Details:
+${taskSummaryStr}
+
+Write the following sections using "=== SECTION NAME ===" as dividers.
+Use plain business language. No markdown. No employee names. Be specific with numbers and dates.
+Write as if sending directly to a client.
+
+Sections:
+1. Executive Summary
+2. Project Timeline and Milestones
+3. Task Performance Analysis
+4. Communication and Meeting Summary
+5. Current Status and Next Steps
+    `.trim();
+
+    // ── Call Gemini ──────────────────────────────────
+    const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(500).json({ message: "GEMINI_API_KEY not configured." });
+
+    const genAI  = new GoogleGenerativeAI(apiKey);
+    const model  = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+    const result = await model.generateContent(prompt);
+    const aiText = result.response.text();
+
+    // ── Build Excel ──────────────────────────────────
+    const workbook = new ExcelJS.Workbook();
+    const aiSheet  = workbook.addWorksheet("AI Analysis");
+    aiSheet.getColumn(1).width = 130;
+
+    // Title
+    const titleRow = aiSheet.addRow([`PROJECT ANALYSIS REPORT — ${project.name.toUpperCase()}`]);
+    titleRow.getCell(1).font      = { bold: true, size: 16, color: { argb: "FF132EA7" } };
+    titleRow.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
+    titleRow.getCell(1).alignment = { vertical: "middle", wrapText: true };
+    titleRow.height = 32;
+
+    const subRow = aiSheet.addRow([
+      `Activity Period: ${projectStart} to ${projectLatest}${from && to ? `  |  Filtered: ${from} to ${to}` : ""}   |   Generated: ${new Date().toLocaleDateString("en-IN")}`
+    ]);
+    subRow.getCell(1).font = { size: 9, color: { argb: "FF64748B" } };
+    aiSheet.addRow([""]);
+
+    // Parse and write sections
+    const sections = aiText.split(/===\s*(.+?)\s*===/g).filter(Boolean);
+    let isHeader = true;
+
+    for (const part of sections) {
+      const trimmed = cleanMarkdown(part.trim());
+      if (!trimmed) continue;
+
+      if (isHeader) {
+        aiSheet.addRow([""]);
+        const headerRow = aiSheet.addRow([trimmed.toUpperCase()]);
+        headerRow.getCell(1).font      = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
+        headerRow.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FF132EA7" } };
+        headerRow.getCell(1).alignment = { vertical: "middle", wrapText: true };
+        headerRow.height = 22;
+        isHeader = false;
+      } else {
+        const lines = trimmed.split("\n").filter((l) => l.trim());
+        for (const line of lines) {
+          const cleaned  = cleanMarkdown(line);
+          const bodyRow  = aiSheet.addRow([cleaned]);
+          bodyRow.getCell(1).font      = { size: 10 };
+          bodyRow.getCell(1).alignment = { wrapText: true, vertical: "top" };
+          bodyRow.height = 18;
+        }
+        isHeader = true;
+      }
+    }
+
+    // Footer
+    aiSheet.addRow([""]);
+    const footerRow = aiSheet.addRow(["This report was generated automatically using AI analysis of project data."]);
+    footerRow.getCell(1).font      = { italic: true, size: 9, color: { argb: "FF94A3B8" } };
+    footerRow.getCell(1).alignment = { horizontal: "center" };
+
+    // ── Send file ────────────────────────────────────
+    const fileLabel = from && to
+      ? `${from}_to_${to}`
+      : new Date().toISOString().split("T")[0];
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${project.name}_AI_Analysis_${fileLabel}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("exportProjectDataAiOnly error:", err);
+    return res.status(500).json({ message: err.message || "Internal server error" });
+  }
+};
+
 const exportLeaveData = async (req, res) => {
   try {
     const { from, to, user_id } = req.query;
@@ -1756,7 +2072,7 @@ const exportAllLeavesPDF = async (req, res) => {
   }
 };
 
-module.exports = { exportData, exportMyData, exportEmployeeData, exportProjectData , exportAllEmployeeData, exportLeaveData  ,  exportAllLeavesExcel,
+module.exports = { exportData, exportMyData, exportEmployeeData, exportProjectData , exportAllEmployeeData, exportLeaveData  ,  exportAllLeavesExcel,exportProjectDataAiOnly,
   exportAllLeavesPDF};
 // module.exports = { exportData };
 
