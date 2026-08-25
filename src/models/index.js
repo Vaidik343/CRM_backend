@@ -31,7 +31,10 @@ const InternWorkLog = require("./internWorkLog.model")(sequelize, DataTypes);
 const Event = require("./event.model")(sequelize, DataTypes);
 const EmployeeApplication = require("./employeeApplication.model")(sequelize, DataTypes);
 const EmployeeApplicationDocument  = require("./employeeApplicationDocument.model")(sequelize, DataTypes);
- 
+const OfferLetterPosition = require('./offerLetterPosition.model')(sequelize, DataTypes);
+const OfferLetterAddress  = require('./offerLetterAddress.model')(sequelize, DataTypes); 
+
+
 // ── Role ↔ User ───────────────────────────────────────────────
 Role.hasMany(User, { foreignKey: "role_id", onDelete: "RESTRICT" });
 User.belongsTo(Role, { foreignKey: "role_id" });
@@ -420,5 +423,7 @@ InternWorkLog,
 Event,
 EmployeeApplication,
 EmployeeApplicationDocument,
+OfferLetterAddress,
+OfferLetterPosition,
   Notification
 };

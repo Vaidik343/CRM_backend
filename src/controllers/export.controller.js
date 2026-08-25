@@ -937,7 +937,7 @@ workLogsSheet.getColumn(7).numFmt = "dd/mm/yyyy hh:mm AM/PM";  // Updated At
 const exportProjectDataAiOnly = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { from, to } = req.query;
+    const { from, to, format } = req.query;
 
     const {
       Project, User, ProjectMember, Role,
@@ -1177,73 +1177,204 @@ Sections:
     if (!apiKey) return res.status(500).json({ message: "GEMINI_API_KEY not configured." });
 
     const genAI  = new GoogleGenerativeAI(apiKey);
-    const model  = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+    const model  = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
     const result = await model.generateContent(prompt);
     const aiText = result.response.text();
 
-    // ── Build Excel ──────────────────────────────────
-    const workbook = new ExcelJS.Workbook();
-    const aiSheet  = workbook.addWorksheet("AI Analysis");
-    aiSheet.getColumn(1).width = 130;
-
-    // Title
-    const titleRow = aiSheet.addRow([`PROJECT ANALYSIS REPORT — ${project.name.toUpperCase()}`]);
-    titleRow.getCell(1).font      = { bold: true, size: 16, color: { argb: "FF132EA7" } };
-    titleRow.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
-    titleRow.getCell(1).alignment = { vertical: "middle", wrapText: true };
-    titleRow.height = 32;
-
-    const subRow = aiSheet.addRow([
-      `Activity Period: ${projectStart} to ${projectLatest}${from && to ? `  |  Filtered: ${from} to ${to}` : ""}   |   Generated: ${new Date().toLocaleDateString("en-IN")}`
-    ]);
-    subRow.getCell(1).font = { size: 9, color: { argb: "FF64748B" } };
-    aiSheet.addRow([""]);
-
-    // Parse and write sections
-    const sections = aiText.split(/===\s*(.+?)\s*===/g).filter(Boolean);
-    let isHeader = true;
-
-    for (const part of sections) {
-      const trimmed = cleanMarkdown(part.trim());
-      if (!trimmed) continue;
-
-      if (isHeader) {
-        aiSheet.addRow([""]);
-        const headerRow = aiSheet.addRow([trimmed.toUpperCase()]);
-        headerRow.getCell(1).font      = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
-        headerRow.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FF132EA7" } };
-        headerRow.getCell(1).alignment = { vertical: "middle", wrapText: true };
-        headerRow.height = 22;
-        isHeader = false;
-      } else {
-        const lines = trimmed.split("\n").filter((l) => l.trim());
-        for (const line of lines) {
-          const cleaned  = cleanMarkdown(line);
-          const bodyRow  = aiSheet.addRow([cleaned]);
-          bodyRow.getCell(1).font      = { size: 10 };
-          bodyRow.getCell(1).alignment = { wrapText: true, vertical: "top" };
-          bodyRow.height = 18;
-        }
-        isHeader = true;
-      }
-    }
-
-    // Footer
-    aiSheet.addRow([""]);
-    const footerRow = aiSheet.addRow(["This report was generated automatically using AI analysis of project data."]);
-    footerRow.getCell(1).font      = { italic: true, size: 9, color: { argb: "FF94A3B8" } };
-    footerRow.getCell(1).alignment = { horizontal: "center" };
-
-    // ── Send file ────────────────────────────────────
     const fileLabel = from && to
       ? `${from}_to_${to}`
       : new Date().toISOString().split("T")[0];
+    const projLabel = project.code || project.name.replace(/\s+/g, "_");
 
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="${project.name}_AI_Analysis_${fileLabel}.xlsx"`);
-    await workbook.xlsx.write(res);
-    res.end();
+    // ── Branch: PDF or Excel ──
+   // ── Branch: PDF Output ──
+    if (format === "pdf") {
+      const PDFDocument = require("pdfkit");
+      const doc = new PDFDocument({
+        margin: 50,
+        size:   "A4",
+        bufferPages: true, // Required to apply footers across pages
+        info: {
+          Title:   `${project.name} — AI Analysis Report`,
+          Author:  "EWM CRM",
+          Subject: "Project Analysis",
+        },
+      });
 
+      const BLUE   = "#132ea7";
+      const ORANGE = "#e98937";
+      const SLATE  = "#475569";
+      const WHITE  = "#ffffff";
+      const DARK   = "#0f172a";
+
+      // Cover Header
+      doc.rect(0, 0, doc.page.width, 180).fill(BLUE);
+      doc.fill(WHITE).font("Helvetica-Bold").fontSize(20)
+         .text(project.name.toUpperCase(), 50, 45, { width: doc.page.width - 100 });
+      doc.fill(WHITE).font("Helvetica").fontSize(10)
+         .text("AI PROJECT ANALYSIS REPORT", 50, 75, { characterSpacing: 2 });
+      doc.fill(ORANGE).font("Helvetica-Bold").fontSize(9)
+         .text(`${projectStart}  —  ${projectLatest}`, 50, 95);
+      if (from && to) {
+        doc.fill(WHITE).font("Helvetica").fontSize(8.5)
+           .text(`Filtered Range: ${from} to ${to}`, 50, 110);
+      }
+      doc.fill(WHITE).font("Helvetica").fontSize(8.5)
+         .text(`Generated: ${new Date().toLocaleDateString("en-IN")}   |   Team Size: ${teamSize} members`, 50, 125);
+      doc.fill(WHITE).font("Helvetica").fontSize(8.5)
+         .text(`Code: ${project.code || "—"}   |   Status: ${(project.development_status || "").toUpperCase()}   |   Tech: ${techDetailsStr.slice(0, 60)}${techDetailsStr.length > 60 ? "..." : ""}`, 50, 140);
+      
+      doc.moveTo(50, 180).lineTo(doc.page.width - 50, 180)
+         .strokeColor(ORANGE).lineWidth(2).stroke();
+      
+      doc.y = 205; // Set starting position for main content
+
+      // Render Sections (Natural flow without forced addPage calls)
+      const sections = aiText.split(/===\s*(.+?)\s*===/g).filter(Boolean);
+      let isHeader   = true;
+      let sectionNum = 0;
+
+      for (const part of sections) {
+        const trimmed = cleanMarkdown(part.trim());
+        if (!trimmed) continue;
+
+        if (isHeader) {
+          sectionNum++;
+          
+          // Check if space remains on page; only add page if near bottom
+          if (doc.y > doc.page.height - 120) {
+            doc.addPage();
+          } else if (sectionNum > 1) {
+            doc.moveDown(1);
+          }
+
+          const y = doc.y;
+          doc.rect(50, y, doc.page.width - 100, 26).fill(BLUE);
+          doc.fill(WHITE).font("Helvetica-Bold").fontSize(10)
+             .text(`${sectionNum}.  ${trimmed.toUpperCase()}`, 60, y + 8, {
+               width: doc.page.width - 120,
+               characterSpacing: 1,
+               lineBreak: false
+             });
+          doc.y = y + 34;
+          isHeader = false;
+        } else {
+          const lines = trimmed.split("\n").filter((l) => l.trim());
+          for (const line of lines) {
+            const cleaned = cleanMarkdown(line.trim());
+            if (!cleaned) continue;
+            const isSubheading = cleaned.endsWith(":") && cleaned.length < 60;
+
+            if (isSubheading) {
+              doc.moveDown(0.4);
+              doc.fill(DARK).font("Helvetica-Bold").fontSize(9.5)
+                 .text(cleaned, 50, doc.y, { width: doc.page.width - 100 });
+              doc.moveDown(0.2);
+            } else {
+              doc.fill(SLATE).font("Helvetica").fontSize(9)
+                 .text(cleaned, 50, doc.y, {
+                   width:   doc.page.width - 100,
+                   align:   "justify",
+                   lineGap: 2,
+                 });
+              doc.moveDown(0.3);
+            }
+          }
+          isHeader = true;
+        }
+      }
+
+      // Safe Footer Loop (lineBreak: false prevents blank page creation)
+      const range = doc.bufferedPageRange();
+      for (let i = range.start; i < range.start + range.count; i++) {
+        doc.switchToPage(i);
+        const footerY = doc.page.height - 40;
+
+        doc.moveTo(50, footerY - 5)
+           .lineTo(doc.page.width - 50, footerY - 5)
+           .strokeColor("#e2e8f0").lineWidth(1).stroke();
+
+        doc.fill("#94a3b8").font("Helvetica").fontSize(8)
+           .text(
+             `${project.name}  |  AI Analysis Report  |  Generated by EWM CRM`,
+             50,
+             footerY,
+             { width: doc.page.width - 150, align: "left", lineBreak: false }
+           );
+
+        doc.fill("#94a3b8").font("Helvetica").fontSize(8)
+           .text(
+             `Page ${i + 1} of ${range.count}`,
+             doc.page.width - 110,
+             footerY,
+             { width: 60, align: "right", lineBreak: false }
+           );
+      }
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${projLabel}_AI_Analysis_${fileLabel}.pdf"`);
+      doc.pipe(res);
+      doc.end();
+   } else {
+  console.log("📊 Generating Excel, aiText length:", aiText?.length);
+  
+  const workbook = new ExcelJS.Workbook();
+  const aiSheet  = workbook.addWorksheet("AI Analysis");
+  aiSheet.getColumn(1).width = 130;
+
+  // Title
+  const titleRow = aiSheet.addRow([`PROJECT ANALYSIS REPORT — ${project.name.toUpperCase()}`]);
+  titleRow.getCell(1).font      = { bold: true, size: 16, color: { argb: "FF132EA7" } };
+  titleRow.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE9EDF5" } };
+  titleRow.getCell(1).alignment = { vertical: "middle", wrapText: true };
+  titleRow.height = 32;
+
+  const subRow = aiSheet.addRow([
+    `Activity Period: ${projectStart} to ${projectLatest}${from && to ? `  |  Filtered: ${from} to ${to}` : ""}   |   Generated: ${new Date().toLocaleDateString("en-IN")}`
+  ]);
+  subRow.getCell(1).font = { size: 9, color: { argb: "FF64748B" } };
+  aiSheet.addRow([""]);
+
+  // Parse and write sections
+  const sections = aiText.split(/===\s*(.+?)\s*===/g).filter(Boolean);
+  let isHeader = true;
+
+  for (const part of sections) {
+    const trimmed = cleanMarkdown(part.trim());
+    if (!trimmed) continue;
+
+    if (isHeader) {
+      aiSheet.addRow([""]);
+      const headerRow = aiSheet.addRow([trimmed.toUpperCase()]);
+      headerRow.getCell(1).font      = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
+      headerRow.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FF132EA7" } };
+      headerRow.getCell(1).alignment = { vertical: "middle", wrapText: true };
+      headerRow.height = 22;
+      isHeader = false;
+    } else {
+      const lines = trimmed.split("\n").filter((l) => l.trim());
+      for (const line of lines) {
+        const cleaned  = cleanMarkdown(line);
+        const bodyRow  = aiSheet.addRow([cleaned]);
+        bodyRow.getCell(1).font      = { size: 10 };
+        bodyRow.getCell(1).alignment = { wrapText: true, vertical: "top" };
+        bodyRow.height = 18;
+      }
+      isHeader = true;
+    }
+  }
+
+  // Footer
+  aiSheet.addRow([""]);
+  const footerRow = aiSheet.addRow(["This report was generated automatically using AI analysis of project data."]);
+  footerRow.getCell(1).font      = { italic: true, size: 9, color: { argb: "FF94A3B8" } };
+  footerRow.getCell(1).alignment = { horizontal: "center" };
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${projLabel}_AI_Analysis_${fileLabel}.xlsx"`);
+  await workbook.xlsx.write(res);
+  res.end();
+}
   } catch (err) {
     console.error("exportProjectDataAiOnly error:", err);
     return res.status(500).json({ message: err.message || "Internal server error" });
