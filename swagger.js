@@ -61,6 +61,8 @@ const routes = [
   "./src/routes/event.routes.js",
   "./src/routes/notifications.routes.js",
   "./src/routes/report.routes.js",
+  "./src/routes/employeeApplication.routes.js",
+  "./src/routes/offerLetter.routes.js",
    "./src/routes/backup.routes.js",
 ];
 

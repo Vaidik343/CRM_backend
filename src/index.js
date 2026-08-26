@@ -55,6 +55,7 @@ const routeFiles = [
   "intern.routes.js",
   "event.routes.js",
   "employeeApplication.routes.js",
+  "offerLetter.routes.js",
   "notifications.routes.js",  // new
   "report.routes.js",
   
