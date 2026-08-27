@@ -22,7 +22,7 @@ const employeeInclude = {
 
 const buildCardHTML = (event, aiConfig = null) => {
   const templates = {
-   birthday_1: (e) => `
+    birthday_1: (e) => `
   <div style="width:800px;height:500px;background:#4f46e5;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
     
     <!-- Updated Soft Wavy Grid & Sparkles SVG (Replaces the 2 solid circles) -->
@@ -84,7 +84,7 @@ const buildCardHTML = (event, aiConfig = null) => {
           ${e.message || "May this special day bring you lots of joy. You are an amazing part of our team!"}
         </p>
       </div>`,
-promotion_1: (e) => `
+    promotion_1: (e) => `
       <div style="width:800px;height:500px;background:linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;border-radius:20px;padding:40px;box-sizing:border-box;position:relative;overflow:hidden;">
         <!-- Subtle Radial Ambient Glow -->
         <div style="position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:400px;height:400px;background:radial-gradient(circle, rgba(251,191,36,0.15) 0%, rgba(15,23,42,0) 70%);pointer-events:none;"></div>
@@ -357,13 +357,17 @@ const createEvent = async (req, res) => {
       event_date,
     } = req.body;
 
-    console.log("event",req.body)
-    
+    console.log("event", req.body);
+
     const created_by = req.user.id;
-    console.log("🚀 ~ createEvent ~ created_by:", created_by)
+    console.log("🚀 ~ createEvent ~ created_by:", created_by);
 
     if (!event_type || !mode || !employee_name || !event_date) {
-      return res.status(400).json({ message: "event_type, mode, name and event_date are required." });
+      return res
+        .status(400)
+        .json({
+          message: "event_type, mode, name and event_date are required.",
+        });
     }
 
     let ai_config = {};
@@ -371,7 +375,9 @@ const createEvent = async (req, res) => {
 
     if (mode === "ai") {
       if (!ai_prompt) {
-        return res.status(400).json({ message: "ai_prompt is required for AI mode." });
+        return res
+          .status(400)
+          .json({ message: "ai_prompt is required for AI mode." });
       }
       const aiResult = await generateEventCard({
         event_type,
@@ -409,9 +415,11 @@ const createEvent = async (req, res) => {
       display_id,
       is_published: true,
     });
-    console.log("🚀 ~ createEvent ~ event:", event)
+    console.log("🚀 ~ createEvent ~ event:", event);
 
-    return res.status(201).json({ message: "Event created successfully.", event });
+    return res
+      .status(201)
+      .json({ message: "Event created successfully.", event });
   } catch (error) {
     console.error("createEvent error:", error);
     return res.status(500).json({ message: error.message });
@@ -513,6 +521,49 @@ const getEventById = async (req, res) => {
   }
 };
 
+
+// admin
+  
+const updateEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { employee_name, message, event_date } = req.body;
+
+    const event = await Event.findByPk(id);
+    if (!event) return res.status(404).json({ message: "Event not found." });
+
+    // Rebuild card HTML with updated data
+    const updatedData = {
+      employee_name: employee_name || event.employee_name,
+      message:       message       ?? event.message,
+      event_date:    event_date    || event.event_date,
+    };
+
+    const card_html = buildCardHTML(
+      {
+        employee_name:   updatedData.employee_name,
+        message:         updatedData.message,
+        design_template: event.design_template,
+        mode:            event.mode,
+      },
+      event.mode === "ai" ? event.ai_config : null
+    );
+
+    await event.update({
+      ...updatedData,
+      card_html,
+    });
+
+    return res.status(200).json({ message: "Event updated.", event });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+
+
 // ─────────────────────────────────────────────
 // DELETE EVENT — Admin
 // ─────────────────────────────────────────────
@@ -567,7 +618,7 @@ const exportCardPNG = async (req, res) => {
     res.setHeader("Content-Type", "image/png");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="event-${event.display_id}.png"`
+      `attachment; filename="event-${event.display_id}.png"`,
     );
     return res.send(screenshot);
   } catch (error) {
@@ -585,10 +636,19 @@ const previewAICard = async (req, res) => {
     const { event_type, employee_name, message, ai_prompt } = req.body;
 
     if (!event_type || !employee_name || !ai_prompt) {
-      return res.status(400).json({ message: "event_type, employee_name and ai_prompt are required." });
+      return res
+        .status(400)
+        .json({
+          message: "event_type, employee_name and ai_prompt are required.",
+        });
     }
 
-    const aiResult = await generateEventCard({ event_type, employee_name, message, ai_prompt });
+    const aiResult = await generateEventCard({
+      event_type,
+      employee_name,
+      message,
+      ai_prompt,
+    });
 
     const cardData = { employee_name, message: aiResult.message, mode: "ai" };
     const card_html = buildCardHTML(cardData, aiResult);
@@ -615,21 +675,22 @@ const announceEvent = async (req, res) => {
     // Emit to ALL connected employees instantly
     const io = req.app.get("io");
     io.emit("EVENT_ANNOUNCED", {
-      id:            event.id,
-      display_id:    event.display_id,
-      event_type:    event.event_type,
+      id: event.id,
+      display_id: event.display_id,
+      event_type: event.event_type,
       employee_name: event.employee_name,
-      message:       event.message,
-      card_html:     event.card_html,
-      event_date:    event.event_date,
+      message: event.message,
+      card_html: event.card_html,
+      event_date: event.event_date,
     });
 
-    return res.status(200).json({ message: "Event announced successfully.", event });
+    return res
+      .status(200)
+      .json({ message: "Event announced successfully.", event });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
-
 
 const getDesignPreviews = async (req, res) => {
   try {
@@ -640,11 +701,11 @@ const getDesignPreviews = async (req, res) => {
     }
 
     const DESIGNS_BY_TYPE = {
-      birthday:  ["birthday_1",  "birthday_2"],
+      birthday: ["birthday_1", "birthday_2"],
       promotion: ["promotion_1", "promotion_2"],
-      office:    ["office_1",    "office_2"],
-      trip:      ["trip_1",      "trip_2"],
-      fun_game:  ["fun_game_1",  "fun_game_2"],
+      office: ["office_1", "office_2"],
+      trip: ["trip_1", "trip_2"],
+      fun_game: ["fun_game_1", "fun_game_2"],
     };
 
     const designs = DESIGNS_BY_TYPE[event_type] || [];
@@ -652,12 +713,12 @@ const getDesignPreviews = async (req, res) => {
     const previews = designs.map((design_template) => {
       const html = buildCardHTML(
         {
-          employee_name: employee_name || "Name",  // ← use real name if provided
-          message:       message       || "Your custom message will appear here.",
+          employee_name: employee_name || "Name", // ← use real name if provided
+          message: message || "Your custom message will appear here.",
           design_template,
           mode: "manual",
         },
-        null
+        null,
       );
       return { design_template, html };
     });
@@ -668,5 +729,14 @@ const getDesignPreviews = async (req, res) => {
   }
 };
 module.exports = {
-    createEvent, getAllEvents, getEmployeeEvents, getEventById, deleteEvent, exportCardPNG, previewAICard, announceEvent, getDesignPreviews
-}
+  createEvent,
+  getAllEvents,
+  getEmployeeEvents,
+  getEventById,
+  deleteEvent,
+  exportCardPNG,
+  previewAICard,
+  announceEvent,
+  getDesignPreviews,
+  updateEvent
+};

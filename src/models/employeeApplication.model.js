@@ -28,6 +28,13 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
+
+      alternate_number: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
+
+
       address: {
         type: DataTypes.TEXT,
         allowNull: false,

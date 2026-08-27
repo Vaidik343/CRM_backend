@@ -32,6 +32,11 @@ status: {
       type: DataTypes.STRING, // ❌ not INTEGER — mobile numbers have leading zeros and can be 10+ digits
       allowNull: false,
     },
+
+    alternate_number: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
     enrollment_no: {
       type: DataTypes.STRING, // ❌ not INTEGER — enrollment numbers often have letters e.g. "GTU/2021/001"
       allowNull: false,

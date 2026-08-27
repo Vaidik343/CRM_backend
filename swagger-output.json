@@ -1798,6 +1798,34 @@
         }
       }
     },
+    "/tasks/remark-summary": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
     "/tasks/{id}": {
       "get": {
         "description": "",
@@ -7611,13 +7639,20 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "OK"
+          },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "500": {
+            "description": "Internal Server Error"
           }
         }
-      }
-    },
-    "/offer-letter/position": {
+      },
       "post": {
         "description": "",
         "parameters": [
@@ -7642,6 +7677,9 @@
           "401": {
             "description": "Unauthorized"
           },
+          "403": {
+            "description": "Forbidden"
+          },
           "500": {
             "description": "Internal Server Error"
           }
@@ -7662,7 +7700,7 @@
         }
       }
     },
-    "/offer-latter/addresses": {
+    "/offer-letter/addresses": {
       "get": {
         "description": "",
         "parameters": [
@@ -7681,13 +7719,14 @@
           "401": {
             "description": "Unauthorized"
           },
+          "403": {
+            "description": "Forbidden"
+          },
           "500": {
             "description": "Internal Server Error"
           }
         }
-      }
-    },
-    "/offer-letter/addresses": {
+      },
       "post": {
         "description": "",
         "parameters": [
@@ -7700,8 +7739,37 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "example": "any"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -7736,6 +7804,9 @@
           "401": {
             "description": "Unauthorized"
           },
+          "404": {
+            "description": "Not Found"
+          },
           "500": {
             "description": "Internal Server Error"
           }
@@ -7760,35 +7831,13 @@
                   },
                   "salary": {
                     "example": "any"
+                  },
+                  "format": {
+                    "example": "any"
                   }
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/backup/download": {
-      "get": {
-        "description": "",
-        "produces": [
-          "application/zip"
-        ],
-        "parameters": [
-          {
-            "name": "x-backup-key",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "401": {
-            "description": "Unauthorized"
-          },
-          "500": {
-            "description": "Internal Server Error"
           }
         }
       }

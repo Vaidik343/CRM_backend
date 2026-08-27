@@ -1,5 +1,3 @@
-'use strict';
-
 const { EmployeeApplication, EmployeeApplicationDocument } = require('../models');
 const { Op } = require('sequelize');
 const path = require('path');
@@ -30,7 +28,7 @@ const CONFLICTABLE_SUBTYPES = ['aadhaar', 'voter_card', 'passport', 'driving_lic
 const submitApplication = async (req, res) => {
   try {
     const {
-      first_name, last_name, email, phone, address, gender,
+      first_name, last_name, email, phone, alternate_number, address, gender,
       photo_id_subtype, address_id_subtype,
       bank_name, account_number, ifsc_code, account_holder_name,
     } = req.body;
@@ -75,6 +73,7 @@ const submitApplication = async (req, res) => {
       last_name,
       email,
       phone,
+       alternate_number: alternate_number?.trim() || null,
       address,
       gender,
       bank_name,

@@ -34,7 +34,7 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 7015;
 
 const routeFiles = [
-  "backup.routes.js",
+  
   "auth.routes.js",
   "calls.routes.js",
   "client.routes.js",
@@ -56,6 +56,7 @@ const routeFiles = [
   "event.routes.js",
   "employeeApplication.routes.js",
   "offerLetter.routes.js",
+  "internExport.routes.js",
   "notifications.routes.js",  // new
   "report.routes.js",
   

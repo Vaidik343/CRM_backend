@@ -71,6 +71,7 @@ const register = async (req, res) => {
       name,
       email,
       mobile,
+      alternate_number,
       enrollment_no,
       degree_type,
       intern_type,
@@ -183,6 +184,7 @@ if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReference
       name:          name.trim(),
       email:         email.trim().toLowerCase(),
       mobile,
+       alternate_number: alternate_number?.trim() || null, 
       enrollment_no,
       college_name,  // ✅ extracted from college_detail
       degree_type,
@@ -815,6 +817,7 @@ const updateMyProfile = async (req, res) => {
     const {
       name,
       mobile,
+      alternate_number,
       college_name,
       enrollment_no,
       degree_type,
@@ -873,6 +876,7 @@ if (normalizedReferenceType && !validReferenceTypes.includes(normalizedReference
     await intern.update({
       name:              name?.trim()              || intern.name,
       mobile:            mobile                    || intern.mobile,
+       alternate_number:  alternate_number?.trim() ?? intern.alternate_number, 
       college_name:      college_name?.trim()      || intern.college_name,
       enrollment_no:     enrollment_no?.trim()     || intern.enrollment_no,
       degree_type:       degree_type               || intern.degree_type,
@@ -993,6 +997,7 @@ const adminUpdateIntern = async (req, res) => {
       name,
       email,
       mobile,
+      alternate_number,
       college_name,
       enrollment_no,
       degree_type,
@@ -1021,8 +1026,8 @@ const adminUpdateIntern = async (req, res) => {
     // ── Validate mentor_ids ───────────────────────────────────────────────
     if (mentor_ids && Array.isArray(mentor_ids) && mentor_ids.length > 0) {
       console.log('mentor_ids:', mentor_ids);
-console.log('isArray:', Array.isArray(mentor_ids));
-console.log('mentor_ids types:', mentor_ids?.map(id => typeof id));
+// console.log('isArray:', Array.isArray(mentor_ids));
+// console.log('mentor_ids types:', mentor_ids?.map(id => typeof id));
       const mentors = await User.findAll({ where: { id: mentor_ids } });
       if (mentors.length !== mentor_ids.length) {
         return res.status(404).json({ message: 'One or more mentors not found.' });
@@ -1051,7 +1056,11 @@ console.log('mentor_ids types:', mentor_ids?.map(id => typeof id));
         return res.status(409).json({ message: 'Enrollment number already in use.' });
       }
     }
- 
+ if (alternate_number && !/^\d{10}$/.test(alternate_number)) {
+  return res.status(400).json({ message: 'Alternate number must be a 10-digit number.' });
+}
+
+
     // ── Validate reference_type ───────────────────────────────────────────
     const validReferenceTypes = ['employee', 'intern', 'college', 'friend', 'social_media', 'website', 'other'];
     let normalizedReferenceType = null;
@@ -1067,6 +1076,7 @@ console.log('mentor_ids types:', mentor_ids?.map(id => typeof id));
       name:              name?.trim()               ?? intern.name,
       email:             email?.trim().toLowerCase() ?? intern.email,
       mobile:            mobile                      ?? intern.mobile,
+        alternate_number:  alternate_number?.trim()    ?? intern.alternate_number,
       college_name:      college_name?.trim()        ?? intern.college_name,
       enrollment_no:     enrollment_no?.trim()       ?? intern.enrollment_no,
       degree_type:       degree_type                 ?? intern.degree_type,

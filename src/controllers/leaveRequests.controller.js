@@ -1737,7 +1737,6 @@ sendLeaveCancelledEmail({
 };
 
 
-
 module.exports.leaveController = {
   createLeave,
   getMyLeaves,
@@ -1754,5 +1753,6 @@ module.exports.leaveController = {
    uploadLeaveDocument,
      checkAdjacentLeaves,  
   reverseLeave,       
+  
 
 }

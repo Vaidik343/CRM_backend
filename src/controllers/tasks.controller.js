@@ -1,5 +1,5 @@
 const { body, param } = require("express-validator");
-const { Task, User, Call, Project, Role, ProjectMember, TaskStatusLog } = require("../models");
+const { Task, User, Call, Project, Role, ProjectMember, TaskStatusLog, sequelize  } = require("../models");
 const { handleValidation } = require("../utils/validate");
 const { Op } = require("sequelize");
 const generateDisplayId = require("../utils/generateDisplayId");
@@ -583,6 +583,79 @@ return res.json({ message: "Task deleted" });
   }
 };
 
+const getRemarkSummary = async (req, res) => {
+  try {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    // Raw query to avoid Sequelize JSONB evaluation order issues
+const results = await sequelize.query(`
+  SELECT t.id
+  FROM tasks t
+  WHERE 
+    t.remarks IS NOT NULL
+    AND jsonb_typeof(t.remarks) = 'array'
+    AND EXISTS (
+      SELECT 1 FROM jsonb_array_elements(t.remarks) AS r
+      WHERE (r->>'created_at')::timestamptz >= :start
+        AND (r->>'created_at')::timestamptz <= :end
+    )
+`, {
+  replacements: { start: start.toISOString(), end: end.toISOString() },
+  type: sequelize.QueryTypes.SELECT,
+});
+    console.log("🚀 ~ raw results:", results);
+
+    // Get the IDs then fetch full tasks with includes
+    const ids = results.map(r => r.id);
+
+    if (!ids.length) {
+      return res.json({
+        summary: {
+          open:    { count: 0, tasks: [] },
+          ongoing: { count: 0, tasks: [] },
+          hold:    { count: 0, tasks: [] },
+          closed:  { count: 0, tasks: [] },
+        }
+      });
+    }
+
+    const tasks = await Task.findAll({
+      where: { id: { [Op.in]: ids } },
+      include: taskIncludes,
+    });
+
+    const grouped = { open: [], ongoing: [], hold: [], closed: [] };
+    for (const t of tasks) {
+      if (grouped[t.status]) grouped[t.status].push(t);
+    }
+
+    const summary = {};
+    for (const [status, list] of Object.entries(grouped)) {
+      summary[status] = {
+        count: list.length,
+        tasks: list.map(t => ({
+          id: t.id,
+          display_id: t.display_id,
+          task: t.task,
+          status: t.status,
+          assignee: t.assignee,
+          remark_count: (t.remarks || []).length,
+          last_remark: t.remarks?.at(-1)?.text || null,
+        })),
+      };
+    }
+
+    return res.json({ summary });
+
+  } catch (err) {
+    console.error("getRemarkSummary error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports = {
   createTask,
   listTasks,
@@ -592,4 +665,6 @@ module.exports = {
     getTaskStatusLogs,
   createTaskValidators,
   updateTaskValidators,
+  getRemarkSummary
+
 };

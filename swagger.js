@@ -63,7 +63,7 @@ const routes = [
   "./src/routes/report.routes.js",
   "./src/routes/employeeApplication.routes.js",
   "./src/routes/offerLetter.routes.js",
-   "./src/routes/backup.routes.js",
+  
 ];
 
 swaggerAutogen(outputFile, routes, doc);
