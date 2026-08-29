@@ -52,16 +52,21 @@ const validateCreateLeave = (req, res, next) => {
     errors.push('end_date is not a valid date.');
   }
 
-  // ── Exchange: worked_saturday_id required ──
-  if (leave_type === 'exchange' && !worked_saturday_id) {
-    errors.push('worked_saturday_id is required for exchange leave.');
-  }
+// ── Exchange: must have either worked_saturday_id OR both self-declared dates ──
+if (leave_type === 'exchange') {
+  const { exchange_with_date, exchange_for_date } = req.body || {};
+  const hasAdminSaturday = !!worked_saturday_id;
+  const hasSelfDeclared  = !!exchange_with_date && !!exchange_for_date;
 
-  // ── Non-exchange: worked_saturday_id must not be sent ──
-  if (leave_type && leave_type !== 'exchange' && worked_saturday_id) {
-    errors.push('worked_saturday_id should not be provided for non-exchange leave.');
+  if (!hasAdminSaturday && !hasSelfDeclared) {
+    errors.push('Exchange leave requires either a worked_saturday_id or both exchange_with_date and exchange_for_date.');
   }
+}
 
+// ── Non-exchange: worked_saturday_id must not be sent ──
+if (leave_type && leave_type !== 'exchange' && worked_saturday_id) {
+  errors.push('worked_saturday_id should not be provided for non-exchange leave.');
+}
   if (errors.length > 0) {
     return res.status(400).json({ message: 'Validation failed.', errors });
   }

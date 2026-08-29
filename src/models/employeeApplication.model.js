@@ -76,6 +76,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
+      work_location_type: {
+  type: DataTypes.ENUM('in_office', 'out_of_office'),
+  allowNull: true,
+},
+work_location: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
+
     },
     {
       tableName: 'employee_applications',

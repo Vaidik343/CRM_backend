@@ -1,4 +1,4 @@
-const { EmployeeApplication, EmployeeApplicationDocument } = require('../models');
+const { EmployeeApplication, EmployeeApplicationDocument ,sequelize} = require('../models');
 const { Op } = require('sequelize');
 const path = require('path');
 
@@ -12,10 +12,10 @@ async function generateDisplayId() {
     paranoid: false,
   });
 
-  if (!last) return 'EP001';
+  if (!last) return 'AP001';
 
-  const num = parseInt(last.display_id.replace('EP', ''), 10);
-  return `EP${String(num + 1).padStart(3, '0')}`;
+  const num = parseInt(last.display_id.replace('AP', ''), 10);
+  return `AP${String(num + 1).padStart(3, '0')}`;
 }
 
 // photo_id subtypes that can conflict with address_id
@@ -203,25 +203,49 @@ const getApplicationById = async (req, res) => {
 
 // PATCH /api/employee-applications/:id/approve
 const approveApplication = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
-    const application = await EmployeeApplication.findByPk(req.params.id);
-    if (!application) return res.status(404).json({ message: 'Application not found.' });
+    const { work_location_type, work_location } = req.body;
 
-    if (application.status !== 'pending') {
-      return res.status(400).json({ message: 'Only pending applications can be approved.' });
+    if (!work_location_type) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Work location type is required.' });
+    }
+    if (work_location_type === 'out_of_office' && !work_location?.trim()) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Work location is required for out of office.' });
     }
 
-    await application.update({ status: 'approved', rejection_reason: null });
+    const application = await EmployeeApplication.findByPk(req.params.id);
+    if (!application) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Application not found.' });
+    }
+    if (application.status !== 'pending') {
+      await t.rollback();
+      return res.status(400).json({ message: `Application is already ${application.status}.` });
+    }
 
-    // TODO: notifyAdmins or generate credentials here once flow is confirmed
+    await application.update({
+      status: 'approved',
+      rejection_reason: null,
+      work_location_type,
+      work_location: work_location_type === 'out_of_office' ? work_location.trim() : null,
+    }, { transaction: t });
 
-    return res.json({ message: 'Application approved.', application });
+    await t.commit();
+
+    return res.json({
+      message: 'Application approved.',
+      application,
+    });
+
   } catch (err) {
-    console.error('approveApplication error:', err);
-    return res.status(500).json({ message: 'Server error.' });
+    await t.rollback();
+    console.log('approveApplication error:', err);
+    return res.status(500).json({ message: err.message });
   }
 };
-
 // ── admin: reject ─────────────────────────────────────────────────────────────
 
 // PATCH /api/employee-applications/:id/reject
@@ -268,6 +292,33 @@ const deleteApplication = async (req, res) => {
 };
 
 
+const getApprovedPending = async (req, res) => {
+  try {
+    const { User } = require('../models');
+    
+    // get all approved applications
+    const applications = await EmployeeApplication.findAll({
+      where: { status: 'approved' },
+      order: [['createdAt', 'DESC']],
+    });
+
+    // filter out ones whose email already exists in users table
+    const emails = applications.map(a => a.email);
+    const existingUsers = await User.findAll({
+      where: { email: emails },
+      attributes: ['email'],
+    });
+    const existingEmails = new Set(existingUsers.map(u => u.email));
+
+    const pending = applications.filter(a => !existingEmails.has(a.email));
+
+    return res.json({ applications: pending });
+  } catch (err) {
+    console.log('getApprovedPending error:', err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
-   submitApplication, getAllApplications, getApplicationById, approveApplication, rejectApplication, deleteApplication
+   submitApplication, getAllApplications, getApplicationById, approveApplication, rejectApplication, deleteApplication, getApprovedPending
 }

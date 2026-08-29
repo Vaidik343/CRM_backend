@@ -56,10 +56,10 @@ medical_document: {
         ),
         allowNull: false,
     },
-    exchange_date : {
-        type: DataTypes.DATE,
-        allowNull: true,
-    },
+    // exchange_date : {
+    //     type: DataTypes.DATE,
+    //     allowNull: true,
+    // },
     reason: {
         type: DataTypes.TEXT,
         allowNull: false,  
@@ -92,7 +92,10 @@ medical_document: {
   type: DataTypes.UUID,
   allowNull: true,  // only populated when leave_type === 'exchange'
 },
-
+ exchange_with_date: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,  // only set when leave_type === 'exchange' via employee self-declare
+      },
         }, {
       tableName: "leave_requests",
       timestamps: true,

@@ -28,7 +28,7 @@ const updateUserValidators = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const safeAttributes = [
   "id", "employee_id", "name", "email", "role_id", "is_admin", "mobile",
-  "is_active", "saturday_group",
+  "is_active", "saturday_group", "date_of_birth", "address",
   "is_probation", "probation_start", "probation_end", "probation_status",
   "createdAt",
 ];

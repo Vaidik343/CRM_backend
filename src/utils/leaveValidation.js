@@ -111,15 +111,51 @@ const validateNoticePeriod = async ({ reason_type, duration, start_date }) => {
   }
 };
 
-const validateExchangeLeave = async ({ leave_type, worked_saturday_id, user_id }) => {
+const validateExchangeLeave = async ({
+  leave_type,
+  worked_saturday_id,
+  exchange_with_date,
+  exchange_for_date,
+  user_id,
+}) => {
   if (leave_type !== LEAVE_TYPES.EXCHANGE) return;
-  if (!worked_saturday_id)
-    throw new Error("You must select a worked Saturday to exchange.");
-  const workedSaturday = await WorkedSaturday.findOne({
-    where: { id: worked_saturday_id, user_id, is_exchanged: false },
+
+  // ── Path A: admin-marked Saturday ──
+  if (worked_saturday_id) {
+    const workedSaturday = await WorkedSaturday.findOne({
+      where: { id: worked_saturday_id, user_id, is_exchanged: false },
+    });
+    if (!workedSaturday)
+      throw new Error('Selected Saturday is not available for exchange.');
+    return;
+  }
+
+  // ── Path B: employee self-declared dates ──
+  if (!exchange_with_date || !exchange_for_date) {
+    throw new Error(
+      'Exchange leave requires either a worked Saturday or both "Exchange With" and "Exchange For" dates.'
+    );
+  }
+
+  // exchange_with_date and exchange_for_date cannot be the same day
+  if (exchange_with_date === exchange_for_date) {
+    throw new Error('"Exchange With" and "Exchange For" dates cannot be the same day.');
+  }
+
+  // check no existing active WorkedSaturday for same user + exchange_with_date
+  // (prevents reusing the same worked day twice)
+  const duplicate = await WorkedSaturday.findOne({
+    where: {
+      user_id,
+      saturday_date: exchange_with_date,
+      is_exchanged: true,
+    },
   });
-  if (!workedSaturday)
-    throw new Error("Selected Saturday is not available for exchange.");
+  if (duplicate) {
+    throw new Error(
+      `You have already used ${exchange_with_date} as an exchange day in another request.`
+    );
+  }
 };
 
 const getOffDaysInRange = async (start_date, end_date, saturday_group) => {
@@ -184,7 +220,7 @@ const splitDaysByMonth = (start_date, end_date, duration) => {
   return Object.values(result);
 };
 
-const ABSENT_UNTIL_EOD = [LEAVE_DURATION.FULL_DAY, LEAVE_DURATION.SECOND_HALF];
+const ABSENT_UNTIL_EOD = [LEAVE_DURATION.FULL_DAY];
 const ABSENT_FROM_SOD = [LEAVE_DURATION.FULL_DAY, LEAVE_DURATION.FIRST_HALF];
 
 // ── Helper: count total calendar days in a range ──

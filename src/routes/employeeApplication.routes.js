@@ -18,9 +18,12 @@ router.post('/employee-applications/register',
 // ── admin routes ──────────────────────────────────────────────────────────────
 
 router.get('/employee-applications',authenticate, ctrl.getAllApplications);
+router.get('/employee-applications/approved-pending', authenticate, ctrl.getApprovedPending);
+
 router.get('/employee-applications/:id', authenticate, ctrl.getApplicationById);
 router.patch('/employee-applications/:id/approve', authenticate, ctrl.approveApplication);
 router.patch('/employee-applications/:id/reject', authenticate, ctrl.rejectApplication);
 router.delete('/employee-applications/:id', authenticate, ctrl.deleteApplication);
+
 
 module.exports = router;

@@ -11,22 +11,31 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     saturday_date: {
-      type: DataTypes.DATEONLY,  // just the date, no time needed
+      type: DataTypes.DATEONLY,
       allowNull: false,
     },
     is_exchanged: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false,       // true = already used in an exchange leave
+      defaultValue: false,
       allowNull: false,
     },
     marked_by: {
-      type: DataTypes.UUID,      // admin who marked it
+      type: DataTypes.UUID,
+      allowNull: true,  // ← changed to true — employee-declared records have no admin
+    },
+    source: {
+      type: DataTypes.ENUM('admin', 'employee'),
       allowNull: false,
+      defaultValue: 'admin',
+    },
+    exchange_for_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,  // only set for employee-declared records
     },
   }, {
     tableName: 'worked_saturdays',
     timestamps: true,
+    underscored: true,  // ← added — stays consistent with rest of models
   });
-
   return WorkedSaturday;
 };

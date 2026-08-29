@@ -99,17 +99,18 @@ const createLeave = async (req, res) => {
   const t = await sequelize.transaction();
  
   try {
-    const {
-
+const {
   leave_type,
-      reason_type,
-      start_date,
-      end_date,
-      duration,
-      worked_saturday_id,
-      reason,
-    } = req.body;
+  reason_type,
+  start_date,
+  end_date,
+  duration,
+  worked_saturday_id,
+  reason,
+} = req.body;
 
+const exchange_with_date = req.body.exchange_with_date || null;
+const exchange_for_date  = req.body.exchange_for_date  || null;
 
     console.log(req.body);
 const user_id = req.user.id;
@@ -155,8 +156,14 @@ const user_id = req.user.id;
     await validateNoticePeriod({ reason_type, duration, start_date });
 
     // ── 6. Exchange validation ──
-    await validateExchangeLeave({ leave_type, worked_saturday_id, user_id , start_date,
-  end_date,});
+// ── 6. Exchange validation ──
+await validateExchangeLeave({
+  leave_type,
+  worked_saturday_id,
+  exchange_with_date,
+  exchange_for_date,
+  user_id,
+});
 
 console.log("req.file:", req.file);
 console.log("req.body:", req.body);
@@ -191,24 +198,35 @@ console.log(employee.toJSON());
     });
     // create leave
 
-    const leave = await LeaveRequest.create({
-     user_id,
-      display_id,
-      leave_type,
-      reason_type,
-       emergency_sub_type: reason_type === LEAVE_REASONS.EMERGENCY
+   // For self-declared exchange — start/end come from exchange_for_date
+const resolvedStartDate = leave_type === LEAVE_TYPES.EXCHANGE && !worked_saturday_id
+  ? exchange_for_date
+  : start_date;
+const resolvedEndDate = leave_type === LEAVE_TYPES.EXCHANGE && !worked_saturday_id
+  ? exchange_for_date
+  : end_date;
+
+const leave = await LeaveRequest.create({
+  user_id,
+  display_id,
+  leave_type,
+  reason_type,
+  emergency_sub_type: reason_type === LEAVE_REASONS.EMERGENCY
     ? req.body.emergency_sub_type
     : null,
-  medical_document: null,      // ← set after file move below
-      start_date,
-      end_date,
-      duration,
-       worked_saturday_id: leave_type === LEAVE_TYPES.EXCHANGE ? worked_saturday_id : null,
-      reason,
-      status: LEAVE_STATUS.PENDING,
-    }, { transaction: t });
-    console.log("🚀 ~ createLeave ~ leave:", leave)
-    // console.log("🚀 ~ createLeave ~ leave:", leave)
+  medical_document: null,
+  start_date:  resolvedStartDate,
+  end_date:    resolvedEndDate,
+  duration:    'full_day',
+  worked_saturday_id: leave_type === LEAVE_TYPES.EXCHANGE && worked_saturday_id
+    ? worked_saturday_id
+    : null,
+  exchange_with_date: leave_type === LEAVE_TYPES.EXCHANGE && !worked_saturday_id
+    ? exchange_with_date
+    : null,
+  reason,
+  status: LEAVE_STATUS.PENDING,
+}, { transaction: t });
 
     // ── Medical document upload ──
 
@@ -229,16 +247,26 @@ if (req.file) {
 }
 
       // ── 9. Mark Saturday as exchanged ──
-    if (leave_type === LEAVE_TYPES.EXCHANGE) {
-      await WorkedSaturday.update(
-        { is_exchanged: true },
-        {
-          where: { id: worked_saturday_id, user_id },
-          transaction: t,
-        }
-      );
-    }
-
+ // ── 9. Mark Saturday as exchanged ──
+if (leave_type === LEAVE_TYPES.EXCHANGE) {
+  if (worked_saturday_id) {
+    // Path A — admin-marked: lock it
+    await WorkedSaturday.update(
+      { is_exchanged: true },
+      { where: { id: worked_saturday_id, user_id }, transaction: t }
+    );
+  } else {
+    // Path B — employee self-declared: create record and lock immediately
+    await WorkedSaturday.create({
+      user_id,
+      saturday_date:     exchange_with_date,
+      exchange_for_date: exchange_for_date,
+      is_exchanged:      true,
+      marked_by:         null,
+      source:            'employee',
+    }, { transaction: t });
+  }
+}
 
      // ── 10. Create leave log ──
   await LeaveLog.create({
@@ -386,12 +414,23 @@ const cancelLeave = async (req, res) => {
     if (leave.status === LEAVE_STATUS.PENDING) {
       await leave.update({ status: LEAVE_STATUS.CANCELLED }, { transaction: t });
 
-      if (leave.leave_type === LEAVE_TYPES.EXCHANGE && leave.worked_saturday_id) {
-        await WorkedSaturday.update(
-          { is_exchanged: false },
-          { where: { id: leave.worked_saturday_id, user_id }, transaction: t }
-        );
-      }
+    if (leave.leave_type === LEAVE_TYPES.EXCHANGE) {
+  if (leave.worked_saturday_id) {
+    await WorkedSaturday.update(
+      { is_exchanged: false },
+      { where: { id: leave.worked_saturday_id, user_id }, transaction: t }
+    );
+  } else if (leave.exchange_with_date) {
+    await WorkedSaturday.destroy({
+      where: {
+        user_id:       leave.user_id,
+        saturday_date: leave.exchange_with_date,
+        source:        'employee',
+      },
+      transaction: t,
+    });
+  }
+}
 
       await LeaveLog.create({
         leave_request_id: leave.id,
@@ -1510,8 +1549,8 @@ const checkAdjacentLeaves = async (req, res) => {
       return res.status(400).json({ message: 'start_date, end_date, duration are required.' });
     }
 
-    const ABSENT_UNTIL_EOD = ['full_day', 'second_half'];
-    const ABSENT_FROM_SOD  = ['full_day', 'first_half'];
+    const ABSENT_UNTIL_EOD = ['full_day'];
+    const ABSENT_FROM_SOD  = ['full_day'];
 
     const dayBefore = new Date(start_date);
     dayBefore.setDate(dayBefore.getDate() - 1);
